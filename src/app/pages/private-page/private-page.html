@@ -1,0 +1,181 @@
+<div class="my-projects-container">
+  <div class="my-projects-header">
+    <h2>Mes projets</h2>
+    <p>Liste des projets dont l'utilisateur est membre.</p>
+  </div>
+
+  <div class="my-projects-body">
+    <div class="row g-3 h-100">
+      <!-- Liste des projets (gauche) -->
+      <div class="col-12 col-lg-5 d-flex">
+        <div class="card flex-fill d-flex flex-column">
+          <div class="card-body p-0 flex-fill overflow-auto">
+            <div class="table-responsive">
+              <table class="table table-sm table-hover table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Projet</th>
+                    <th>Mon rôle</th>
+                    <th>Statut</th>
+                    <th>État de santé</th>
+                    <th class="text-end"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let project of myProjects"
+                      (click)="selectProject(project)"
+                      [class.table-active]="project === selectedProject">
+                    <td>{{ project.name }}</td>
+                    <td>{{ project.role }}</td>
+                    <td>{{ project.status }}</td>
+                    <td>
+                      <span class="health-dot"
+                            [ngClass]="{
+                              'health-good': project.health === 'good',
+                              'health-warning': project.health === 'warning',
+                              'health-critical': project.health === 'critical'
+                            }"
+                            [title]="getHealthLabel(project.health)">
+                      </span>
+                    </td>
+                    <td class="text-end" (click)="$event.stopPropagation()">
+                      <div ngbDropdown [container]="'body'" class="d-inline-block">
+                        <button
+                          class="btn btn-sm btn-link text-dark p-0"
+                          ngbDropdownToggle
+                          aria-label="Menu contextuel">
+                          &#8226;&#8226;&#8226;
+                        </button>
+                        <ul ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
+                          <li>
+                            <button ngbDropdownItem (click)="onView(project)">
+                              <span class="me-2">👁️</span> Voir
+                            </button>
+                          </li>
+                          <li>
+                            <button ngbDropdownItem (click)="onEdit(project)">
+                              <span class="me-2">✏️</span> Éditer
+                            </button>
+                          </li>
+                          <li>
+                            <button ngbDropdownItem (click)="onPause(project)">
+                              <span class="me-2">⏸️</span> Mettre en pause
+                            </button>
+                          </li>
+                          <li>
+                            <button ngbDropdownItem (click)="onArchive(project)">
+                              <span class="me-2">🗄️</span> Archiver
+                            </button>
+                          </li>
+                        </ul>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zone de détail (droite) -->
+      <div class="col-12 col-lg-7 d-flex">
+<div class="card flex-fill d-flex flex-column" *ngIf="selectedProject">
+<div class="card-body flex-fill overflow-auto" *ngIf="selectedProject">
+
+  <!-- Nom du projet -->
+<h3 class="h5 mb-1">{{ selectedProject.name }}</h3>
+<p class="project-description mb-3">
+  {{ selectedProject.description }}
+</p>
+
+  <!-- Barre d'informations sous le nom du projet -->
+  <div class="project-info-bar mb-3">
+    <div class="info-item">
+      <span class="info-label">Chef de projet</span>
+      <span class="info-value">{{ selectedProject.projectManager }}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Sponsor</span>
+      <span class="info-value">{{ selectedProject.sponsor }}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Phase en cours</span>
+      <span class="info-value">{{ selectedProject.currentPhase }}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">Statut</span>
+      <span class="info-value">{{ selectedProject.status }}</span>
+    </div>
+    <div class="info-item">
+      <span class="info-label">État de santé</span>
+      <span class="info-value">
+        <span
+          class="health-dot align-middle me-1"
+          [ngClass]="{
+            'health-good': selectedProject.health === 'good',
+            'health-warning': selectedProject.health === 'warning',
+            'health-critical': selectedProject.health === 'critical'
+          }">
+        </span>
+        {{ getHealthLabel(selectedProject.health) }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Matrice des activités -->
+  <h4 class="h6 mt-3 mb-3">Matrice des activités</h4>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm activity-matrix text-center align-middle mb-3">
+      <thead>
+        <tr>
+          <th class="text-start">Activités</th>
+          <th *ngFor="let phase of phases">{{ phase }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let activity of activities">
+          <td class="text-start">{{ activity.label }}</td>
+          <td *ngFor="let phase of phases">
+            <span
+              class="status-pill"
+              [ngClass]="getStatusClass(selectedProject.activityMatrix[activity.id][phase])">
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Liste des membres du projet (sous la grille) -->
+  <h4 class="h6 mt-3 mb-3">Équipe projet</h4>
+
+  <div class="team-row">
+    <div class="team-label">Chef de projet</div>
+    <div class="team-value">{{ selectedProject.projectManager }}</div>
+  </div>
+
+  <div class="team-row">
+    <div class="team-label">Praticien du changement</div>
+    <div class="team-value">{{ selectedProject.changePractitioner }}</div>
+  </div>
+
+  <div class="team-row">
+    <div class="team-label">Visionnaire métier</div>
+    <div class="team-value">{{ selectedProject.businessVisionary }}</div>
+  </div>
+
+  <div class="team-row">
+    <div class="team-label">Expert technique</div>
+    <div class="team-value">{{ selectedProject.technicalExpert }}</div>
+  </div>
+
+</div>
+
+</div>
+
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,82 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.projects-page-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Header */
+.projects-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+
+  h2 {
+    margin-bottom: 0.1rem;
+  }
+}
+
+/* Filtres */
+.projects-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+
+  .filter-item {
+    min-width: 180px;
+  }
+
+  .form-label-sm {
+    font-size: 0.75rem;
+    margin-bottom: 0.15rem;
+    color: #6c757d;
+  }
+}
+
+/* Table */
+.project-name-cell a {
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.project-name-cell a:hover {
+  text-decoration: underline;
+}
+
+/* Pastilles d'état de santé */
+.health-dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+}
+
+.health-good {
+  background-color: #28a745;
+}
+
+.health-warning {
+  background-color: #ffc107;
+}
+
+.health-critical {
+  background-color: #dc3545;
+}
+
+/* Responsive */
+@media (max-width: 767.98px) {
+  .projects-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .projects-filters {
+    flex-direction: column;
+  }
+}

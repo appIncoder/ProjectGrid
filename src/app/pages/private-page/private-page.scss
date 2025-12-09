@@ -1,0 +1,207 @@
+/* ===========================
+   Layout global du composant
+   =========================== */
+
+:host {
+  display: block;
+  height: 100%; // le composant prend toute la hauteur de la zone centrale
+}
+
+.my-projects-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.my-projects-header {
+  flex: 0 0 auto;
+  margin-bottom: 0.75rem;
+
+  h2 {
+    margin-bottom: 0.25rem;
+  }
+
+  p {
+    margin-bottom: 0;
+  }
+}
+
+.my-projects-body {
+  flex: 1 1 auto;
+  min-height: 0; // permet le scroll interne
+  height: 100%;
+}
+
+/* Pour que les colonnes laissent leurs cartes gérer le scroll interne */
+.my-projects-body .col-12.col-lg-5,
+.my-projects-body .col-12.col-lg-7 {
+  min-height: 0;
+}
+
+/* ===========================
+   Table UX - liste des projets
+   =========================== */
+
+.table tbody tr {
+  cursor: pointer;
+}
+
+/* Pastilles d'état de santé */
+.health-dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+}
+
+.health-good {
+  background-color: #28a745;
+}
+
+.health-warning {
+  background-color: #ffc107;
+}
+
+.health-critical {
+  background-color: #dc3545;
+}
+
+/* ===========================
+   Équipe projet (grille en bas)
+   =========================== */
+
+.team-row {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 0.15rem; // léger espace entre les lignes
+  min-height: 0;
+}
+
+.team-label {
+  font-weight: 600;
+  color: #6c757d;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.team-value {
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+/* Layout responsive pour bien utiliser la largeur */
+@media (min-width: 768px) {
+  .team-label {
+    flex: 0 0 40%;      // ~4/10 de la largeur
+    max-width: 40%;
+  }
+
+  .team-value {
+    flex: 1 1 auto;     // prend tout le reste
+  }
+}
+
+@media (max-width: 767.98px) {
+  .team-row {
+    flex-direction: column;
+  }
+
+  .team-label {
+    margin-bottom: 0.05rem;
+  }
+}
+
+/* ===========================
+   Matrice des activités
+   =========================== */
+
+.activity-matrix th,
+.activity-matrix td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.activity-matrix th:first-child,
+.activity-matrix td:first-child {
+  width: 35%;
+}
+
+/* Cartouches de statut */
+.status-pill {
+  display: inline-block;
+  width: 1.6rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 1px solid #000;
+  background-color: #fff;
+}
+
+/* Vert = Fait */
+.status-done {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+/* Blanc + bord noir = À faire */
+.status-todo {
+  background-color: #ffffff;
+  border-color: #000000;
+}
+
+/* Orange = En cours */
+.status-inprogress {
+  background-color: #fd7e14;
+  border-color: #fd7e14;
+}
+
+/* Rouge = Non fait */
+.status-notdone {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+/* ===========================
+   Barre d'informations projet
+   =========================== */
+
+.project-info-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background-color: #f8f9fa; // léger fond gris
+  margin-bottom: 1rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6c757d;
+  margin-bottom: 0.1rem;
+}
+
+.info-value {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Sur petits écrans, une seule colonne pour la barre info */
+@media (max-width: 767.98px) {
+  .project-info-bar {
+    grid-template-columns: 1fr;
+  }
+}
+.project-description {
+  font-size: 0.9rem;
+  color: #6c757d; 
+  margin-top: -0.25rem;
+}

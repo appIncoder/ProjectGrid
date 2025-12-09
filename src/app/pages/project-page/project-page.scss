@@ -1,0 +1,300 @@
+/* ===========================
+   Layout global
+   =========================== */
+
+:host {
+  display: block;
+  height: 100%;
+}
+
+.project-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100%;
+}
+
+/* ===========================
+   Header projet
+   =========================== */
+
+.project-header {
+  .project-description {
+    font-size: 0.9rem;
+    color: #6c757d;
+  }
+}
+
+/* ===========================
+   Onglets
+   =========================== */
+
+.project-tabs .nav-link {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+/* ===========================
+   Matrice Scorecard
+   =========================== */
+
+.activity-matrix-detail th,
+.activity-matrix-detail td {
+  vertical-align: top;
+}
+
+.activity-header-col {
+  width: 22%;
+}
+
+.activity-cell {
+  min-width: 180px;
+}
+
+.activity-name {
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.activity-owner {
+  font-size: 0.8rem;
+}
+
+/* Cellules de tâches */
+.cell-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-height: 2.2rem; // évite des lignes trop serrées
+}
+
+.task-pill {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid #000;
+  background-color: #fff;
+  text-align: left;
+}
+
+/* Couleurs des tâches selon le statut */
+.status-done {
+  background-color: #28a745;
+  border-color: #28a745;
+  color: #fff;
+}
+
+.status-todo {
+  background-color: #ffffff;
+  border-color: #000000;
+  color: #000;
+}
+
+.status-inprogress {
+  background-color: #fd7e14;
+  border-color: #fd7e14;
+  color: #fff;
+}
+
+.status-notdone {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+/* Pas de tâche */
+.no-task {
+  font-size: 0.7rem;
+}
+
+/* ===========================
+   Matrice des risques
+   =========================== */
+
+.risk-matrix th,
+.risk-matrix td {
+  vertical-align: middle;
+}
+
+.risk-header-col {
+  width: 24%;
+}
+
+.risk-cell {
+  min-height: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  justify-content: center;
+}
+
+.risk-pill {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  border: 1px solid transparent;
+  color: #fff;
+}
+
+/* Niveaux de risque */
+.risk-low {
+  background-color: #198754;
+  border-color: #198754;
+}
+
+.risk-medium {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #000;
+}
+
+.risk-high {
+  background-color: #fd7e14;
+  border-color: #fd7e14;
+}
+
+.risk-critical {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+/* Top 5 risques */
+.top-risks-table {
+  font-size: 0.85rem;
+}
+
+.risk-level-badge {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  color: #fff;
+}
+
+/* ===========================
+   Budget
+   =========================== */
+
+.budget-summary-item {
+  background-color: #f8f9fa;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.budget-summary-item .label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #6c757d;
+  margin-bottom: 0.1rem;
+}
+
+.budget-summary-item .value {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.budget-table {
+  font-size: 0.85rem;
+}
+
+/* ===========================
+   Roadmap / Gantt
+   =========================== */
+
+.gantt-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.gantt-svg {
+  width: 100%;
+  height: auto;
+}
+
+/* Grille */
+.gantt-grid-line {
+  stroke: #e9ecef;
+  stroke-width: 1;
+}
+
+.gantt-header-text {
+  font-size: 0.75rem;
+  text-anchor: middle;
+  fill: #495057;
+}
+
+/* Ligne des mois */
+.gantt-month-text {
+  font-size: 0.75rem;
+  text-anchor: middle;
+  fill: #343a40;
+  font-weight: 600;
+}
+
+/* Jalons (markers) */
+.gantt-milestone-dot {
+  fill: #dc3545;
+}
+
+.gantt-milestone-text {
+  font-size: 0.7rem;
+  text-anchor: middle;
+  fill: #dc3545;
+}
+
+/* Lignes d'activités */
+.gantt-row-label {
+  font-size: 0.75rem;
+  fill: #495057;
+}
+
+.gantt-row-line {
+  stroke: #f1f3f5;
+  stroke-width: 1;
+}
+
+/* Barres de tâches */
+.gantt-bar {
+  fill: #0d6efd;
+  opacity: 0.85;
+  rx: 4;
+  ry: 4;
+}
+
+.gantt-bar-label {
+  font-size: 0.7rem;
+  fill: #ffffff;
+  pointer-events: none;
+}
+
+/* Lignes de dépendance */
+.gantt-link {
+  fill: none;
+  stroke: #6c757d;
+  stroke-width: 1;
+}
+
+/* ===========================
+   Responsive
+   =========================== */
+
+@media (max-width: 767.98px) {
+  .activity-header-col {
+    width: 40%;
+  }
+
+  .activity-matrix-detail {
+    font-size: 0.8rem;
+  }
+
+  .task-pill {
+    font-size: 0.7rem;
+  }
+
+  .top-risks-table,
+  .budget-table {
+    font-size: 0.8rem;
+  }
+}

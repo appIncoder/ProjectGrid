@@ -1,0 +1,31 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Connexion</h5>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="mb-3">
+        <label for="username" class="form-label">Nom d'utilisateur</label>
+        <input id="username"
+               class="form-control"
+               type="text"
+               [(ngModel)]="model.username"
+               name="username"
+               required>
+      </div>
+
+      <div class="mb-3">
+        <label for="password" class="form-label">Mot de passe</label>
+        <input id="password"
+               class="form-control"
+               type="password"
+               [(ngModel)]="model.password"
+               name="password"
+               required>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">
+        Se connecter
+      </button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,414 @@
+<div class="project-page-container" *ngIf="project as p">
+
+  <!-- Header du projet -->
+  <div class="project-header card mb-3">
+    <div class="card-body">
+      <h2 class="h5 mb-1">{{ p.name }}</h2>
+      <p class="project-description mb-2">
+        {{ p.description }}
+      </p>
+      <p class="text-muted small mb-0">
+        Vue détaillée du projet : scorecard, risques, budget et roadmap.
+      </p>
+    </div>
+  </div>
+
+  <!-- Onglets -->
+  <ul class="nav nav-tabs project-tabs mb-3">
+    <li class="nav-item">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'scorecard'"
+        type="button"
+        (click)="setTab('scorecard')">
+        Scorecard
+      </button>
+    </li>
+    <li class="nav-item">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'risks'"
+        type="button"
+        (click)="setTab('risks')">
+        Gestion des risques
+      </button>
+    </li>
+    <li class="nav-item">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'budget'"
+        type="button"
+        (click)="setTab('budget')">
+        Gestion du budget
+      </button>
+    </li>
+    <li class="nav-item">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'roadmap'"
+        type="button"
+        (click)="setTab('roadmap')">
+        Roadmap
+      </button>
+    </li>
+  </ul>
+
+  <!-- Onglet 1 : Scorecard -->
+  <div *ngIf="activeTab === 'scorecard'" class="card flex-fill">
+    <div class="card-body">
+      <h3 class="h6 mb-3">Scorecard – Matrice détaillée des activités</h3>
+
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm activity-matrix-detail text-center align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="text-start activity-header-col">Activités</th>
+              <th *ngFor="let phase of getPhases()">
+                {{ getPhaseLabel(phase) }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let activity of getActivities()">
+              <!-- 1ère colonne : thématique + responsable -->
+              <td class="text-start activity-cell">
+                <div class="activity-name">{{ activity.label }}</div>
+                <div class="activity-owner text-muted">
+                  Responsable : <strong>{{ activity.owner }}</strong>
+                </div>
+              </td>
+
+              <!-- Cellules : tâches (1 à 4) sous forme de cartouches -->
+              <td *ngFor="let phase of getPhases()">
+                <div class="cell-tasks">
+                  <div
+                    *ngFor="let task of getTasks(activity.id, phase)"
+                    class="task-pill"
+                    [ngClass]="getStatusClass(task.status)"
+                    (click)="openTaskStatusModal(taskStatusModal, task)">
+                    {{ task.label }}
+                  </div>
+                  <div *ngIf="getTasks(activity.id, phase).length === 0" class="no-task text-muted small">
+                    -
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal d'édition de statut de tâche -->
+  <ng-template #taskStatusModal let-modal>
+    <div class="modal-header py-2">
+      <h5 class="modal-title fs-6">Modifier le statut</h5>
+      <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-2">
+        <div class="small text-muted mb-1">Tâche</div>
+        <div class="fw-semibold">
+          {{ taskBeingEdited?.label }}
+        </div>
+      </div>
+      <div class="mb-0">
+        <label class="form-label form-label-sm">Statut</label>
+        <select class="form-select form-select-sm" [(ngModel)]="editedTaskStatus">
+          <option *ngFor="let opt of taskStatusOptions" [ngValue]="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer py-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="modal.dismiss()">
+        Annuler
+      </button>
+      <button type="button" class="btn btn-sm btn-primary" (click)="saveTaskStatus(modal)">
+        Enregistrer
+      </button>
+    </div>
+  </ng-template>
+
+  <!-- Onglet 2 : Gestion des risques -->
+  <div *ngIf="activeTab === 'risks'" class="card flex-fill">
+    <div class="card-body">
+
+      <!-- Matrice des risques dans une card -->
+      <div class="card mb-3">
+        <div class="card-body">
+          <h3 class="h6 mb-3">Matrice des risques</h3>
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm risk-matrix text-center align-middle mb-0">
+              <thead>
+                <tr>
+                  <th class="text-start risk-header-col">Impact \ Probabilité</th>
+                  <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let impact of riskImpactLevels">
+                  <td class="text-start"><strong>{{ impact }}</strong></td>
+                  <td *ngFor="let prob of riskProbabilityLevels">
+                    <div
+                      class="risk-cell"
+                      (dragover)="onRiskDragOver($event)"
+                      (drop)="onRiskDrop($event, impact, prob)">
+                      <div
+                        *ngFor="let item of getRiskCellItems(impact, prob)"
+                        class="risk-pill"
+                        [ngClass]="getRiskLevelClass(item.level)"
+                        draggable="true"
+                        (dragstart)="onRiskDragStart($event, item, impact, prob)">
+                        {{ item.id }}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Top 5 risques -->
+      <h4 class="h6 mb-2">Top 5 des risques</h4>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 top-risks-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Risque</th>
+              <th>Impact</th>
+              <th>Probabilité</th>
+              <th>Niveau</th>
+              <th>Responsable</th>
+              <th>Échéance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let risk of topRisks">
+              <td>{{ risk.id }}</td>
+              <td>{{ risk.title }}</td>
+              <td>{{ risk.impact }}</td>
+              <td>{{ risk.probability }}</td>
+              <td>
+                <span class="risk-level-badge" [ngClass]="getRiskLevelClass(risk.level)">
+                  {{ risk.level | titlecase }}
+                </span>
+              </td>
+              <td>{{ risk.owner }}</td>
+              <td>{{ risk.dueDate }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Onglet 3 : Gestion du budget -->
+  <div *ngIf="activeTab === 'budget'" class="card flex-fill">
+    <div class="card-body">
+      <h3 class="h6 mb-3">Synthèse budgétaire</h3>
+
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="budget-summary-item">
+            <div class="label">Budget initial</div>
+            <div class="value">
+              {{ budgetSummary.initial | number:'1.0-0' }} {{ budgetSummary.currency }}
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="budget-summary-item">
+            <div class="label">Engagé</div>
+            <div class="value">
+              {{ budgetSummary.engaged | number:'1.0-0' }} {{ budgetSummary.currency }}
+              <span class="small text-muted">
+                ({{ getPercent(budgetSummary.engaged, budgetSummary.initial) }} %)
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="budget-summary-item">
+            <div class="label">Dépensé</div>
+            <div class="value">
+              {{ budgetSummary.spent | number:'1.0-0' }} {{ budgetSummary.currency }}
+              <span class="small text-muted">
+                ({{ getPercent(budgetSummary.spent, budgetSummary.initial) }} %)
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="budget-summary-item">
+            <div class="label">Prévision à terminaison</div>
+            <div class="value">
+              {{ budgetSummary.forecast | number:'1.0-0' }} {{ budgetSummary.currency }}
+              <span class="small text-muted">
+                ({{ getPercent(budgetSummary.forecast, budgetSummary.initial) }} %)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h4 class="h6 mb-2">Détail par poste</h4>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 budget-table">
+          <thead>
+            <tr>
+              <th>Poste</th>
+              <th>Budget initial</th>
+              <th>Dépensé</th>
+              <th>Prévision</th>
+              <th>% Dépensé</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let line of budgetLines">
+              <td>{{ line.category }}</td>
+              <td>{{ line.initial | number:'1.0-0' }} {{ budgetSummary.currency }}</td>
+              <td>{{ line.spent | number:'1.0-0' }} {{ budgetSummary.currency }}</td>
+              <td>{{ line.forecast | number:'1.0-0' }} {{ budgetSummary.currency }}</td>
+              <td>
+                {{ getPercent(line.spent, line.initial) }} %
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Onglet 4 : Roadmap / Gantt -->
+  <div *ngIf="activeTab === 'roadmap'" class="card flex-fill">
+    <div class="card-body">
+      <h3 class="h6 mb-3">Roadmap – Diagramme de Gantt (6 prochains mois)</h3>
+
+      <div class="gantt-container">
+        <svg
+          class="gantt-svg"
+          [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight"
+          [attr.height]="svgHeight"
+          preserveAspectRatio="xMinYMin meet"
+          (mousemove)="onGanttMouseMove($event)"
+          (mouseup)="onGanttMouseUp($event)"
+          (mouseleave)="onGanttMouseUp($event)">
+
+          <!-- Ligne des mois -->
+          <g *ngFor="let month of ganttMonths; index as i">
+            <text
+              class="gantt-month-text"
+              [attr.x]="ganttLeftOffset + i * ganttColWidth + ganttColWidth / 2"
+              [attr.y]="ganttTopOffset - 35">
+              {{ month }}
+            </text>
+          </g>
+
+          <!-- Jalons (markers) -->
+          <g *ngFor="let ms of ganttMilestones">
+            <circle
+              class="gantt-milestone-dot"
+              [attr.cx]="ganttLeftOffset + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
+              [attr.cy]="ganttTopOffset - 23"
+              r="4">
+            </circle>
+            <text
+              class="gantt-milestone-text"
+              [attr.x]="ganttLeftOffset + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
+              [attr.y]="ganttTopOffset - 40">
+              {{ ms.label }}
+            </text>
+          </g>
+
+          <!-- Bandes de phases (peuvent chevaucher plusieurs mois) -->
+          <g *ngFor="let band of ganttPhaseBands">
+            <rect
+              class="gantt-phase-band"
+              [attr.x]="ganttLeftOffset + band.startMonthIndex * ganttColWidth"
+              [attr.y]="ganttTopOffset - 15"
+              [attr.width]="(band.endMonthIndex - band.startMonthIndex + 1) * ganttColWidth"
+              [attr.height]="10">
+            </rect>
+            <text
+              class="gantt-phase-text"
+              [attr.x]="ganttLeftOffset + (band.startMonthIndex + band.endMonthIndex + 1) * ganttColWidth / 2"
+              [attr.y]="ganttTopOffset - 6">
+              {{ band.label }}
+            </text>
+          </g>
+
+          <!-- Colonnes (grille temps) -->
+          <g *ngFor="let month of ganttMonths; index as colIndex">
+            <line
+              class="gantt-grid-line"
+              [attr.x1]="ganttLeftOffset + colIndex * ganttColWidth"
+              [attr.y1]="ganttTopOffset"
+              [attr.x2]="ganttLeftOffset + colIndex * ganttColWidth"
+              [attr.y2]="svgHeight - 20">
+            </line>
+          </g>
+
+          <!-- Lignes & labels d'activités -->
+          <g *ngFor="let row of ganttActivityRows">
+            <text
+              class="gantt-row-label"
+              [attr.x]="10"
+              [attr.y]="ganttTopOffset + row.rowIndex * ganttRowHeight + ganttRowHeight / 2">
+              {{ row.label }}
+            </text>
+            <line
+              class="gantt-row-line"
+              [attr.x1]="ganttLeftOffset"
+              [attr.y1]="ganttTopOffset + (row.rowIndex + 1) * ganttRowHeight"
+              [attr.x2]="svgWidth - 20"
+              [attr.y2]="ganttTopOffset + (row.rowIndex + 1) * ganttRowHeight">
+            </line>
+          </g>
+
+          <!-- Barres de tâches (draggables) -->
+          <g *ngFor="let task of ganttTasksView">
+            <rect
+              class="gantt-bar"
+              [attr.x]="task.x"
+              [attr.y]="task.y"
+              [attr.width]="task.width"
+              [attr.height]="task.height"
+              (mousedown)="onGanttBarMouseDown($event, task)">
+            </rect>
+            <text
+              class="gantt-bar-label"
+              [attr.x]="task.x + 4"
+              [attr.y]="task.y + task.height / 2 + 4">
+              {{ task.label }}
+            </text>
+          </g>
+
+          <!-- Lignes de dépendances -->
+          <g *ngFor="let link of ganttLinksView">
+            <path
+              class="gantt-link"
+              [attr.d]="link.path">
+            </path>
+          </g>
+        </svg>
+      </div>
+
+      <p class="text-muted small mt-2">
+        Les mois sont affichés en haut, les phases apparaissent sous forme de bandes pouvant chevaucher plusieurs mois.
+        Les barres de tâches sont déplaçables horizontalement, et les dépendances se mettent à jour automatiquement.
+      </p>
+    </div>
+  </div>
+
+</div>

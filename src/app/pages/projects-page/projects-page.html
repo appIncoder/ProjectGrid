@@ -1,0 +1,133 @@
+<div class="projects-page-container">
+
+  <!-- Header / Toolbar -->
+  <div class="projects-header">
+    <div>
+      <h2 class="mb-1">Mes projets</h2>
+      <p class="mb-0 text-muted">
+        Consultez, filtrez et gérez les projets dont vous êtes membre.
+      </p>
+    </div>
+    <div>
+      <button class="btn btn-primary btn-sm" (click)="onCreateProject()">
+        + Nouveau projet
+      </button>
+    </div>
+  </div>
+
+  <!-- Filtres et recherche -->
+  <div class="projects-filters mb-3">
+    <div class="filter-item">
+      <label class="form-label form-label-sm">Recherche</label>
+      <input
+        type="text"
+        class="form-control form-control-sm"
+        [(ngModel)]="searchTerm"
+        placeholder="Nom du projet ou propriétaire…" />
+    </div>
+
+    <div class="filter-item">
+      <label class="form-label form-label-sm">Statut</label>
+      <select
+        class="form-select form-select-sm"
+        [(ngModel)]="statusFilter">
+        <option *ngFor="let s of statuses" [ngValue]="s">{{ s }}</option>
+      </select>
+    </div>
+
+    <div class="filter-item">
+      <label class="form-label form-label-sm">État de santé</label>
+      <select
+        class="form-select form-select-sm"
+        [(ngModel)]="healthFilter">
+        <option [ngValue]="'Tous'">Tous</option>
+        <option [ngValue]="'good'">Tout est OK</option>
+        <option [ngValue]="'warning'">Attention</option>
+        <option [ngValue]="'critical'">Alerte</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Liste des projets -->
+  <div class="card flex-fill">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-striped table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Projet</th>
+              <th>Propriétaire</th>
+              <th>Mon rôle</th>
+              <th>Phase</th>
+              <th>Statut</th>
+              <th>État de santé</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let project of filteredProjects">
+              <td class="project-name-cell">
+                <a href="javascript:void(0)" (click)="onOpen(project)">
+                  {{ project.name }}
+                </a>
+              </td>
+              <td>{{ project.owner }}</td>
+              <td>{{ project.role }}</td>
+              <td>{{ project.currentPhase }}</td>
+              <td>{{ project.status }}</td>
+              <td>
+                <span
+                  class="health-dot me-1"
+                  [ngClass]="{
+                    'health-good': project.health === 'good',
+                    'health-warning': project.health === 'warning',
+                    'health-critical': project.health === 'critical'
+                  }">
+                </span>
+                {{ getHealthLabel(project.health) }}
+              </td>
+              <td class="text-end" (click)="$event.stopPropagation()">
+                <div ngbDropdown [container]="'body'" class="d-inline-block">
+                  <button
+                    class="btn btn-sm btn-link text-dark p-0"
+                    ngbDropdownToggle
+                    aria-label="Menu projet">
+                    &#8226;&#8226;&#8226;
+                  </button>
+                  <ul ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
+                    <li>
+                      <button ngbDropdownItem (click)="onOpen(project)">
+                        <span class="me-2">👁️</span> Ouvrir
+                      </button>
+                    </li>
+                    <li>
+                      <button ngbDropdownItem (click)="onEdit(project)">
+                        <span class="me-2">✏️</span> Éditer
+                      </button>
+                    </li>
+                    <li>
+                      <button ngbDropdownItem (click)="onPause(project)">
+                        <span class="me-2">⏸️</span> Mettre en pause
+                      </button>
+                    </li>
+                    <li>
+                      <button ngbDropdownItem (click)="onArchive(project)">
+                        <span class="me-2">🗄️</span> Archiver
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </td>
+            </tr>
+
+            <tr *ngIf="filteredProjects.length === 0">
+              <td colspan="7" class="text-center py-3 text-muted">
+                Aucun projet ne correspond à vos critères.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,5 @@
+<!-- Si non connecté : page "public" avec login box -->
+<app-public-page *ngIf="!auth.isAuthenticated"></app-public-page>
+
+<!-- Si connecté : page "private" avec infos projets -->
+<app-private-page *ngIf="auth.isAuthenticated"></app-private-page>
