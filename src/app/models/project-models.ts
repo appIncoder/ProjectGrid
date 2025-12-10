@@ -69,7 +69,9 @@ export interface GanttActivityRow {
   activityId: ActivityId;
   label: string;
   rowIndex: number;
+  isHeader: boolean;   // ⬅️ nouveau : true = ligne titre, false = ligne détail
 }
+
 
 export interface GanttTaskView {
   id: string;
@@ -77,12 +79,26 @@ export interface GanttTaskView {
   activityId: ActivityId;
   phase: PhaseId;
   rowIndex: number;
+
+  // Mois "principal" (utile pour phases / dépendances)
   monthIndex: number;
+
+  // Coordonnées/tailles dans le SVG
   x: number;
   y: number;
   width: number;
   height: number;
+
+  // Pour les calculs de dates et la durée
+  startMonthIndex?: number;
+  endMonthIndex?: number;
+
+  // Indices de jours relatifs au début de la période Gantt (ganttStartDate)
+  // 0 = premier jour du Gantt, 1 = +1 jour, etc.
+  startDayIndex?: number;
+  endDayIndex?: number;
 }
+
 
 export interface GanttLinkView {
   fromId: string;

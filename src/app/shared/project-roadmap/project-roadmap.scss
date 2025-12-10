@@ -1,4 +1,121 @@
-/* Bullets de début/fin de tâche */
+:host {
+  display: block;
+}
+
+/* ===========================
+   Roadmap / Gantt – container
+   =========================== */
+
+.gantt-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.gantt-svg {
+  width: 100%;
+  height: auto;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ===========================
+   Grille & header
+   =========================== */
+
+.gantt-grid-line {
+  stroke: #e9ecef;
+  stroke-width: 1;
+}
+
+.gantt-month-text {
+  font-size: 0.75rem;
+  text-anchor: middle;
+  fill: #343a40;
+  font-weight: 600;
+}
+
+/* ===========================
+   Jalons (markers)
+   =========================== */
+
+.gantt-milestone-dot {
+  fill: #dc3545;
+}
+
+.gantt-milestone-text {
+  font-size: 0.7rem;
+  text-anchor: middle;
+  fill: #dc3545;
+}
+
+/* ===========================
+   Phases (bandes)
+   =========================== */
+
+.gantt-phase-band {
+  fill: rgba(13, 110, 253, 0.1);
+}
+
+.gantt-phase-text {
+  font-size: 0.7rem;
+  text-anchor: middle;
+  fill: #0d6efd;
+}
+
+/* ===========================
+   Lignes d'activités
+   =========================== */
+
+.gantt-row-label {
+  font-size: 0.75rem;
+  fill: #495057;
+  cursor: pointer;
+}
+
+.gantt-row-line {
+  stroke: #f5f6f7;
+  stroke-width: 0.5; /* ligne plus fine pour ne pas masquer les phases */
+}
+
+/* ===========================
+   Barres de tâches
+   =========================== */
+
+.gantt-bar {
+  fill: #0d6efd;
+  opacity: 0.85;
+  rx: 4;
+  ry: 4;
+  cursor: grab;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.gantt-bar:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.gantt-bar-label {
+  font-size: 0.7rem;
+  fill: #ffffff;
+  pointer-events: none;
+}
+
+/* ===========================
+   Lignes de dépendance
+   =========================== */
+
+.gantt-link {
+  fill: none;
+  stroke: #6c757d;
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+/* ===========================
+   Bullets début/fin
+   =========================== */
+
 .gantt-bar-bullet {
   fill: #ffffff;
   stroke: #0d6efd;
@@ -6,14 +123,49 @@
   cursor: pointer;
 }
 
-.gantt-bar-bullet-start {
-  /* éventuellement un style spécifique pour le bullet de début */
-}
-
-.gantt-bar-bullet-end {
-  /* éventuellement un style spécifique pour le bullet de fin */
-}
-
 .gantt-bar-bullet:hover {
   stroke-width: 2;
+}
+
+/* ===========================
+   Hint (tooltip)
+   =========================== */
+
+.gantt-hint-bg {
+  fill: rgba(0, 0, 0, 0.8);
+}
+
+.gantt-hint-text {
+  fill: #ffffff;
+  font-size: 0.65rem;
+  pointer-events: none;
+}
+
+/* ===========================
+   Responsif
+   =========================== */
+
+@media (max-width: 767.98px) {
+  .gantt-month-text {
+    font-size: 0.7rem;
+  }
+
+  .gantt-row-label {
+    font-size: 0.7rem;
+  }
+
+  .gantt-bar-label {
+    font-size: 0.65rem;
+  }
+.gantt-row-label-header {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gantt-row-label-detail {
+  fill: #adb5bd;
+  cursor: default;
+}
+
+
 }

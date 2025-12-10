@@ -12,7 +12,7 @@
         (mouseup)="onGanttMouseUp($event)"
         (mouseleave)="onGanttMouseUp($event)">
 
-        <!-- Ligne des mois (MIDDLE) -->
+        <!-- Mois (MIDDLE) -->
         <g *ngFor="let month of ganttMonths; index as i">
           <text
             class="gantt-month-text"
@@ -22,7 +22,7 @@
           </text>
         </g>
 
-        <!-- Jalons (markers) – TOP -->
+        <!-- Jalons (TOP) -->
         <g *ngFor="let ms of ganttMilestones">
           <circle
             class="gantt-milestone-dot"
@@ -38,14 +38,14 @@
           </text>
         </g>
 
-        <!-- Bandes de phases (BOTTOM, juste au-dessus de la grille) -->
+        <!-- Phases (BOTTOM) -->
         <g *ngFor="let band of ganttPhaseBands">
           <rect
             class="gantt-phase-band"
             [attr.x]="ganttLeftOffset + band.startMonthIndex * ganttColWidth"
-            [attr.y]="ganttTopOffset"
+            [attr.y]="ganttTopOffset - 18"
             [attr.width]="(band.endMonthIndex - band.startMonthIndex + 1) * ganttColWidth"
-            [attr.height]="2">
+            [attr.height]="10">
           </rect>
           <text
             class="gantt-phase-text"
@@ -55,7 +55,7 @@
           </text>
         </g>
 
-        <!-- Colonnes (grille temps) -->
+        <!-- Grille verticale -->
         <g *ngFor="let month of ganttMonths; index as colIndex">
           <line
             class="gantt-grid-line"
@@ -66,24 +66,37 @@
           </line>
         </g>
 
-        <!-- Lignes & labels d'activités -->
-        <g *ngFor="let row of ganttActivityRows">
-          <text
-            class="gantt-row-label"
-            [attr.x]="10"
-            [attr.y]="ganttTopOffset + row.rowIndex * ganttRowHeight + ganttRowHeight / 2">
-            {{ row.label }}
-          </text>
-          <line
-            class="gantt-row-line"
-            [attr.x1]="ganttLeftOffset"
-            [attr.y1]="ganttTopOffset + (row.rowIndex + 1) * ganttRowHeight"
-            [attr.x2]="svgWidth - 50"
-            [attr.y2]="ganttTopOffset + (row.rowIndex + 1) * ganttRowHeight">
-          </line>
-        </g>
+<!-- Lignes & labels d'activités -->
+<g *ngFor="let row of ganttActivityRows">
+  <text
+    class="gantt-row-label"
+    [ngClass]="{
+      'gantt-row-label-header': row.isHeader,
+      'gantt-row-label-detail': !row.isHeader
+    }"
+    [attr.x]="10"
+    [attr.y]="ganttTopOffset + row.rowIndex * ganttRowHeight + ganttRowHeight / 2"
+    (click)="onRowLabelClick(row)">
+    {{ getRowDisplayLabel(row) }}
+  </text>
+  <line
+    class="gantt-row-line"
+    [attr.x1]="ganttLeftOffset"
+    [attr.y1]="ganttTopOffset + (row.rowIndex + 1) * ganttRowHeight"
+    [attr.x2]="svgWidth - 20"
+    [attr.y2]="ganttTopOffset + (row.rowIndex + 1) * ganttRowHeight">
+  </line>
+</g>
 
-        <!-- Barres de tâches (draggables) -->
+
+<!-- Lignes de dépendances (dessinées AVANT les barres pour passer sous elles) -->
+<g *ngFor="let link of ganttLinksView">
+  <path
+    class="gantt-link"
+    [attr.d]="link.path">
+  </path>
+</g>
+
 <!-- Barres de tâches (draggables) -->
 <g *ngFor="let task of ganttTasksView">
   <!-- Barre principale -->
@@ -102,8 +115,9 @@
     [attr.cx]="task.x"
     [attr.cy]="task.y + task.height / 2"
     r="4"
-    (mousedown)="onGanttBarMouseDown($event, task)">
-    <title>{{ getTaskStartLabel(task) }}</title>
+    (mousedown)="onGanttBarMouseDown($event, task)"
+    (mouseenter)="showHintForTask(task, 'start')"
+    (mouseleave)="hideHint()">
   </circle>
 
   <!-- Bullet droite = date de fin -->
@@ -112,8 +126,9 @@
     [attr.cx]="task.x + task.width"
     [attr.cy]="task.y + task.height / 2"
     r="4"
-    (mousedown)="onGanttBarMouseDown($event, task)">
-    <title>{{ getTaskEndLabel(task) }}</title>
+    (mousedown)="onGanttBarMouseDown($event, task)"
+    (mouseenter)="showHintForTask(task, 'end')"
+    (mouseleave)="hideHint()">
   </circle>
 
   <!-- Label de la tâche -->
@@ -125,6 +140,24 @@
   </text>
 </g>
 
+<!-- Hint de date -->
+<g *ngIf="hoverHint as h">
+  <rect
+    class="gantt-hint-bg"
+    [attr.x]="h.x + 6"
+    [attr.y]="h.y - 18"
+    rx="3"
+    ry="3"
+    width="90"
+    height="20">
+  </rect>
+  <text
+    class="gantt-hint-text"
+    [attr.x]="h.x + 10"
+    [attr.y]="h.y - 5">
+    {{ h.text }}
+  </text>
+</g>
 
         <!-- Lignes de dépendances -->
         <g *ngFor="let link of ganttLinksView">
@@ -133,12 +166,32 @@
             [attr.d]="link.path">
           </path>
         </g>
+
+        <!-- Hint de date -->
+        <g *ngIf="hoverHint as h">
+          <rect
+            class="gantt-hint-bg"
+            [attr.x]="h.x + 6"
+            [attr.y]="h.y - 18"
+            rx="3"
+            ry="3"
+            width="90"
+            height="20">
+          </rect>
+          <text
+            class="gantt-hint-text"
+            [attr.x]="h.x + 10"
+            [attr.y]="h.y - 5">
+            {{ h.text }}
+          </text>
+        </g>
       </svg>
     </div>
 
     <p class="text-muted small mt-2">
       Les mois sont affichés en haut, les phases apparaissent sous forme de bandes pouvant chevaucher plusieurs mois.
       Les barres de tâches sont déplaçables horizontalement, et les dépendances se mettent à jour automatiquement.
+      Vous pouvez cliquer sur les libellés d’activités pour afficher une vue détaillée ou une synthèse.
     </p>
   </div>
 </div>
