@@ -1,0 +1,77 @@
+<div class="card flex-fill">
+  <div class="card-body">
+
+    <!-- Matrice des risques dans une card -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h3 class="h6 mb-3">Matrice des risques</h3>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm risk-matrix text-center align-middle mb-0">
+            <thead>
+              <tr>
+                <th class="text-start risk-header-col">Impact \ Probabilité</th>
+                <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let impact of riskImpactLevels">
+                <td class="text-start"><strong>{{ impact }}</strong></td>
+                <td *ngFor="let prob of riskProbabilityLevels">
+                  <div
+                    class="risk-cell"
+                    (dragover)="onRiskDragOver($event)"
+                    (drop)="onRiskDrop($event, impact, prob)">
+                    <div
+                      *ngFor="let item of getRiskCellItems(impact, prob)"
+                      class="risk-pill"
+                      [ngClass]="getRiskLevelClass(item.level)"
+                      draggable="true"
+                      (dragstart)="onRiskDragStart($event, item, impact, prob)">
+                      {{ item.id }}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Top 5 risques -->
+    <h4 class="h6 mb-2">Top 5 des risques</h4>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0 top-risks-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Risque</th>
+            <th>Impact</th>
+            <th>Probabilité</th>
+            <th>Niveau</th>
+            <th>Responsable</th>
+            <th>Échéance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let risk of topRisks">
+            <td>{{ risk.id }}</td>
+            <td>{{ risk.title }}</td>
+            <td>{{ risk.impact }}</td>
+            <td>{{ risk.probability }}</td>
+            <td>
+              <span class="risk-level-badge" [ngClass]="getRiskLevelClass(risk.level)">
+                {{ risk.level | titlecase }}
+              </span>
+            </td>
+            <td>{{ risk.owner }}</td>
+            <td>{{ risk.dueDate }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>

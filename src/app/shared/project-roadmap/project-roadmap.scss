@@ -1,0 +1,19 @@
+/* Bullets de début/fin de tâche */
+.gantt-bar-bullet {
+  fill: #ffffff;
+  stroke: #0d6efd;
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+
+.gantt-bar-bullet-start {
+  /* éventuellement un style spécifique pour le bullet de début */
+}
+
+.gantt-bar-bullet-end {
+  /* éventuellement un style spécifique pour le bullet de fin */
+}
+
+.gantt-bar-bullet:hover {
+  stroke-width: 2;
+}

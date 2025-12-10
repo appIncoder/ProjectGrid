@@ -1,0 +1,76 @@
+<div class="card flex-fill">
+  <div class="card-body">
+    <h3 class="h6 mb-3">Synthèse budgétaire</h3>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="budget-summary-item">
+          <div class="label">Budget initial</div>
+          <div class="value">
+            {{ budgetSummary.initial | number:'1.0-0' }} {{ budgetSummary.currency }}
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="budget-summary-item">
+          <div class="label">Engagé</div>
+          <div class="value">
+            {{ budgetSummary.engaged | number:'1.0-0' }} {{ budgetSummary.currency }}
+            <span class="small text-muted">
+              ({{ getPercent(budgetSummary.engaged, budgetSummary.initial) }} %)
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="budget-summary-item">
+          <div class="label">Dépensé</div>
+          <div class="value">
+            {{ budgetSummary.spent | number:'1.0-0' }} {{ budgetSummary.currency }}
+            <span class="small text-muted">
+              ({{ getPercent(budgetSummary.spent, budgetSummary.initial) }} %)
+            </span>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="budget-summary-item">
+          <div class="label">Prévision à terminaison</div>
+          <div class="value">
+            {{ budgetSummary.forecast | number:'1.0-0' }} {{ budgetSummary.currency }}
+            <span class="small text-muted">
+              ({{ getPercent(budgetSummary.forecast, budgetSummary.initial) }} %)
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="h6 mb-2">Détail par poste</h4>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0 budget-table">
+        <thead>
+          <tr>
+            <th>Poste</th>
+            <th>Budget initial</th>
+            <th>Dépensé</th>
+            <th>Prévision</th>
+            <th>% Dépensé</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let line of budgetLines">
+            <td>{{ line.category }}</td>
+            <td>{{ line.initial | number:'1.0-0' }} {{ budgetSummary.currency }}</td>
+            <td>{{ line.spent | number:'1.0-0' }} {{ budgetSummary.currency }}</td>
+            <td>{{ line.forecast | number:'1.0-0' }} {{ budgetSummary.currency }}</td>
+            <td>
+              {{ getPercent(line.spent, line.initial) }} %
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>

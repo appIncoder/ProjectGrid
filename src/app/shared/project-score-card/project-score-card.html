@@ -1,0 +1,78 @@
+<div class="card flex-fill">
+  <div class="card-body">
+    <h3 class="h6 mb-3">Scorecard – Matrice détaillée des activités</h3>
+
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm activity-matrix-detail text-center align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="text-start activity-header-col">Activités</th>
+            <th *ngFor="let phase of getPhases()">
+              {{ getPhaseLabel(phase) }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let activity of getActivities()">
+            <!-- 1ère colonne : thématique + responsable -->
+            <td class="text-start activity-cell">
+              <div class="activity-name">{{ activity.label }}</div>
+              <div class="activity-owner text-muted">
+                Responsable : <strong>{{ activity.owner }}</strong>
+              </div>
+            </td>
+
+            <!-- Cellules : tâches (1 à 4) sous forme de cartouches -->
+            <td *ngFor="let phase of getPhases()">
+              <div class="cell-tasks">
+                <div
+                  *ngFor="let task of getTasks(activity.id, phase)"
+                  class="task-pill"
+                  [ngClass]="getStatusClass(task.status)"
+                  (click)="openTaskStatusModal(taskStatusModal, task)">
+                  {{ task.label }}
+                </div>
+                <div *ngIf="getTasks(activity.id, phase).length === 0" class="no-task text-muted small">
+                  -
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal d'édition de statut de tâche -->
+<ng-template #taskStatusModal let-modal>
+  <div class="modal-header py-2">
+    <h5 class="modal-title fs-6">Modifier le statut</h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <div class="mb-2">
+      <div class="small text-muted mb-1">Tâche</div>
+      <div class="fw-semibold">
+        {{ taskBeingEdited?.label }}
+      </div>
+    </div>
+    <div class="mb-0">
+      <label class="form-label form-label-sm">Statut</label>
+      <select class="form-select form-select-sm" [(ngModel)]="editedTaskStatus">
+        <option *ngFor="let opt of taskStatusOptions" [ngValue]="opt.value">
+          {{ opt.label }}
+        </option>
+      </select>
+    </div>
+  </div>
+  <div class="modal-footer py-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="modal.dismiss()">
+      Annuler
+    </button>
+    <button type="button" class="btn btn-sm btn-primary" (click)="saveTaskStatus(modal)">
+      Enregistrer
+    </button>
+  </div>
+</ng-template>
