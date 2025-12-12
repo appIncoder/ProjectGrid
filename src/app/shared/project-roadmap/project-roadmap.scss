@@ -13,10 +13,12 @@
 }
 
 .gantt-svg {
-  width: 100%;
-  height: auto;
+  display: block;     /* évite l’espace baseline inline SVG */
+  width: auto;        /* IMPORTANT: ne pas forcer 100% */
+  height: auto;       /* IMPORTANT: ne pas forcer auto scaling */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
+
 
 /* ===========================
    Grille & header
@@ -28,11 +30,12 @@
 }
 
 .gantt-month-text {
-  font-size: 0.75rem;
+  font-size: 0.62rem; /* avant: 0.75rem */
   text-anchor: middle;
   fill: #343a40;
   font-weight: 600;
 }
+
 
 /* ===========================
    Jalons (markers)
@@ -43,7 +46,7 @@
 }
 
 .gantt-milestone-text {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   text-anchor: middle;
   fill: #dc3545;
 }
@@ -57,7 +60,7 @@
 }
 
 .gantt-phase-text {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   text-anchor: middle;
   fill: #0d6efd;
 }
@@ -165,6 +168,43 @@
 .gantt-row-label-detail {
   fill: #adb5bd;
   cursor: default;
+}
+
+/* ===== Alignement parfait table <-> Gantt ===== */
+.roadmap-scroll-y {
+  /* --rowH est injecté depuis le HTML via [style.--rowH.px] */
+}
+
+.roadmap-left-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.roadmap-left-table thead th {
+  /* Header sticky : on évite qu'il "pousse" trop en hauteur */
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.roadmap-left-table tbody tr {
+  height: var(--rowH);
+}
+
+.roadmap-left-table tbody td {
+  /* On force une hauteur constante */
+  height: var(--rowH);
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+  line-height: 1.1;
+  font-size: 0.72rem; /* légèrement plus petit */
+}
+
+/* Header row (thématique) : même hauteur que les autres */
+.roadmap-left-table tbody tr.table-active td {
+  font-weight: 600;
 }
 
 

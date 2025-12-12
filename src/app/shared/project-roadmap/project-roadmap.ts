@@ -12,6 +12,8 @@ import {
   Task,
 } from '../../models/project-models';
 
+type HoverHint = { x: number; y: number; text: string };
+
 @Component({
   selector: 'app-project-roadmap',
   standalone: true,
@@ -32,6 +34,14 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   // approx : 30 jours par "mois" de Gantt
   readonly daysPerMonth = 30;
   readonly taskInnerMargin = 10;
+
+  // Hint sizing (doit rester cohérent avec le HTML)
+  readonly hintWidth = 90;
+  readonly hintHeight = 20;
+
+  // Décalage tooltip: gauche ne doit pas chevaucher le cartouche
+  readonly hintStartDx = -(this.hintWidth + 6);
+  readonly hintEndDx = 6;
 
   // largeur en pixels d’un jour sur l’axe du temps
   get dayWidth(): number {
@@ -75,6 +85,16 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     phase: PhaseId;
   }[] = [];
 
+  // Ordre + libellés thématiques
+  private readonly orderedActivities: ActivityId[] = ['projet', 'metier', 'changement', 'technologie'];
+
+  private readonly activityThemeLabel: Record<ActivityId, string> = {
+    projet: 'Gestion du projet',
+    metier: 'Gestion du métier',
+    changement: 'Gestion du changement',
+    technologie: 'Gestion de la technologie',
+  };
+
   // État ouvert/fermé par activité
   activityCollapse: Record<ActivityId, boolean> = {
     projet: false,
@@ -89,8 +109,15 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   dragStartTaskX = 0;
   dragHasMoved = false;
 
-  // Hint de date (tooltip SVG)
-  hoverHint: { x: number; y: number; text: string } | null = null;
+  // Tooltips SVG: début + fin
+  hoverHints: { start?: HoverHint; end?: HoverHint } = {};
+
+  // Preview indices (dates live pendant drag)
+  private previewStartDayIndex: number | null = null;
+  private previewEndDayIndex: number | null = null;
+
+  // Mapping rowIndex -> task (pour remplir le tableau à gauche)
+  private taskByRowIndex: Record<number, GanttTaskView> = {};
 
   ngOnInit(): void {
     this.buildGanttCalendar();
@@ -98,7 +125,7 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['project'] && !changes['project'].firstChange) {
+    if (changes['project']) {
       this.buildRoadmap();
     }
   }
@@ -143,25 +170,6 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     this.svgWidth = this.ganttLeftOffset + this.ganttMonthsCount * this.ganttColWidth + 40;
   }
 
-  private getMonthStartDate(monthIndex: number): Date | null {
-    if (!this.ganttStartDate) return null;
-    return new Date(
-      this.ganttStartDate.getFullYear(),
-      this.ganttStartDate.getMonth() + monthIndex,
-      1
-    );
-  }
-
-  private getMonthEndDate(monthIndex: number): Date | null {
-    if (!this.ganttStartDate) return null;
-    // Jour 0 du mois suivant = dernier jour du mois courant
-    return new Date(
-      this.ganttStartDate.getFullYear(),
-      this.ganttStartDate.getMonth() + monthIndex + 1,
-      0
-    );
-  }
-
   private addDays(base: Date, days: number): Date {
     const d = new Date(base);
     d.setDate(d.getDate() + days);
@@ -178,6 +186,8 @@ export class ProjectRoadmap implements OnInit, OnChanges {
       this.ganttActivityRows = [];
       this.ganttTasksView = [];
       this.ganttLinksView = [];
+      this.taskByRowIndex = {};
+      this.hideHints();
       return;
     }
 
@@ -208,103 +218,50 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     this.rebuildGanttFromBase();
   }
 
-private rebuildGanttFromBase(): void {
-  const rows: GanttActivityRow[] = [];
-  const tasksView: GanttTaskView[] = [];
-  let rowIndex = 0;
+  private rebuildGanttFromBase(): void {
+    const rows: GanttActivityRow[] = [];
+    const tasksView: GanttTaskView[] = [];
+    let rowIndex = 0;
 
-  const orderedActivities: ActivityId[] = ['projet', 'metier', 'changement', 'technologie'];
+    for (const activityId of this.orderedActivities) {
+      const activityTasks = this.baseTasks.filter((t) => t.activityId === activityId);
+      if (!activityTasks.length) continue;
 
-  for (const activityId of orderedActivities) {
-    const activityTasks = this.baseTasks.filter((t) => t.activityId === activityId);
-    if (!activityTasks.length) continue;
-
-    const firstLabel = activityTasks[0].activityLabel;
-    const isCollapsed = this.activityCollapse[activityId];
-
-    // ---- Ligne titre (toujours présente) ----
-    rows.push({
-      activityId,
-      label: firstLabel,
-      rowIndex,
-      isHeader: true,
-    });
-
-    if (isCollapsed) {
-      // ---- Mode synthèse : barre sur la ligne titre uniquement ----
-
-      const monthIndexes = activityTasks.map(
-        (t) => this.phaseToMonthIndex[t.phase] ?? 0
-      );
-      const minMonthIndex = Math.min(...monthIndexes);
-      const maxMonthIndex = Math.max(...monthIndexes);
-
-      const startDayIndex = minMonthIndex * this.daysPerMonth;
-      const endDayIndex = (maxMonthIndex + 1) * this.daysPerMonth - 1;
-
-      const x =
-        this.ganttLeftOffset + startDayIndex * this.dayWidth + this.taskInnerMargin;
-      const y = this.ganttTopOffset + rowIndex * this.ganttRowHeight + 6;
-      const width =
-        (endDayIndex - startDayIndex + 1) * this.dayWidth -
-        2 * this.taskInnerMargin;
-      const height = this.ganttRowHeight - 12;
-
-      tasksView.push({
-        id: `summary-${activityId}`,
-        label: firstLabel + ' (synthèse)',
+      // ---- Ligne titre (toujours présente) ----
+      rows.push({
         activityId,
-        phase: 'Phase1', // sans importance ici
+        label: this.activityThemeLabel[activityId],
         rowIndex,
-        monthIndex: minMonthIndex,
-        startMonthIndex: minMonthIndex,
-        endMonthIndex: maxMonthIndex,
-        startDayIndex,
-        endDayIndex,
-        x,
-        y,
-        width,
-        height,
+        isHeader: true,
       });
 
-      rowIndex++; // on passe à l’activité suivante
-    } else {
-      // ---- Mode détaillé : lignes de détail pour chaque tâche ----
+      const isCollapsed = this.activityCollapse[activityId];
 
-      rowIndex++; // on descend sous la ligne titre pour commencer les détails
+      if (isCollapsed) {
+        // ---- Mode synthèse : 1 seule barre sur la ligne titre ----
+        const monthIndexes = activityTasks.map((t) => this.phaseToMonthIndex[t.phase] ?? 0);
+        const minMonthIndex = Math.min(...monthIndexes);
+        const maxMonthIndex = Math.max(...monthIndexes);
 
-      for (const t of activityTasks) {
-        // Ligne de détail (sans toggler)
-        rows.push({
-          activityId,
-          label: '',     // pas de texte (ou tu peux mettre un bullet si tu veux)
-          rowIndex,
-          isHeader: false,
-        });
-
-        const monthIndex = this.phaseToMonthIndex[t.phase] ?? 0;
-        const startDayIndex = monthIndex * this.daysPerMonth;
-        const endDayIndex = startDayIndex + this.daysPerMonth - 1;
+        const startDayIndex = minMonthIndex * this.daysPerMonth;
+        const endDayIndex = (maxMonthIndex + 1) * this.daysPerMonth - 1;
 
         const x =
-          this.ganttLeftOffset +
-          startDayIndex * this.dayWidth +
-          this.taskInnerMargin;
+          this.ganttLeftOffset + startDayIndex * this.dayWidth + this.taskInnerMargin;
         const y = this.ganttTopOffset + rowIndex * this.ganttRowHeight + 6;
         const width =
-          (endDayIndex - startDayIndex + 1) * this.dayWidth -
-          2 * this.taskInnerMargin;
+          (endDayIndex - startDayIndex + 1) * this.dayWidth - 2 * this.taskInnerMargin;
         const height = this.ganttRowHeight - 12;
 
         tasksView.push({
-          id: t.task.id,
-          label: t.task.label,
+          id: `summary-${activityId}`,
+          label: `${this.activityThemeLabel[activityId]} (synthèse)`,
           activityId,
-          phase: t.phase,
+          phase: 'Phase1',
           rowIndex,
-          monthIndex,
-          startMonthIndex: monthIndex,
-          endMonthIndex: monthIndex,
+          monthIndex: minMonthIndex,
+          startMonthIndex: minMonthIndex,
+          endMonthIndex: maxMonthIndex,
           startDayIndex,
           endDayIndex,
           x,
@@ -313,128 +270,263 @@ private rebuildGanttFromBase(): void {
           height,
         });
 
-        rowIndex++;
+        rowIndex++; // activité suivante
+      } else {
+        // ---- Mode éclaté : une ligne par tâche ----
+        rowIndex++; // première ligne de détail sous le header
+
+        for (const t of activityTasks) {
+          rows.push({
+            activityId,
+            label: '',
+            rowIndex,
+            isHeader: false,
+          });
+
+          const monthIndex = this.phaseToMonthIndex[t.phase] ?? 0;
+          const startDayIndex = monthIndex * this.daysPerMonth;
+          const endDayIndex = startDayIndex + this.daysPerMonth - 1;
+
+          const x =
+            this.ganttLeftOffset + startDayIndex * this.dayWidth + this.taskInnerMargin;
+          const y = this.ganttTopOffset + rowIndex * this.ganttRowHeight + 6;
+          const width =
+            (endDayIndex - startDayIndex + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+          const height = this.ganttRowHeight - 12;
+
+          tasksView.push({
+            id: t.task.id,
+            label: t.task.label,
+            activityId,
+            phase: t.phase,
+            rowIndex,
+            monthIndex,
+            startMonthIndex: monthIndex,
+            endMonthIndex: monthIndex,
+            startDayIndex,
+            endDayIndex,
+            x,
+            y,
+            width,
+            height,
+          });
+
+          rowIndex++;
+        }
       }
+    }
+
+    this.ganttActivityRows = rows;
+    this.ganttTasksView = tasksView;
+
+    this.svgHeight =
+      this.ganttTopOffset + this.ganttActivityRows.length * this.ganttRowHeight + 40;
+
+    this.rebuildTaskRowIndexMap();
+    this.updateGanttLinks();
+  }
+
+  private rebuildTaskRowIndexMap(): void {
+    this.taskByRowIndex = {};
+
+    // On ne remplit le tableau qu'avec les lignes "détail" (pas les headers, pas les synthèses)
+    const headerRowIndexes = new Set<number>(
+      this.ganttActivityRows.filter(r => r.isHeader).map(r => r.rowIndex)
+    );
+
+    for (const t of this.ganttTasksView) {
+      if (String(t.id).startsWith('summary-')) continue;
+      if (headerRowIndexes.has(t.rowIndex)) continue;
+      this.taskByRowIndex[t.rowIndex] = t;
     }
   }
 
-  this.ganttActivityRows = rows;
-  this.ganttTasksView = tasksView;
+  // =======================
+  //   Liens (angles droits)
+  // =======================
 
-  this.svgHeight =
-    this.ganttTopOffset + this.ganttActivityRows.length * this.ganttRowHeight + 40;
+  private updateGanttLinks(): void {
+    const links: GanttLinkView[] = [];
+    const hMargin = 10;
+    const vGap = Math.max(10, Math.round(this.ganttRowHeight * 0.55));
 
-  this.updateGanttLinks();
-}
+    for (const dep of this.ganttDependencies) {
+      const from = this.ganttTasksView.find((t) => t.id === dep.fromId);
+      const to = this.ganttTasksView.find((t) => t.id === dep.toId);
+      if (!from || !to) continue;
 
+      const startX = from.x + from.width;
+      const startY = from.y + from.height / 2;
 
-private updateGanttLinks(): void {
-  const links: GanttLinkView[] = [];
-  const horizontalMargin = 8;
-  const verticalSpacing = this.ganttRowHeight / 2 + 6;
+      const endX = to.x;
+      const endY = to.y + to.height / 2;
 
-  for (const dep of this.ganttDependencies) {
-    const from = this.ganttTasksView.find((t) => t.id === dep.fromId);
-    const to = this.ganttTasksView.find((t) => t.id === dep.toId);
-    if (!from || !to) continue;
+      const yUnderSource = from.y + from.height + vGap; // sous source
+      const yAboveTarget = to.y - vGap;                 // au-dessus cible
 
-    const startX = from.x + from.width;
-    const startY = from.y + from.height / 2;
-    const endX = to.x;
-    const endY = to.y + to.height / 2;
+      const xOut = startX + hMargin;
+      const xIn = endX - hMargin;
 
-    // Règles:
-    // - sortir SOUS le cartouche source
-    // - arriver AU-DESSUS du cartouche cible
-    const yUnderSource = startY + verticalSpacing;
-    const yAboveTarget = endY - verticalSpacing;
+      const path = [
+        `M ${startX} ${startY}`,
+        `L ${xOut} ${startY}`,
+        `L ${xOut} ${yUnderSource}`,
+        `L ${xIn} ${yUnderSource}`,
+        `L ${xIn} ${yAboveTarget}`,
+        `L ${xIn} ${endY}`,
+        `L ${endX} ${endY}`,
+      ].join(' ');
 
-    // Points intermédiaires en X
-    const midX1 = startX + horizontalMargin;
-    const midX2 = endX - horizontalMargin;
+      links.push({ fromId: dep.fromId, toId: dep.toId, path });
+    }
 
-    // Trajet exclusivement horizontal/vertical :
-    // 1. horizontal depuis la source
-    // 2. vertical vers "sous la source"
-    // 3. horizontal vers la zone proche de la cible
-    // 4. vertical jusqu'au niveau "au-dessus de la cible"
-    // 5. vertical jusqu'au niveau de la cible
-    // 6. horizontal jusque sur le bord de la cible
-    const path = `
-      M ${startX} ${startY}
-      L ${midX1} ${startY}
-      L ${midX1} ${yUnderSource}
-      L ${midX2} ${yUnderSource}
-      L ${midX2} ${yAboveTarget}
-      L ${midX2} ${endY}
-      L ${endX} ${endY}
-    `;
-
-    links.push({
-      fromId: dep.fromId,
-      toId: dep.toId,
-      path,
-    });
+    this.ganttLinksView = links;
   }
 
-  this.ganttLinksView = links;
-}
-
-
-
-
   // =======================
-  //   Libellés & regroupement
+  //   Groupe / éclaté
   // =======================
 
-  toggleActivityCollapse(activityId: ActivityId): void {
-    this.activityCollapse[activityId] = !this.activityCollapse[activityId];
+  getRowDisplayLabel(row: GanttActivityRow): string {
+    if (!row.isHeader) return '';
+    const collapsed = this.activityCollapse[row.activityId];
+    const prefix = collapsed ? '[+]' : '[-]';
+    return `${prefix} ${row.label}`;
+  }
+
+  onRowLabelClick(row: GanttActivityRow): void {
+    if (!row.isHeader) return;
+    this.activityCollapse[row.activityId] = !this.activityCollapse[row.activityId];
     this.rebuildGanttFromBase();
   }
 
-getRowDisplayLabel(row: GanttActivityRow): string {
-  if (!row.isHeader) {
-    return ''; // aucune étiquette sur les lignes de détail
-  }
-  const collapsed = this.activityCollapse[row.activityId];
-  const prefix = collapsed ? '[+]' : '[-]';
-  return `${prefix} ${row.label}`;
-}
+  // =======================
+  //   Tableau gauche : helpers
+  // =======================
 
-
-  getTaskStartLabel(task: GanttTaskView): string {
-    if (!this.ganttStartDate) return '';
-
-    const dayIndex =
-      task.startDayIndex ??
-      (task.startMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth;
-
-    const d = this.addDays(this.ganttStartDate, dayIndex);
-    return d.toLocaleDateString('fr-BE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+  getRowTask(rowIndex: number): GanttTaskView | null {
+    return this.taskByRowIndex[rowIndex] ?? null;
   }
 
-  getTaskEndLabel(task: GanttTaskView): string {
-    if (!this.ganttStartDate) return '';
+  getTaskStartLabelForTable(task: GanttTaskView): string {
+    const preview = !!this.draggingTask && this.draggingTask.id === task.id;
+    return this.getTaskStartLabel(task, preview);
+  }
 
-    const dayIndex =
-      task.endDayIndex ??
-      (task.endMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth +
-        (this.daysPerMonth - 1);
+  getTaskEndLabelForTable(task: GanttTaskView): string {
+    const preview = !!this.draggingTask && this.draggingTask.id === task.id;
+    return this.getTaskEndLabel(task, preview);
+  }
 
-    const d = this.addDays(this.ganttStartDate, dayIndex);
-    return d.toLocaleDateString('fr-BE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+  getTaskProgressPercent(task: GanttTaskView): number {
+    const base = this.baseTasks.find(b => b.task.id === task.id);
+    const raw = (base as any)?.task?.progress ?? (base as any)?.task?.completion ?? 0;
+
+    const n = Number(raw);
+    if (Number.isNaN(n)) return 0;
+    return Math.max(0, Math.min(100, Math.round(n)));
   }
 
   // =======================
-  //   Drag & drop (par jour)
+  //   Labels dates (support preview)
+  // =======================
+
+  getTaskStartLabel(task: GanttTaskView, preview = false): string {
+    if (!this.ganttStartDate) return '';
+
+    const dayIndex = preview && this.previewStartDayIndex !== null
+      ? this.previewStartDayIndex
+      : task.startDayIndex ??
+        (task.startMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth;
+
+    const d = this.addDays(this.ganttStartDate, dayIndex);
+    return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  getTaskEndLabel(task: GanttTaskView, preview = false): string {
+    if (!this.ganttStartDate) return '';
+
+    const dayIndex = preview && this.previewEndDayIndex !== null
+      ? this.previewEndDayIndex
+      : task.endDayIndex ??
+        (task.endMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth + (this.daysPerMonth - 1);
+
+    const d = this.addDays(this.ganttStartDate, dayIndex);
+    return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  // =======================
+  //   Tooltips (2 côtés) + preview live
+  // =======================
+
+  private computeHint(task: GanttTaskView, type: 'start' | 'end', preview = false): HoverHint | null {
+    const text =
+      type === 'start'
+        ? this.getTaskStartLabel(task, preview)
+        : this.getTaskEndLabel(task, preview);
+
+    if (!text) return null;
+
+    const bulletX = type === 'start' ? task.x : task.x + task.width;
+    const bulletY = task.y + task.height / 2;
+
+    const dx = type === 'start' ? this.hintStartDx : this.hintEndDx;
+
+    return { x: bulletX + dx, y: bulletY, text };
+  }
+
+  private computePreviewDaysFromX(task: GanttTaskView): void {
+    const totalDays = this.ganttMonthsCount * this.daysPerMonth;
+
+    const currentStart =
+      task.startDayIndex ??
+      (task.startMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth;
+
+    const currentEnd =
+      task.endDayIndex ?? currentStart + (this.daysPerMonth - 1);
+
+    const durationDays = Math.max(0, currentEnd - currentStart);
+
+    const rawStart =
+      (task.x - this.ganttLeftOffset - this.taskInnerMargin) / this.dayWidth;
+
+    let startDay = Math.round(rawStart);
+
+    const maxStart = totalDays - (durationDays + 1);
+    startDay = Math.max(0, Math.min(maxStart, startDay));
+
+    this.previewStartDayIndex = startDay;
+    this.previewEndDayIndex = startDay + durationDays;
+  }
+
+  private showHintsForDraggingTask(task: GanttTaskView): void {
+    this.hoverHints = {
+      start: this.computeHint(task, 'start', true) ?? undefined,
+      end: this.computeHint(task, 'end', true) ?? undefined,
+    };
+  }
+
+  showHintForTask(task: GanttTaskView, type: 'start' | 'end'): void {
+    // Si on drag, on force les 2 en live
+    if (this.draggingTask) {
+      this.showHintsForDraggingTask(this.draggingTask);
+      return;
+    }
+    const single = this.computeHint(task, type, false);
+    this.hoverHints = {
+      start: type === 'start' ? single ?? undefined : undefined,
+      end: type === 'end' ? single ?? undefined : undefined,
+    };
+  }
+
+  hideHints(): void {
+    this.hoverHints = {};
+    this.previewStartDayIndex = null;
+    this.previewEndDayIndex = null;
+  }
+
+  // =======================
+  //   Drag & drop (par jour) + dates live
   // =======================
 
   onGanttBarMouseDown(event: MouseEvent, task: GanttTaskView): void {
@@ -442,6 +534,10 @@ getRowDisplayLabel(row: GanttActivityRow): string {
     this.dragStartClientX = event.clientX;
     this.dragStartTaskX = task.x;
     this.dragHasMoved = false;
+
+    // init preview + hints
+    this.computePreviewDaysFromX(task);
+    this.showHintsForDraggingTask(task);
 
     event.stopPropagation();
     event.preventDefault();
@@ -458,98 +554,46 @@ getRowDisplayLabel(row: GanttActivityRow): string {
 
     // Déplacement libre de la barre pendant le drag
     this.draggingTask.x = this.dragStartTaskX + dx;
+
+    // Dates live + hints live
+    this.computePreviewDaysFromX(this.draggingTask);
+    this.showHintsForDraggingTask(this.draggingTask);
   }
 
   onGanttMouseUp(event: MouseEvent): void {
     if (!this.draggingTask) return;
 
-    // Clic simple : aucun déplacement
+    // clic sans déplacement
     if (!this.dragHasMoved) {
       this.draggingTask = null;
+      this.hideHints();
       return;
     }
 
-    const totalDays = this.ganttMonthsCount * this.daysPerMonth;
+    // Persist preview -> task
+    if (this.previewStartDayIndex === null || this.previewEndDayIndex === null) {
+      this.draggingTask = null;
+      this.hideHints();
+      return;
+    }
 
-    // Durée en jours de la barre (synthèse ou tâche)
-    const currentStartDay =
-      this.draggingTask.startDayIndex ??
-      (this.draggingTask.startMonthIndex ?? this.draggingTask.monthIndex ?? 0) *
-        this.daysPerMonth;
-    const currentEndDay =
-      this.draggingTask.endDayIndex ??
-      currentStartDay + (this.daysPerMonth - 1);
-    const durationDays = Math.max(0, currentEndDay - currentStartDay);
+    const durationDays = Math.max(0, this.previewEndDayIndex - this.previewStartDayIndex);
 
-    // Calcul du nouvel indice de début à partir de la position x
-    const rawStartDay =
-      (this.draggingTask.x - this.ganttLeftOffset - this.taskInnerMargin) /
-      this.dayWidth;
-    let newStartDayIndex = Math.round(rawStartDay);
-
-    // Clamp pour rester dans la fenêtre Gantt
-    const maxStart = totalDays - (durationDays + 1);
-    newStartDayIndex = Math.max(0, Math.min(maxStart, newStartDayIndex));
-
-    const newEndDayIndex = newStartDayIndex + durationDays;
-
-    // Nouveau mois "principal" basé sur le centre de la barre
-    const midDayIndex = newStartDayIndex + durationDays / 2;
-    let newMonthIndex = Math.floor(midDayIndex / this.daysPerMonth);
-    newMonthIndex = Math.max(0, Math.min(this.ganttMonthsCount - 1, newMonthIndex));
-
-    // Mise à jour de la barre
-    this.draggingTask.startDayIndex = newStartDayIndex;
-    this.draggingTask.endDayIndex = newEndDayIndex;
-    this.draggingTask.monthIndex = newMonthIndex;
-    this.draggingTask.startMonthIndex = newMonthIndex;
-    this.draggingTask.endMonthIndex = newMonthIndex;
+    // Recalage exact sur la grille
+    this.draggingTask.startDayIndex = this.previewStartDayIndex;
+    this.draggingTask.endDayIndex = this.previewEndDayIndex;
 
     this.draggingTask.x =
       this.ganttLeftOffset +
-      newStartDayIndex * this.dayWidth +
+      this.previewStartDayIndex * this.dayWidth +
       this.taskInnerMargin;
+
     this.draggingTask.width =
       (durationDays + 1) * this.dayWidth - 2 * this.taskInnerMargin;
 
     this.updateGanttLinks();
+
     this.draggingTask = null;
+    this.hideHints();
   }
-
-  // =======================
-  //   Hint (tooltip date)
-  // =======================
-
-  showHintForTask(task: GanttTaskView, type: 'start' | 'end'): void {
-    const text =
-      type === 'start'
-        ? this.getTaskStartLabel(task)
-        : this.getTaskEndLabel(task);
-
-    if (!text) {
-      this.hoverHint = null;
-      return;
-    }
-
-    const bulletX = type === 'start' ? task.x : task.x + task.width;
-    const bulletY = task.y + task.height / 2;
-
-    this.hoverHint = {
-      x: bulletX,
-      y: bulletY,
-      text,
-    };
-  }
-
-  hideHint(): void {
-    this.hoverHint = null;
-  }
-
-  onRowLabelClick(row: GanttActivityRow): void {
-  if (!row.isHeader) {
-    return;
-  }
-  this.toggleActivityCollapse(row.activityId);
-}
-
 }

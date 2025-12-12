@@ -1,7 +1,7 @@
 <div class="card flex-fill">
   <div class="card-body">
 
-    <!-- Matrice des risques dans une card -->
+    <!-- Matrice des risques -->
     <div class="card mb-3">
       <div class="card-body">
         <h3 class="h6 mb-3">Matrice des risques</h3>
@@ -17,21 +17,27 @@
             <tbody>
               <tr *ngFor="let impact of riskImpactLevels">
                 <td class="text-start"><strong>{{ impact }}</strong></td>
+
                 <td *ngFor="let prob of riskProbabilityLevels">
                   <div
                     class="risk-cell"
                     (dragover)="onRiskDragOver($event)"
                     (drop)="onRiskDrop($event, impact, prob)">
+
                     <div
                       *ngFor="let item of getRiskCellItems(impact, prob)"
                       class="risk-pill"
                       [ngClass]="getRiskLevelClass(item.level)"
+                      [attr.title]="item.label"
                       draggable="true"
-                      (dragstart)="onRiskDragStart($event, item, impact, prob)">
+                      (dragstart)="onRiskDragStart($event, item, impact, prob)"
+                      (contextmenu)="onRiskContextMenu($event, item)">
                       {{ item.id }}
                     </div>
+
                   </div>
                 </td>
+
               </tr>
             </tbody>
           </table>
@@ -51,26 +57,116 @@
             <th>Impact</th>
             <th>Probabilité</th>
             <th>Niveau</th>
+            <th>Statut</th>
+            <th>Risque résiduel</th>
             <th>Responsable</th>
             <th>Échéance</th>
           </tr>
         </thead>
+
         <tbody>
           <tr *ngFor="let risk of topRisks">
-            <td>{{ risk.id }}</td>
+            <td [attr.title]="risk.title">{{ risk.id }}</td>
             <td>{{ risk.title }}</td>
-            <td>{{ risk.impact }}</td>
-            <td>{{ risk.probability }}</td>
+
+            <!-- Impact editable => repositionne pastille -->
             <td>
-              <span class="risk-level-badge" [ngClass]="getRiskLevelClass(risk.level)">
-                {{ risk.level | titlecase }}
-              </span>
+              <select class="form-select form-select-sm"
+                      [(ngModel)]="risk.impact"
+                      (change)="onTopRiskImpactOrProbabilityChange(risk)">
+                <option *ngFor="let i of impactOptions" [ngValue]="i">{{ i }}</option>
+              </select>
             </td>
+
+            <!-- Probabilité editable => repositionne pastille -->
+            <td>
+              <select class="form-select form-select-sm"
+                      [(ngModel)]="risk.probability"
+                      (change)="onTopRiskImpactOrProbabilityChange(risk)">
+                <option *ngFor="let p of probabilityOptions" [ngValue]="p">{{ p }}</option>
+              </select>
+            </td>
+
+            <!-- Criticité editable => met à jour style pastille -->
+            <td>
+              <select class="form-select form-select-sm"
+                      [(ngModel)]="risk.level"
+                      (change)="onTopRiskLevelChange(risk)">
+                <option *ngFor="let lvl of levelOptions" [ngValue]="lvl">{{ lvl | titlecase }}</option>
+              </select>
+            </td>
+
+            <!-- Statut editable -->
+            <td>
+              <select class="form-select form-select-sm"
+                      [(ngModel)]="risk.status"
+                      (change)="onTopRiskStatusChange(risk)">
+                <option *ngFor="let s of statusOptions" [ngValue]="s">
+                  {{ RISK_STATUS_LABEL[s] }}
+                </option>
+              </select>
+            </td>
+
+            <!-- Lien risque résiduel -->
+            <td>
+              <ng-container *ngIf="risk.residualRiskId; else noResidual">
+                <a class="link-primary" [routerLink]="['/risks', risk.residualRiskId]">Voir</a>
+              </ng-container>
+              <ng-template #noResidual>
+                <span class="text-muted">—</span>
+              </ng-template>
+            </td>
+
             <td>{{ risk.owner }}</td>
             <td>{{ risk.dueDate }}</td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Menu contextuel -->
+    <div *ngIf="contextMenu.visible"
+         class="card shadow position-fixed"
+         [style.left.px]="contextMenu.x"
+         [style.top.px]="contextMenu.y"
+         style="z-index: 2000; min-width: 240px;"
+         (click)="$event.stopPropagation()">
+
+      <div class="card-body p-2">
+        <div class="small fw-semibold mb-2">Modifier le risque</div>
+
+        <div class="mb-2">
+          <label class="form-label small mb-1">Probabilité</label>
+          <select class="form-select form-select-sm"
+                  (change)="changeRiskProbability(($any($event.target)).value)">
+            <option *ngFor="let p of probabilityOptions" [value]="p">{{ p }}</option>
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small mb-1">Impact</label>
+          <select class="form-select form-select-sm"
+                  (change)="changeRiskImpact(($any($event.target)).value)">
+            <option *ngFor="let i of impactOptions" [value]="i">{{ i }}</option>
+          </select>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small mb-1">Criticité</label>
+          <select class="form-select form-select-sm"
+                  (change)="changeRiskLevel(($any($event.target)).value)">
+            <option *ngFor="let lvl of levelOptions" [value]="lvl">{{ lvl | titlecase }}</option>
+          </select>
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label small mb-1">Statut</label>
+          <select class="form-select form-select-sm"
+                  (change)="changeRiskStatus(($any($event.target)).value)">
+            <option *ngFor="let s of statusOptions" [value]="s">{{ RISK_STATUS_LABEL[s] }}</option>
+          </select>
+        </div>
+      </div>
     </div>
 
   </div>
