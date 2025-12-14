@@ -45,11 +45,7 @@
   fill: #dc3545;
 }
 
-.gantt-milestone-text {
-  font-size: 0.6rem;
-  text-anchor: middle;
-  fill: #dc3545;
-}
+.gantt-milestone-text { font-size: 0.60rem; }
 
 /* ===========================
    Phases (bandes)
@@ -59,11 +55,7 @@
   fill: rgba(13, 110, 253, 0.1);
 }
 
-.gantt-phase-text {
-  font-size: 0.6rem;
-  text-anchor: middle;
-  fill: #0d6efd;
-}
+.gantt-phase-text { font-size: 0.60rem; }
 
 /* ===========================
    Lignes d'activités
@@ -103,7 +95,10 @@
   fill: #ffffff;
   pointer-events: none;
 }
-
+.gantt-bar-summary {
+  opacity: 0.25;
+  cursor: grab;
+}
 /* ===========================
    Lignes de dépendance
    =========================== */
@@ -150,7 +145,8 @@
 
 @media (max-width: 767.98px) {
   .gantt-month-text {
-    font-size: 0.7rem;
+    font-size: 0.62rem;   /* avant 0.75rem */
+    font-weight: 600;
   }
 
   .gantt-row-label {
@@ -205,6 +201,11 @@
 /* Header row (thématique) : même hauteur que les autres */
 .roadmap-left-table tbody tr.table-active td {
   font-weight: 600;
+}
+
+/* Poignée plus agréable */
+.roadmap-grid [title="Glisser pour redimensionner"]:hover {
+  background: rgba(13, 110, 253, 0.12) !important;
 }
 
 
