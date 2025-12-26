@@ -92,10 +92,14 @@
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash4">
                   <div class="d-flex align-items-center gap-2 w-100">
                     <div class="progress flex-grow-1" style="height: 8px; min-width: 70px;">
-                      <div class="progress-bar" role="progressbar"
-                           [style.width.%]="getTaskProgressPercent(t)"
-                           [attr.aria-valuenow]="getTaskProgressPercent(t)"
-                           aria-valuemin="0" aria-valuemax="100"></div>
+                      <div
+                        class="progress-bar"
+                        role="progressbar"
+                        [style.width.%]="getTaskProgressPercent(t)"
+                        [attr.aria-valuenow]="getTaskProgressPercent(t)"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                      ></div>
                     </div>
                     <span class="small text-muted" style="min-width: 3ch; text-align:right;">
                       {{ getTaskProgressPercent(t) }}%
@@ -140,7 +144,8 @@
                   class="gantt-milestone-dot"
                   [attr.cx]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
                   [attr.cy]="18"
-                  r="4"></circle>
+                  r="4"
+                ></circle>
                 <text
                   class="gantt-milestone-text"
                   [attr.x]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
@@ -157,7 +162,8 @@
                   [attr.x]="ganttLeftPadding + band.startMonthIndex * ganttColWidth"
                   [attr.y]="28"
                   [attr.width]="(band.endMonthIndex - band.startMonthIndex + 1) * ganttColWidth"
-                  [attr.height]="10"></rect>
+                  [attr.height]="10"
+                ></rect>
                 <text
                   class="gantt-phase-text"
                   [attr.x]="ganttLeftPadding + (band.startMonthIndex + band.endMonthIndex + 1) * ganttColWidth / 2"
@@ -199,7 +205,8 @@
                   [attr.x1]="ganttLeftPadding + colIndex * ganttColWidth"
                   [attr.y1]="0"
                   [attr.x2]="ganttLeftPadding + colIndex * ganttColWidth"
-                  [attr.y2]="ganttBodyHeight"></line>
+                  [attr.y2]="ganttBodyHeight"
+                ></line>
               </g>
 
               <g *ngFor="let r of ganttActivityRows">
@@ -208,7 +215,8 @@
                   [attr.x1]="0"
                   [attr.y1]="r.rowIndex * bodyRowHeight"
                   [attr.x2]="ganttViewportWidth"
-                  [attr.y2]="r.rowIndex * bodyRowHeight"></line>
+                  [attr.y2]="r.rowIndex * bodyRowHeight"
+                ></line>
               </g>
 
               <g *ngFor="let link of ganttLinksView">
@@ -222,8 +230,10 @@
                   [attr.y]="task.y"
                   [attr.width]="task.width"
                   [attr.height]="task.height"
-                  (mousedown)="onGanttBarMouseDown($event, task)"></rect>
+                  (mousedown)="onGanttBarMouseDown($event, task)"
+                ></rect>
 
+                <!-- Bullet gauche = move (comme avant) -->
                 <circle
                   class="gantt-bar-bullet gantt-bar-bullet-start"
                   [attr.cx]="task.x"
@@ -231,16 +241,19 @@
                   r="4"
                   (mousedown)="onGanttBarMouseDown($event, task)"
                   (mouseenter)="showHintForTask(task, 'start')"
-                  (mouseleave)="hideHints()"></circle>
+                  (mouseleave)="hideHints()"
+                ></circle>
 
+                <!-- ✅ Bullet droit = resize fin -->
                 <circle
                   class="gantt-bar-bullet gantt-bar-bullet-end"
                   [attr.cx]="task.x + task.width"
                   [attr.cy]="task.y + task.height / 2"
                   r="4"
-                  (mousedown)="onGanttBarMouseDown($event, task)"
+                  (mousedown)="onGanttBarResizeEndMouseDown($event, task)"
                   (mouseenter)="showHintForTask(task, 'end')"
-                  (mouseleave)="hideHints()"></circle>
+                  (mouseleave)="hideHints()"
+                ></circle>
 
                 <text
                   class="gantt-bar-label"
