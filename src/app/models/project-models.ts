@@ -23,10 +23,18 @@ export interface ProjectDetail {
   id: string;
   name: string;
   description: string;
+
+  // ✅ inchangé (utilisé partout)
   phases: PhaseId[];
+
+  // ✅ nouveau : métadonnées des phases
+  phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
+
   activities: Record<ActivityId, ActivityDefinition>;
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
 }
+
+
 
 /* ----- Risques ----- */
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
@@ -132,4 +140,13 @@ export interface Task {
 
   // IMPORTANT : une tâche "vit" dans une phase de la matrice
   phase?: PhaseId;
+}
+
+export interface PhaseDefinition {
+  id: PhaseId;
+  label?: string;
+
+  // format ISO "YYYY-MM-DD" (cohérent avec <input type="date">)
+  startDate: string;
+  endDate: string;
 }

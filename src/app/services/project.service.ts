@@ -44,11 +44,38 @@ export class ProjectService {
     Phase6: 5,
   };
 
+private ensurePhaseDefinitions(project: ProjectDetail): void {
+  if (project.phaseDefinitions) return;
+
+  const ganttStart = this.getDefaultGanttStartDate();
+
+  const defs: Record<PhaseId, any> = {} as any;
+  for (const phase of project.phases) {
+    const monthIndex = this.phaseToMonthIndex[phase] ?? 0;
+
+    const startDayIndex = monthIndex * this.daysPerMonth;
+    const endDayIndex = startDayIndex + (this.daysPerMonth - 1);
+
+    defs[phase] = {
+      id: phase,
+      label: phase,
+      startDate: this.toIsoDate(this.addDays(ganttStart, startDayIndex)),
+      endDate: this.toIsoDate(this.addDays(ganttStart, endDayIndex)),
+    };
+  }
+
+  project.phaseDefinitions = defs;
+}
+
+
   // -----------------------------
   // Store / registration
   // -----------------------------
   registerProject(project: ProjectDetail): void {
     this.projects.set(project.id, project);
+    this.ensurePhaseDefinitions(project);
+    this.seedMissingTaskDates(project.id);
+
 
     // ✅ important : seed des dates par défaut dès que le projet est disponible
     this.seedMissingTaskDates(project.id);
@@ -194,30 +221,47 @@ export class ProjectService {
   // -----------------------------
   // Gantt -> Task (dates)
   // -----------------------------
-  syncGanttDayIndexesToTask(params: {
-    projectId: string;
-    activityId: ActivityId;
-    phase: PhaseId;          // phase de la cellule d'origine (ou actuelle)
-    taskId: string;
-    ganttStartDate: Date;    // Date object
-    startDayIndex?: number;
-    endDayIndex?: number;
-  }): void {
-    const project = this.projects.get(params.projectId);
-    if (!project) return;
+syncGanttDayIndexesToTask(params: {
+  projectId: string;
+  taskId: string;
+  ganttStartDate: Date;
+  startDayIndex?: number;
+  endDayIndex?: number;
+}): void {
+  const project = this.projects.get(params.projectId);
+  if (!project) return;
 
-    const row = project.taskMatrix[params.activityId]?.[params.phase] ?? [];
-    const task = row.find(t => t.id === params.taskId);
-    if (!task) return;
+  const located = this.findTaskById(project, params.taskId);
+  if (!located) return;
 
-    // Convert indices -> ISO
-    const s = params.startDayIndex ?? 0;
-    const e = params.endDayIndex ?? s + (this.daysPerMonth - 1);
+  const s = params.startDayIndex ?? 0;
+  const e = params.endDayIndex ?? s + (this.daysPerMonth - 1);
 
-    const startIso = this.toIsoDate(this.addDays(params.ganttStartDate, s));
-    const endIso = this.toIsoDate(this.addDays(params.ganttStartDate, e));
+  const startIso = this.toIsoDate(this.addDays(params.ganttStartDate, s));
+  const endIso = this.toIsoDate(this.addDays(params.ganttStartDate, e));
 
-    task.startDate = startIso;
-    task.endDate = endIso;
+  located.task.startDate = startIso;
+  located.task.endDate = endIso;
+
+  // cohérence (utile si tu affiches la phase ailleurs)
+  located.task.phase = located.task.phase ?? located.phase;
+}
+
+
+  private findTaskById(project: ProjectDetail, taskId: string): {
+  activityId: ActivityId;
+  phase: PhaseId;
+  task: Task;
+} | null {
+  for (const activityId of Object.keys(project.taskMatrix) as ActivityId[]) {
+    const byPhase = project.taskMatrix[activityId];
+    for (const phase of project.phases) {
+      const tasks = byPhase?.[phase] ?? [];
+      const found = tasks.find(t => t.id === taskId);
+      if (found) return { activityId, phase, task: found };
+    }
   }
+  return null;
+}
+
 }

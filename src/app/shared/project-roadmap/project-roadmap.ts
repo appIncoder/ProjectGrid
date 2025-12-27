@@ -651,15 +651,14 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     const base = this.findBase(taskView.id);
     if (!base) return;
 
-    this.projectService.syncGanttDayIndexesToTask({
-      projectId: this.project.id,
-      activityId: base.activityId,
-      phase: base.phase, // phase d'origine pour retrouver la Task dans taskMatrix
-      taskId: base.task.id,
-      ganttStartDate: this.ganttStartDate,
-      startDayIndex: taskView.startDayIndex,
-      endDayIndex: taskView.endDayIndex,
-    });
+this.projectService.syncGanttDayIndexesToTask({
+  projectId: this.project.id,
+  taskId: taskView.id,
+  ganttStartDate: this.ganttStartDate,
+  startDayIndex: taskView.startDayIndex,
+  endDayIndex: taskView.endDayIndex,
+});
+
   }
 
   // =======================
