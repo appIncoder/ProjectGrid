@@ -19,7 +19,10 @@ import {
   Task,
 } from '../../models/project-models';
 
+import { ProjectService } from '../../services/project.service';
+
 type HoverHint = { x: number; y: number; text: string };
+type TaskScheduleOverride = { startDayIndex: number; endDayIndex: number };
 
 @Component({
   selector: 'app-project-roadmap',
@@ -32,8 +35,8 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   @Input() project: ProjectDetail | null = null;
 
   // ===== Layout (lignes)
-  readonly headerRow1Height = 44; // milestones + phases
-  readonly headerRow2Height = 32; // titres tableau + mois
+  readonly headerRow1Height = 44;
+  readonly headerRow2Height = 32;
   readonly bodyRowHeight = 32;
 
   // ===== Divider draggable
@@ -42,40 +45,27 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   private resizeStartX = 0;
   private resizeStartPanelW = 0;
 
-  // ===== Largeur "panneau tableau" (viewport visible du tableau)
-  // -> c'est ça qu'on redimensionne au divider
+  // ===== Largeur panneau tableau
   tablePanelWidthPx = 400;
-  readonly minPanelPercentOfScreen = 0.25; // 👈 seuil 15% (si tu veux 15% => 0.15)
-  readonly maxTablePanelWidthPx = 900; // pour éviter un tableau énorme (ajuste si tu veux)
+  readonly minPanelPercentOfScreen = 0.25;
+  readonly maxTablePanelWidthPx = 900;
 
-  // ===== Largeur "contenu tableau" (les 5 colonnes)
-  // -> ne change pas quand on atteint le seuil : scrollbar apparaît dans le panneau
+  // ===== Largeur "contenu tableau" (5 colonnes)
   private readonly tableColRatios = [
-    0.40, // Tâches (beaucoup de texte)
-    0.16, // Début
-    0.16, // Fin
-    0.14, // Phase
-    0.14, // Progression
+    0.40, // Tâches
+    0.25, // Début
+    0.25, // Fin
+    0.2,  // Phase
+    0.20, // Progression
   ];
 
-  tableContentWidthPx = 600; // initialise à moitié, cohérent
+  tableContentWidthPx = 600;
 
-  // Colonnes calculées (contenu)
-  get colTaskW(): number {
-    return Math.round(this.tableContentWidthPx * this.tableColRatios[0]);
-  }
-  get colStartW(): number {
-    return Math.round(this.tableContentWidthPx * this.tableColRatios[1]);
-  }
-  get colEndW(): number {
-    return Math.round(this.tableContentWidthPx * this.tableColRatios[2]);
-  }
-  get colPhaseW(): number {
-    return Math.round(this.tableContentWidthPx * this.tableColRatios[3]);
-  }
-  get colProgW(): number {
-    return Math.round(this.tableContentWidthPx * this.tableColRatios[4]);
-  }
+  get colTaskW(): number  { return Math.round(this.tableContentWidthPx * this.tableColRatios[0]); }
+  get colStartW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[1]); }
+  get colEndW(): number   { return Math.round(this.tableContentWidthPx * this.tableColRatios[2]); }
+  get colPhaseW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[3]); }
+  get colProgW(): number  { return Math.round(this.tableContentWidthPx * this.tableColRatios[4]); }
 
   get tableInnerGridTemplate(): string {
     return `${this.colTaskW}px ${this.colStartW}px ${this.colEndW}px ${this.colPhaseW}px ${this.colProgW}px`;
@@ -91,7 +81,6 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   readonly ganttLeftPadding = 10;
   readonly ganttTopPadding = 0;
 
-  readonly daysPerMonth = 30;
   readonly taskInnerMargin = 10;
 
   // Tooltips
@@ -100,7 +89,7 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   readonly hintEndDx = 6;
 
   get dayWidth(): number {
-    return this.ganttColWidth / this.daysPerMonth;
+    return this.ganttColWidth / this.projectService.daysPerMonth;
   }
 
   ganttMonths: string[] = [];
@@ -111,20 +100,11 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   ganttTasksView: GanttTaskView[] = [];
   ganttLinksView: GanttLinkView[] = [];
 
-  ganttWidth = 0; // largeur native gantt (selon mois)
-  ganttViewportWidth = 0; // largeur d’affichage (>= 2×tableContentWidth)
+  ganttWidth = 0;
+  ganttViewportWidth = 0;
   ganttBodyHeight = 0;
 
   ganttStartDate: Date | null = null;
-
-  phaseToMonthIndex: Record<PhaseId, number> = {
-    Phase1: 0,
-    Phase2: 1,
-    Phase3: 2,
-    Phase4: 3,
-    Phase5: 4,
-    Phase6: 5,
-  };
 
   ganttDependencies: { fromId: string; toId: string }[] = [
     { fromId: 'p1-1', toId: 'p2-1' },
@@ -137,15 +117,10 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     task: Task;
     activityId: ActivityId;
     activityLabel: string;
-    phase: PhaseId;
+    phase: PhaseId; // phase de la cellule d'origine
   }[] = [];
 
-  private readonly orderedActivities: ActivityId[] = [
-    'projet',
-    'metier',
-    'changement',
-    'technologie',
-  ];
+  private readonly orderedActivities: ActivityId[] = ['projet', 'metier', 'changement', 'technologie'];
 
   private readonly activityThemeLabel: Record<ActivityId, string> = {
     projet: 'Gestion du projet',
@@ -162,19 +137,32 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   };
 
   // =======================
+  // Overrides planning (local)
+  // =======================
+  private scheduleOverrides: Record<string, TaskScheduleOverride> = {};
+
+  // =======================
+  // UX validation date (table)
+  // =======================
+  tableDateErrors: Record<string, string> = {};
+
+  private setTableDateError(taskId: string, msg: string): void {
+    this.tableDateErrors[taskId] = msg;
+    window.setTimeout(() => {
+      if (this.tableDateErrors[taskId] === msg) delete this.tableDateErrors[taskId];
+    }, 3500);
+  }
+
+  // =======================
   // Drag & drop + resize
   // =======================
-
-  // Mode interaction : déplacement ou resize fin
   private dragMode: 'move' | 'resize-end' = 'move';
 
-  // Drag & drop (move)
   draggingTask: GanttTaskView | null = null;
   dragStartClientX = 0;
   dragStartTaskX = 0;
   dragHasMoved = false;
 
-  // Resize fin : on fige le start
   private resizeFixedStartDayIndex: number | null = null;
 
   hoverHints: { start?: HoverHint; end?: HoverHint } = {};
@@ -183,31 +171,36 @@ export class ProjectRoadmap implements OnInit, OnChanges {
 
   private taskByRowIndex: Record<number, GanttTaskView> = {};
 
+  constructor(private projectService: ProjectService) {}
+
   ngOnInit(): void {
-    // init “moitié”
     this.tablePanelWidthPx = 400;
     this.tableContentWidthPx = 400;
 
     this.buildGanttCalendar();
     this.buildRoadmap();
 
-    // assure que le panneau respecte déjà le seuil min à l'init
     this.tablePanelWidthPx = Math.max(this.getMinTablePanelWidthPx(), this.tablePanelWidthPx);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['project']) this.buildRoadmap();
+    if (changes['project']) {
+      if (this.project) {
+        // ✅ seed dates + cohérence centralisés
+        this.projectService.registerProject(this.project);
+      }
+      this.buildRoadmap();
+    }
   }
 
   @HostListener('window:resize')
   onWindowResize(): void {
-    // si l’écran rétrécit, on remonte le seuil min et on clamp le panneau
     const minPanel = this.getMinTablePanelWidthPx();
     if (this.tablePanelWidthPx < minPanel) this.tablePanelWidthPx = minPanel;
   }
 
   // =======================
-  // Divider draggable (modifie uniquement le PANNEAU tableau)
+  // Divider draggable
   // =======================
 
   onResizeHandlePointerDown(event: PointerEvent): void {
@@ -228,17 +221,11 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     const dx = event.clientX - this.resizeStartX;
     let nextPanel = this.resizeStartPanelW + dx;
 
-    // seuil min dynamique = 25% viewport (ajuste si besoin)
     const minPanel = this.getMinTablePanelWidthPx();
     nextPanel = Math.max(minPanel, nextPanel);
-
-    // max “raisonnable”
     nextPanel = Math.min(this.maxTablePanelWidthPx, nextPanel);
 
     this.tablePanelWidthPx = nextPanel;
-
-    // IMPORTANT : on ne touche PAS à tableContentWidthPx quand on “compresse” :
-    // => si panneau < contenu => scrollbar du tableau apparaît.
   }
 
   @HostListener('window:pointerup')
@@ -247,20 +234,15 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   }
 
   // =======================
-  // Calendrier Gantt
+  // Calendrier Gantt (source = ProjectService)
   // =======================
 
   private buildGanttCalendar(): void {
-    const now = new Date();
-    this.ganttStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    this.ganttStartDate = this.projectService.getDefaultGanttStartDate();
 
     this.ganttMonths = [];
     for (let i = 0; i < this.ganttMonthsCount; i++) {
-      const d = new Date(
-        this.ganttStartDate.getFullYear(),
-        this.ganttStartDate.getMonth() + i,
-        1
-      );
+      const d = new Date(this.ganttStartDate.getFullYear(), this.ganttStartDate.getMonth() + i, 1);
       this.ganttMonths.push(d.toLocaleString('fr-BE', { month: 'short' }));
     }
 
@@ -280,16 +262,11 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     ];
 
     this.ganttWidth = this.ganttLeftPadding + this.ganttMonthsCount * this.ganttColWidth + 40;
-
-    // Gantt = au moins 2× la somme des colonnes du tableau (contenu),
-    // mais indépendamment du panneau (viewport) tableau.
     this.ganttViewportWidth = Math.max(this.ganttWidth, this.tableContentWidthPx * 2);
   }
 
-  private addDays(base: Date, days: number): Date {
-    const d = new Date(base);
-    d.setDate(d.getDate() + days);
-    return d;
+  private clamp(n: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, n));
   }
 
   // =======================
@@ -308,6 +285,11 @@ export class ProjectRoadmap implements OnInit, OnChanges {
       return;
     }
 
+    if (!this.ganttStartDate) this.buildGanttCalendar();
+
+    // ✅ Seed overrides depuis Task.startDate/endDate (source de vérité)
+    this.seedOverridesFromTaskDates();
+
     const flat: typeof this.baseTasks = [];
     const activities = Object.values(this.project.activities);
 
@@ -316,6 +298,9 @@ export class ProjectRoadmap implements OnInit, OnChanges {
         const tasks = this.project.taskMatrix[activity.id]?.[phase] ?? [];
         for (const task of tasks) {
           flat.push({ task, activityId: activity.id, activityLabel: activity.label, phase });
+
+          // cohérence
+          if (!task.phase) task.phase = phase;
         }
       }
     }
@@ -324,39 +309,52 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     this.rebuildGanttFromBase();
   }
 
+  private seedOverridesFromTaskDates(): void {
+    if (!this.project || !this.ganttStartDate) return;
+
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
+    for (const activityId of Object.keys(this.project.taskMatrix) as ActivityId[]) {
+      const byPhase = this.project.taskMatrix[activityId];
+      for (const phase of this.project.phases) {
+        const tasks = byPhase?.[phase] ?? [];
+        for (const task of tasks) {
+          const s = this.projectService.parseIsoDateToDayIndex(task.startDate ?? '', this.ganttStartDate);
+          const e = this.projectService.parseIsoDateToDayIndex(task.endDate ?? '', this.ganttStartDate);
+
+          if (s === null && e === null) continue;
+
+          const start = s !== null ? this.clamp(s, 0, totalDays - 1) : 0;
+          const end = e !== null ? this.clamp(e, 0, totalDays - 1) : Math.min(totalDays - 1, start + (this.projectService.daysPerMonth - 1));
+
+          const fixedStart = Math.min(start, end);
+          const fixedEnd = Math.max(start, end);
+
+          this.scheduleOverrides[task.id] = { startDayIndex: fixedStart, endDayIndex: fixedEnd };
+        }
+      }
+    }
+  }
+
   private rebuildGanttFromBase(): void {
     const rows: GanttActivityRow[] = [];
     const tasksView: GanttTaskView[] = [];
     let rowIndex = 0;
 
     for (const activityId of this.orderedActivities) {
-      const activityTasks = this.baseTasks.filter((t) => t.activityId === activityId);
+      const activityTasks = this.baseTasks.filter(t => t.activityId === activityId);
       if (!activityTasks.length) continue;
 
-      rows.push({
-        activityId,
-        label: this.activityThemeLabel[activityId],
-        rowIndex,
-        isHeader: true,
-      });
+      rows.push({ activityId, label: this.activityThemeLabel[activityId], rowIndex, isHeader: true });
 
-      const monthIndexes = activityTasks.map((t) => this.phaseToMonthIndex[t.phase] ?? 0);
+      const monthIndexes = activityTasks.map(t => this.projectService.phaseToMonthIndex[t.phase] ?? 0);
       const minMonthIndex = Math.min(...monthIndexes);
       const maxMonthIndex = Math.max(...monthIndexes);
 
-      const startDayIndex = minMonthIndex * this.daysPerMonth;
-      const endDayIndex = (maxMonthIndex + 1) * this.daysPerMonth - 1;
+      const startDayIndex = minMonthIndex * this.projectService.daysPerMonth;
+      const endDayIndex = (maxMonthIndex + 1) * this.projectService.daysPerMonth - 1;
 
-      tasksView.push(
-        this.makeSummaryTaskView(
-          activityId,
-          rowIndex,
-          minMonthIndex,
-          maxMonthIndex,
-          startDayIndex,
-          endDayIndex
-        )
-      );
+      tasksView.push(this.makeSummaryTaskView(activityId, rowIndex, minMonthIndex, maxMonthIndex, startDayIndex, endDayIndex));
 
       if (this.activityCollapse[activityId]) {
         rowIndex++;
@@ -367,22 +365,11 @@ export class ProjectRoadmap implements OnInit, OnChanges {
       for (const t of activityTasks) {
         rows.push({ activityId, label: '', rowIndex, isHeader: false });
 
-        const monthIndex = this.phaseToMonthIndex[t.phase] ?? 0;
-        const dStart = monthIndex * this.daysPerMonth;
-        const dEnd = dStart + this.daysPerMonth - 1;
+        const monthIndex = this.projectService.phaseToMonthIndex[t.phase] ?? 0;
+        const dStart = monthIndex * this.projectService.daysPerMonth;
+        const dEnd = dStart + this.projectService.daysPerMonth - 1;
 
-        tasksView.push(
-          this.makeTaskView(
-            t.task.id,
-            t.task.label,
-            activityId,
-            t.phase,
-            rowIndex,
-            monthIndex,
-            dStart,
-            dEnd
-          )
-        );
+        tasksView.push(this.makeTaskView(t.task.id, t.task.label, activityId, t.phase, rowIndex, monthIndex, dStart, dEnd));
         rowIndex++;
       }
     }
@@ -427,6 +414,16 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     };
   }
 
+  private dayIndexToMonthIndex(dayIndex: number): number {
+    return Math.floor(dayIndex / this.projectService.daysPerMonth);
+  }
+
+  private monthIndexToPhaseId(monthIndex: number): PhaseId {
+    const entries = Object.entries(this.projectService.phaseToMonthIndex) as Array<[PhaseId, number]>;
+    const found = entries.find(([, idx]) => idx === monthIndex);
+    return found?.[0] ?? 'Phase1';
+  }
+
   private makeTaskView(
     id: string,
     label: string,
@@ -437,22 +434,31 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     startDayIndex: number,
     endDayIndex: number
   ): GanttTaskView {
-    const x = this.ganttLeftPadding + startDayIndex * this.dayWidth + this.taskInnerMargin;
+    const ov = this.scheduleOverrides[id];
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
+    const start = this.clamp(ov?.startDayIndex ?? startDayIndex, 0, totalDays - 1);
+    const end = this.clamp(ov?.endDayIndex ?? endDayIndex, start, totalDays - 1);
+
+    const mStart = this.dayIndexToMonthIndex(start);
+    const mEnd = this.dayIndexToMonthIndex(end);
+
+    const x = this.ganttLeftPadding + start * this.dayWidth + this.taskInnerMargin;
     const y = this.ganttTopPadding + rowIndex * this.bodyRowHeight + 6;
-    const width = (endDayIndex - startDayIndex + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+    const width = (end - start + 1) * this.dayWidth - 2 * this.taskInnerMargin;
     const height = this.bodyRowHeight - 12;
 
     return {
       id,
       label,
       activityId,
-      phase,
+      phase: this.monthIndexToPhaseId(mStart),
       rowIndex,
-      monthIndex,
-      startMonthIndex: monthIndex,
-      endMonthIndex: monthIndex,
-      startDayIndex,
-      endDayIndex,
+      monthIndex: mStart,
+      startMonthIndex: mStart,
+      endMonthIndex: mEnd,
+      startDayIndex: start,
+      endDayIndex: end,
       x,
       y,
       width,
@@ -462,9 +468,7 @@ export class ProjectRoadmap implements OnInit, OnChanges {
 
   private rebuildTaskRowIndexMap(): void {
     this.taskByRowIndex = {};
-    const headerRowIndexes = new Set<number>(
-      this.ganttActivityRows.filter((r) => r.isHeader).map((r) => r.rowIndex)
-    );
+    const headerRowIndexes = new Set<number>(this.ganttActivityRows.filter(r => r.isHeader).map(r => r.rowIndex));
 
     for (const t of this.ganttTasksView) {
       if (String(t.id).startsWith('summary-')) continue;
@@ -479,8 +483,8 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     const vGap = Math.max(10, Math.round(this.bodyRowHeight * 0.55));
 
     for (const dep of this.ganttDependencies) {
-      const from = this.ganttTasksView.find((t) => t.id === dep.fromId);
-      const to = this.ganttTasksView.find((t) => t.id === dep.toId);
+      const from = this.ganttTasksView.find(t => t.id === dep.fromId);
+      const to = this.ganttTasksView.find(t => t.id === dep.toId);
       if (!from || !to) continue;
 
       const startX = from.x + from.width;
@@ -511,6 +515,10 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     this.ganttLinksView = links;
   }
 
+  // =======================
+  // Table helpers
+  // =======================
+
   getRowDisplayLabel(row: GanttActivityRow): string {
     if (!row.isHeader) return '';
     const collapsed = this.activityCollapse[row.activityId];
@@ -528,60 +536,138 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   }
 
   getTaskProgressPercent(task: GanttTaskView): number {
-    const base = this.baseTasks.find((b) => b.task.id === task.id);
+    const base = this.baseTasks.find(b => b.task.id === task.id);
     const raw = (base as any)?.task?.progress ?? (base as any)?.task?.completion ?? 0;
     const n = Number(raw);
     if (Number.isNaN(n)) return 0;
     return Math.max(0, Math.min(100, Math.round(n)));
   }
 
-  getTaskStartLabelForTable(task: GanttTaskView): string {
-    const preview = !!this.draggingTask && this.draggingTask.id === task.id;
-    return this.getTaskStartLabel(task, preview);
+  getTaskStartIsoForTable(task: GanttTaskView): string {
+    if (!this.ganttStartDate) return '';
+    const dayIndex = task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth;
+    return this.projectService.toIsoDate(this.projectService.addDays(this.ganttStartDate, dayIndex));
   }
 
-  getTaskEndLabelForTable(task: GanttTaskView): string {
-    const preview = !!this.draggingTask && this.draggingTask.id === task.id;
-    return this.getTaskEndLabel(task, preview);
-  }
-
-  getTaskStartLabel(task: GanttTaskView, preview = false): string {
+  getTaskEndIsoForTable(task: GanttTaskView): string {
     if (!this.ganttStartDate) return '';
     const dayIndex =
-      preview && this.previewStartDayIndex !== null
-        ? this.previewStartDayIndex
-        : task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth;
+      task.endDayIndex ??
+      (task.endMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth + (this.projectService.daysPerMonth - 1);
+    return this.projectService.toIsoDate(this.projectService.addDays(this.ganttStartDate, dayIndex));
+  }
 
-    const d = this.addDays(this.ganttStartDate, dayIndex);
-    return d.toLocaleDateString('fr-BE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+  // =======================
+  // Table -> Gantt + sync -> ProjectService
+  // =======================
+
+  onTableStartDateChange(task: GanttTaskView, iso: string): void {
+    if (!this.ganttStartDate || !this.project) return;
+
+    const start = this.projectService.parseIsoDateToDayIndex(iso, this.ganttStartDate);
+    if (start === null) return;
+
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
+    const oldStart = task.startDayIndex ?? 0;
+    const oldEnd = task.endDayIndex ?? oldStart;
+
+    const newStart = this.clamp(start, 0, totalDays - 1);
+
+    if (newStart > oldEnd) {
+      this.setTableDateError(task.id, 'La date de début ne peut pas être après la date de fin.');
+      return;
+    }
+
+    this.applyScheduleFromTable(task, newStart, oldEnd);
+  }
+
+  onTableEndDateChange(task: GanttTaskView, iso: string): void {
+    if (!this.ganttStartDate || !this.project) return;
+
+    const end = this.projectService.parseIsoDateToDayIndex(iso, this.ganttStartDate);
+    if (end === null) return;
+
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
+    const oldStart = task.startDayIndex ?? 0;
+    const oldEnd = task.endDayIndex ?? (oldStart + this.projectService.daysPerMonth - 1);
+
+    const newEnd = this.clamp(end, 0, totalDays - 1);
+
+    if (newEnd < oldStart) {
+      this.setTableDateError(task.id, 'La date de fin ne peut pas être avant la date de début.');
+      return;
+    }
+
+    this.applyScheduleFromTable(task, oldStart, newEnd);
+  }
+
+  private applyScheduleFromTable(task: GanttTaskView, startDay: number, endDay: number): void {
+    if (!this.project || !this.ganttStartDate) return;
+
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+    const s = this.clamp(startDay, 0, totalDays - 1);
+    const e = this.clamp(endDay, s, totalDays - 1);
+
+    // Update view
+    task.startDayIndex = s;
+    task.endDayIndex = e;
+
+    const mStart = this.dayIndexToMonthIndex(s);
+    const mEnd = this.dayIndexToMonthIndex(e);
+
+    task.monthIndex = mStart;
+    task.startMonthIndex = mStart;
+    task.endMonthIndex = mEnd;
+    task.phase = this.monthIndexToPhaseId(mStart);
+
+    task.x = this.ganttLeftPadding + s * this.dayWidth + this.taskInnerMargin;
+    task.width = (e - s + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+
+    // Persist override
+    this.scheduleOverrides[task.id] = { startDayIndex: s, endDayIndex: e };
+
+    // ✅ Sync -> modèle via service
+    this.syncTaskDatesToModel(task);
+
+    // Links
+    this.updateGanttLinks();
+  }
+
+  // =======================
+  // Sync Gantt -> Task (ProjectService)
+  // =======================
+
+  private findBase(taskId: string): { task: Task; activityId: ActivityId; phase: PhaseId } | null {
+    const b = this.baseTasks.find(x => x.task.id === taskId);
+    return b ? { task: b.task, activityId: b.activityId, phase: b.phase } : null;
+  }
+
+  private syncTaskDatesToModel(taskView: GanttTaskView): void {
+    if (!this.project || !this.ganttStartDate) return;
+    if (String(taskView.id).startsWith('summary-')) return;
+
+    const base = this.findBase(taskView.id);
+    if (!base) return;
+
+    this.projectService.syncGanttDayIndexesToTask({
+      projectId: this.project.id,
+      activityId: base.activityId,
+      phase: base.phase, // phase d'origine pour retrouver la Task dans taskMatrix
+      taskId: base.task.id,
+      ganttStartDate: this.ganttStartDate,
+      startDayIndex: taskView.startDayIndex,
+      endDayIndex: taskView.endDayIndex,
     });
   }
 
-  getTaskEndLabel(task: GanttTaskView, preview = false): string {
-    if (!this.ganttStartDate) return '';
-    const dayIndex =
-      preview && this.previewEndDayIndex !== null
-        ? this.previewEndDayIndex
-        : task.endDayIndex ??
-          (task.endMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth +
-            (this.daysPerMonth - 1);
-
-    const d = this.addDays(this.ganttStartDate, dayIndex);
-    return d.toLocaleDateString('fr-BE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  }
+  // =======================
+  // Tooltips / hints (inchangé)
+  // =======================
 
   private computeHint(task: GanttTaskView, type: 'start' | 'end', preview = false): HoverHint | null {
-    const text =
-      type === 'start'
-        ? this.getTaskStartLabel(task, preview)
-        : this.getTaskEndLabel(task, preview);
+    const text = type === 'start' ? this.getTaskStartLabel(task, preview) : this.getTaskEndLabel(task, preview);
     if (!text) return null;
 
     const bulletX = type === 'start' ? task.x : task.x + task.width;
@@ -591,17 +677,34 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     return { x: bulletX + dx, y: bulletY, text };
   }
 
-  // =========================================================
-  // ✅ CORRECTIF BUG RESIZE : souris -> X dans le repère du SVG
-  // (prend en compte le scroll horizontal du conteneur Gantt)
-  // =========================================================
+  getTaskStartLabel(task: GanttTaskView, preview = false): string {
+    if (!this.ganttStartDate) return '';
+    const dayIndex =
+      preview && this.previewStartDayIndex !== null
+        ? this.previewStartDayIndex
+        : task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth;
+
+    const d = this.projectService.addDays(this.ganttStartDate, dayIndex);
+    return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  getTaskEndLabel(task: GanttTaskView, preview = false): string {
+    if (!this.ganttStartDate) return '';
+    const dayIndex =
+      preview && this.previewEndDayIndex !== null
+        ? this.previewEndDayIndex
+        : task.endDayIndex ??
+          (task.endMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth + (this.projectService.daysPerMonth - 1);
+
+    const d = this.projectService.addDays(this.ganttStartDate, dayIndex);
+    return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
   private getMouseXInSvg(event: MouseEvent): number {
     const svg = event.currentTarget as SVGSVGElement | null;
     if (!svg) return event.clientX;
 
     const rect = svg.getBoundingClientRect();
-
-    // structure: div(scrollX) -> div(inner) -> svg
     const scrollDiv = svg.parentElement?.parentElement as HTMLElement | null;
     const scrollLeft = scrollDiv?.scrollLeft ?? 0;
 
@@ -609,12 +712,12 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   }
 
   private computePreviewDaysFromX(task: GanttTaskView): void {
-    const totalDays = this.ganttMonthsCount * this.daysPerMonth;
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
 
     const currentStart =
-      task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth;
+      task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth;
 
-    const currentEnd = task.endDayIndex ?? currentStart + (this.daysPerMonth - 1);
+    const currentEnd = task.endDayIndex ?? currentStart + (this.projectService.daysPerMonth - 1);
     const durationDays = Math.max(0, currentEnd - currentStart);
 
     const rawStart = (task.x - this.ganttLeftPadding - this.taskInnerMargin) / this.dayWidth;
@@ -634,17 +737,19 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     };
   }
 
-  showHintForTask(task: GanttTaskView, type: 'start' | 'end'): void {
-    if (this.draggingTask) {
-      this.showHintsForDraggingTask(this.draggingTask);
-      return;
-    }
-    const single = this.computeHint(task, type, false);
-    this.hoverHints = {
-      start: type === 'start' ? single ?? undefined : undefined,
-      end: type === 'end' ? single ?? undefined : undefined,
-    };
+showHintForTask(task: GanttTaskView, type: 'start' | 'end'): void {
+  if (this.draggingTask) {
+    this.showHintsForDraggingTask(this.draggingTask);
+    return;
   }
+
+  const single = this.computeHint(task, type, false);
+  this.hoverHints = {
+    start: type === 'start' ? single ?? undefined : undefined,
+    end: type === 'end' ? single ?? undefined : undefined,
+  };
+}
+
 
   hideHints(): void {
     this.hoverHints = {};
@@ -653,7 +758,7 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   }
 
   // =======================
-  // Drag & drop : MOVE
+  // Drag & drop : MOVE / RESIZE END (inchangé sauf sync service)
   // =======================
 
   onGanttBarMouseDown(event: MouseEvent, task: GanttTaskView): void {
@@ -671,20 +776,18 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     event.preventDefault();
   }
 
-  // =======================
-  // Drag & drop : RESIZE END (bullet droit)
-  // =======================
-
   onGanttBarResizeEndMouseDown(event: MouseEvent, task: GanttTaskView): void {
     this.dragMode = 'resize-end';
 
     this.draggingTask = task;
     this.dragHasMoved = false;
 
-    // Figer le start, ne modifier que la fin
-    const start = task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth;
-    const end = task.endDayIndex ??
-      (task.endMonthIndex ?? task.monthIndex ?? 0) * this.daysPerMonth + (this.daysPerMonth - 1);
+    const start =
+      task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth;
+
+    const end =
+      task.endDayIndex ??
+      (task.endMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth + (this.projectService.daysPerMonth - 1);
 
     this.resizeFixedStartDayIndex = start;
     this.previewStartDayIndex = start;
@@ -711,31 +814,22 @@ export class ProjectRoadmap implements OnInit, OnChanges {
       return;
     }
 
-    // =======================
-    // ✅ Resize fin : bord droit = souris (pixel-perfect)
-    // =======================
     if (this.dragMode === 'resize-end') {
       if (this.resizeFixedStartDayIndex === null) return;
 
       this.dragHasMoved = true;
 
-      const totalDays = this.ganttMonthsCount * this.daysPerMonth;
+      const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
       const startDay = this.resizeFixedStartDayIndex;
 
-      // X souris dans le repère SVG (scroll pris en compte)
       const mouseX = this.getMouseXInSvg(event);
 
-      // bornes en X pour le bord droit
       const minRightX = this.draggingTask.x + Math.max(6, this.dayWidth * 0.25);
       const maxRightX = this.ganttLeftPadding + totalDays * this.dayWidth - this.taskInnerMargin;
-
       const rightX = Math.max(minRightX, Math.min(maxRightX, mouseX));
 
-      // 1) Affichage pendant drag : bord droit colle à la souris
       this.draggingTask.width = rightX - this.draggingTask.x;
 
-      // 2) Preview de date de fin (snappée au jour le plus proche)
-      // endX = leftPadding + (endDay+1)*dayWidth - innerMargin
       let endDay = Math.round((rightX + this.taskInnerMargin - this.ganttLeftPadding) / this.dayWidth) - 1;
       endDay = Math.max(startDay, Math.min(totalDays - 1, endDay));
 
@@ -751,7 +845,6 @@ export class ProjectRoadmap implements OnInit, OnChanges {
   onGanttMouseUp(event: MouseEvent): void {
     if (!this.draggingTask) return;
 
-    // click sans drag => annule
     if (!this.dragHasMoved) {
       this.draggingTask = null;
       this.dragMode = 'move';
@@ -768,17 +861,26 @@ export class ProjectRoadmap implements OnInit, OnChanges {
       return;
     }
 
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
     if (this.dragMode === 'move') {
       const durationDays = Math.max(0, this.previewEndDayIndex - this.previewStartDayIndex);
 
-      this.draggingTask.startDayIndex = this.previewStartDayIndex;
-      this.draggingTask.endDayIndex = this.previewEndDayIndex;
+      this.draggingTask.startDayIndex = this.clamp(this.previewStartDayIndex, 0, totalDays - 1);
+      this.draggingTask.endDayIndex = this.clamp(this.previewEndDayIndex, this.draggingTask.startDayIndex, totalDays - 1);
 
       this.draggingTask.x =
-        this.ganttLeftPadding + this.previewStartDayIndex * this.dayWidth + this.taskInnerMargin;
+        this.ganttLeftPadding + this.draggingTask.startDayIndex * this.dayWidth + this.taskInnerMargin;
 
-      this.draggingTask.width =
-        (durationDays + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+      this.draggingTask.width = (durationDays + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+
+      this.scheduleOverrides[this.draggingTask.id] = {
+        startDayIndex: this.draggingTask.startDayIndex,
+        endDayIndex: this.draggingTask.endDayIndex,
+      };
+
+      // ✅ Sync -> modèle via service
+      this.syncTaskDatesToModel(this.draggingTask);
 
       this.updateGanttLinks();
 
@@ -790,21 +892,23 @@ export class ProjectRoadmap implements OnInit, OnChanges {
     }
 
     if (this.dragMode === 'resize-end') {
-      // AU MOUSE UP : on fige, en "snappant" à la grille jour
-      const startDay = this.previewStartDayIndex;
-      const endDay = this.previewEndDayIndex;
+      const startDay = this.clamp(this.previewStartDayIndex, 0, totalDays - 1);
+      const endDay = this.clamp(this.previewEndDayIndex, startDay, totalDays - 1);
       const durationDays = Math.max(0, endDay - startDay);
 
       this.draggingTask.startDayIndex = startDay;
       this.draggingTask.endDayIndex = endDay;
 
-      // x figé au start (sécurité)
-      this.draggingTask.x =
-        this.ganttLeftPadding + startDay * this.dayWidth + this.taskInnerMargin;
+      this.draggingTask.x = this.ganttLeftPadding + startDay * this.dayWidth + this.taskInnerMargin;
+      this.draggingTask.width = (durationDays + 1) * this.dayWidth - 2 * this.taskInnerMargin;
 
-      // width "snappée" (ne bouge plus ensuite)
-      this.draggingTask.width =
-        (durationDays + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+      this.scheduleOverrides[this.draggingTask.id] = {
+        startDayIndex: this.draggingTask.startDayIndex,
+        endDayIndex: this.draggingTask.endDayIndex,
+      };
+
+      // ✅ Sync -> modèle via service
+      this.syncTaskDatesToModel(this.draggingTask);
 
       this.updateGanttLinks();
 

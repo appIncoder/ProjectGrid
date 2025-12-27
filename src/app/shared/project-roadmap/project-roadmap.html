@@ -27,12 +27,7 @@
         <!-- =======================
              PANNEAU TABLEAU (scroll X indépendant)
              ======================= -->
-        <div
-          style="
-            overflow-x: auto;
-            overflow-y: hidden;
-          "
-        >
+        <div style="overflow-x: auto; overflow-y: hidden;">
           <!-- grille interne : 5 colonnes, largeur = contenu -->
           <div
             [style.gridTemplateColumns]="tableInnerGridTemplate"
@@ -69,15 +64,43 @@
                 </span>
               </div>
 
-              <!-- Col2 -->
+              <!-- Col2 : Début (editable) -->
               <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <span *ngIf="getRowTask(row.rowIndex) as t; else dash1">{{ getTaskStartLabelForTable(t) }}</span>
+                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash1">
+                  <div style="display:flex; flex-direction:column;">
+                    <input
+                      type="date"
+                      class="form-control form-control-sm"
+                      style="max-width: 160px;"
+                      [class.is-invalid]="!!tableDateErrors[t.id]"
+                      [value]="getTaskStartIsoForTable(t)"
+                      (change)="onTableStartDateChange(t, ($any($event.target).value))"
+                    />
+                    <div *ngIf="tableDateErrors[t.id]" class="invalid-feedback d-block">
+                      {{ tableDateErrors[t.id] }}
+                    </div>
+                  </div>
+                </ng-container>
                 <ng-template #dash1><span class="text-muted">—</span></ng-template>
               </div>
 
-              <!-- Col3 -->
+              <!-- Col3 : Fin (editable) -->
               <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <span *ngIf="getRowTask(row.rowIndex) as t; else dash2">{{ getTaskEndLabelForTable(t) }}</span>
+                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash2">
+                  <div style="display:flex; flex-direction:column;">
+                    <input
+                      type="date"
+                      class="form-control form-control-sm"
+                      style="max-width: 160px;"
+                      [class.is-invalid]="!!tableDateErrors[t.id]"
+                      [value]="getTaskEndIsoForTable(t)"
+                      (change)="onTableEndDateChange(t, ($any($event.target).value))"
+                    />
+                    <div *ngIf="tableDateErrors[t.id]" class="invalid-feedback d-block">
+                      {{ tableDateErrors[t.id] }}
+                    </div>
+                  </div>
+                </ng-container>
                 <ng-template #dash2><span class="text-muted">—</span></ng-template>
               </div>
 
@@ -144,8 +167,7 @@
                   class="gantt-milestone-dot"
                   [attr.cx]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
                   [attr.cy]="18"
-                  r="4"
-                ></circle>
+                  r="4"></circle>
                 <text
                   class="gantt-milestone-text"
                   [attr.x]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
@@ -162,8 +184,7 @@
                   [attr.x]="ganttLeftPadding + band.startMonthIndex * ganttColWidth"
                   [attr.y]="28"
                   [attr.width]="(band.endMonthIndex - band.startMonthIndex + 1) * ganttColWidth"
-                  [attr.height]="10"
-                ></rect>
+                  [attr.height]="10"></rect>
                 <text
                   class="gantt-phase-text"
                   [attr.x]="ganttLeftPadding + (band.startMonthIndex + band.endMonthIndex + 1) * ganttColWidth / 2"
@@ -205,8 +226,7 @@
                   [attr.x1]="ganttLeftPadding + colIndex * ganttColWidth"
                   [attr.y1]="0"
                   [attr.x2]="ganttLeftPadding + colIndex * ganttColWidth"
-                  [attr.y2]="ganttBodyHeight"
-                ></line>
+                  [attr.y2]="ganttBodyHeight"></line>
               </g>
 
               <g *ngFor="let r of ganttActivityRows">
@@ -215,8 +235,7 @@
                   [attr.x1]="0"
                   [attr.y1]="r.rowIndex * bodyRowHeight"
                   [attr.x2]="ganttViewportWidth"
-                  [attr.y2]="r.rowIndex * bodyRowHeight"
-                ></line>
+                  [attr.y2]="r.rowIndex * bodyRowHeight"></line>
               </g>
 
               <g *ngFor="let link of ganttLinksView">
@@ -230,10 +249,9 @@
                   [attr.y]="task.y"
                   [attr.width]="task.width"
                   [attr.height]="task.height"
-                  (mousedown)="onGanttBarMouseDown($event, task)"
-                ></rect>
+                  (mousedown)="onGanttBarMouseDown($event, task)"></rect>
 
-                <!-- Bullet gauche = move (comme avant) -->
+                <!-- bullet gauche = move -->
                 <circle
                   class="gantt-bar-bullet gantt-bar-bullet-start"
                   [attr.cx]="task.x"
@@ -241,10 +259,9 @@
                   r="4"
                   (mousedown)="onGanttBarMouseDown($event, task)"
                   (mouseenter)="showHintForTask(task, 'start')"
-                  (mouseleave)="hideHints()"
-                ></circle>
+                  (mouseleave)="hideHints()"></circle>
 
-                <!-- ✅ Bullet droit = resize fin -->
+                <!-- bullet droit = resize fin -->
                 <circle
                   class="gantt-bar-bullet gantt-bar-bullet-end"
                   [attr.cx]="task.x + task.width"
@@ -252,8 +269,7 @@
                   r="4"
                   (mousedown)="onGanttBarResizeEndMouseDown($event, task)"
                   (mouseenter)="showHintForTask(task, 'end')"
-                  (mouseleave)="hideHints()"
-                ></circle>
+                  (mouseleave)="hideHints()"></circle>
 
                 <text
                   class="gantt-bar-label"

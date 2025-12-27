@@ -29,9 +29,10 @@
                   *ngFor="let task of getTasks(activity.id, phase)"
                   class="task-pill"
                   [ngClass]="getStatusClass(task.status)"
-                  (click)="openTaskStatusModal(taskStatusModal, task)">
+                  (click)="openTaskEditModal(taskEditModal, activity.id, phase, task)">
                   {{ task.label }}
                 </div>
+
                 <div *ngIf="getTasks(activity.id, phase).length === 0" class="no-task text-muted small">
                   -
                 </div>
@@ -45,20 +46,26 @@
   </div>
 </div>
 
-<!-- Modal d'édition de statut de tâche -->
-<ng-template #taskStatusModal let-modal>
+<!-- Modal d'édition -->
+<ng-template #taskEditModal let-modal>
   <div class="modal-header py-2">
-    <h5 class="modal-title fs-6">Modifier le statut</h5>
+    <h5 class="modal-title fs-6">Modifier l’activité</h5>
     <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
   </div>
+
   <div class="modal-body">
-    <div class="mb-2">
-      <div class="small text-muted mb-1">Tâche</div>
-      <div class="fw-semibold">
-        {{ taskBeingEdited?.label }}
-      </div>
+    <div *ngIf="editError" class="alert alert-danger py-2 small mb-3">
+      {{ editError }}
     </div>
-    <div class="mb-0">
+
+    <!-- Nom -->
+    <div class="mb-3">
+      <label class="form-label form-label-sm">Nom de l’activité</label>
+      <input class="form-control form-control-sm" [(ngModel)]="editedTaskLabel" />
+    </div>
+
+    <!-- Statut -->
+    <div class="mb-3">
       <label class="form-label form-label-sm">Statut</label>
       <select class="form-select form-select-sm" [(ngModel)]="editedTaskStatus">
         <option *ngFor="let opt of taskStatusOptions" [ngValue]="opt.value">
@@ -66,12 +73,48 @@
         </option>
       </select>
     </div>
+
+    <!-- Dates -->
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <label class="form-label form-label-sm">Date de début</label>
+        <input type="date" class="form-control form-control-sm" [(ngModel)]="editedStartDate" />
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm">Date de fin</label>
+        <input type="date" class="form-control form-control-sm" [(ngModel)]="editedEndDate" />
+      </div>
+    </div>
+
+    <!-- Catégorie -->
+    <div class="mb-3">
+      <label class="form-label form-label-sm">Catégorie</label>
+      <select class="form-select form-select-sm" [(ngModel)]="editedCategory">
+        <option *ngFor="let opt of taskCategoryOptions" [ngValue]="opt.value">
+          {{ opt.label }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Phase -->
+    <div class="mb-0">
+      <label class="form-label form-label-sm">Phase</label>
+      <select class="form-select form-select-sm" [(ngModel)]="editedPhase">
+        <option *ngFor="let p of getPhases()" [ngValue]="p">
+          {{ getPhaseLabel(p) }}
+        </option>
+      </select>
+      <div class="form-text small">
+        Changer la phase déplacera l’activité vers la cellule correspondante.
+      </div>
+    </div>
   </div>
+
   <div class="modal-footer py-2">
     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="modal.dismiss()">
       Annuler
     </button>
-    <button type="button" class="btn btn-sm btn-primary" (click)="saveTaskStatus(modal)">
+    <button type="button" class="btn btn-sm btn-primary" (click)="saveTaskEdit(modal)">
       Enregistrer
     </button>
   </div>

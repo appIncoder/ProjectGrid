@@ -112,3 +112,24 @@ export interface GanttPhaseBand {
   startMonthIndex: number;
   endMonthIndex: number;
 }
+
+export type TaskCategory =
+  | 'projectManagement'
+  | 'businessManagement'
+  | 'changeManagement'
+  | 'technologyManagement';
+
+/* ----- Scorecard / tâches ----- */
+export interface Task {
+  id: string;
+  label: string;
+  status: ActivityStatus;
+
+  // ✅ nouveaux champs
+  startDate?: string; // format "YYYY-MM-DD"
+  endDate?: string;   // format "YYYY-MM-DD"
+  category?: TaskCategory;
+
+  // IMPORTANT : une tâche "vit" dans une phase de la matrice
+  phase?: PhaseId;
+}
