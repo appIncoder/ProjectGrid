@@ -1,5 +1,5 @@
 // project-models.ts
-
+import type { DependencyType } from './gantt.model';
 export type PhaseId = 'Phase1' | 'Phase2' | 'Phase3' | 'Phase4' | 'Phase5' | 'Phase6';
 export type ActivityId = 'projet' | 'metier' | 'changement' | 'technologie';
 
@@ -29,21 +29,22 @@ export interface ActivityDefinition {
   owner: string; // responsable du suivi de la thématique
 }
 
-export interface ProjectDetail {
+
+export type ProjectDetail = {
   id: string;
   name: string;
-  description: string;
-
-  // ✅ inchangé (utilisé partout)
+  description: string; // ✅ AJOUT ICI (obligatoire)
   phases: PhaseId[];
-
-  // ✅ nouveau : métadonnées des phases
-  phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
-
   activities: Record<ActivityId, ActivityDefinition>;
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
-}
 
+  // ✅ dépendances Gantt persistées (fake aujourd’hui, API demain)
+  ganttDependencies?: Array<{
+    fromId: string;
+    toId: string;
+    type?: DependencyType; // 'F2S' | 'F2F' | 'S2S'
+  }>;
+};
 
 
 /* ----- Risques ----- */
@@ -80,55 +81,6 @@ export interface BudgetLine {
   initial: number;
   spent: number;
   forecast: number;
-}
-
-/* ----- Roadmap / Gantt ----- */
-export interface GanttActivityRow {
-  activityId: ActivityId;
-  label: string;
-  rowIndex: number;
-  isHeader: boolean;   // ⬅️ nouveau : true = ligne titre, false = ligne détail
-}
-
-
-export interface GanttTaskView {
-  id: string;
-  label: string;
-  activityId: ActivityId;
-  phase: PhaseId;
-  rowIndex: number;
-
-  // Mois "principal" (utile pour phases / dépendances)
-  monthIndex: number;
-
-  // Coordonnées/tailles dans le SVG
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-
-  // Pour les calculs de dates et la durée
-  startMonthIndex?: number;
-  endMonthIndex?: number;
-
-  // Indices de jours relatifs au début de la période Gantt (ganttStartDate)
-  // 0 = premier jour du Gantt, 1 = +1 jour, etc.
-  startDayIndex?: number;
-  endDayIndex?: number;
-}
-
-
-export interface GanttLinkView {
-  fromId: string;
-  toId: string;
-  path: string;
-}
-
-export interface GanttPhaseBand {
-  id: PhaseId;
-  label: string;
-  startMonthIndex: number;
-  endMonthIndex: number;
 }
 
 export type TaskCategory =

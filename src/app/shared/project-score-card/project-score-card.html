@@ -97,7 +97,7 @@
     </div>
 
     <!-- Phase -->
-    <div class="mb-0">
+    <div class="mb-3">
       <label class="form-label form-label-sm">Phase</label>
       <select class="form-select form-select-sm" [(ngModel)]="editedPhase">
         <option *ngFor="let p of getPhases()" [ngValue]="p">
@@ -106,6 +106,64 @@
       </select>
       <div class="form-text small">
         Changer la phase déplacera l’activité vers la cellule correspondante.
+      </div>
+    </div>
+
+    <!-- ✅ Dépendances -->
+    <div class="mt-3 pt-3 border-top">
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <div>
+          <div class="fw-semibold" style="font-size: 0.92rem;">Dépendances</div>
+          <div class="text-muted small">
+            Choisis le type de lien et l’activité liée (affiché aussi dans le Gantt).
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-sm btn-outline-primary" (click)="addDependencyRow()">
+          + Ajouter
+        </button>
+      </div>
+
+      <!-- Liste -->
+      <div *ngIf="editedDependencies.length === 0" class="text-muted small">
+        Aucune dépendance.
+      </div>
+
+      <div *ngFor="let dep of editedDependencies; index as i" class="row g-2 align-items-center mb-2">
+        <!-- Type -->
+        <div class="col-5">
+          <select class="form-select form-select-sm" [(ngModel)]="dep.type">
+            <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Activité liée -->
+        <div class="col-6">
+          <select class="form-select form-select-sm" [(ngModel)]="dep.toId">
+            <option value="">— Choisir une activité liée —</option>
+            <option *ngFor="let t of getLinkableTasks()" [value]="t.id">
+              {{ t.label }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Remove -->
+        <div class="col-1 d-flex justify-content-end">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            title="Supprimer"
+            (click)="removeDependencyRow(i)"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <div class="form-text small">
+        Astuce : laisse une ligne vide si tu veux la supprimer automatiquement (elle ne sera pas enregistrée).
       </div>
     </div>
   </div>

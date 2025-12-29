@@ -13,9 +13,9 @@
 }
 
 .gantt-svg {
-  display: block; /* évite l’espace baseline inline SVG */
-  width: auto; /* IMPORTANT: ne pas forcer 100% */
-  height: auto; /* IMPORTANT: ne pas forcer auto scaling */
+  display: block;
+  width: auto;
+  height: auto;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -103,6 +103,18 @@
   cursor: grab;
 }
 
+/* ✅ Highlight / Dim (hover lien + filtre) */
+.gantt-bar--highlight {
+  stroke: rgba(255, 193, 7, 0.95); /* amber */
+  stroke-width: 2;
+  opacity: 1 !important;
+}
+
+.gantt-bar--dim {
+  opacity: 0.18 !important;
+  transform: none !important;
+}
+
 /* ===========================
    Lignes de dépendance
    =========================== */
@@ -112,6 +124,27 @@
   stroke: #6c757d;
   stroke-width: 1;
   stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: opacity 0.12s ease, stroke-width 0.12s ease;
+}
+
+/* ✅ hover */
+.gantt-link--hover {
+  stroke: #0d6efd;
+  stroke-width: 2;
+  opacity: 1 !important;
+}
+
+/* ✅ lien gardé par filtre */
+.gantt-link--focus {
+  stroke: #0d6efd;
+  stroke-width: 1.6;
+  opacity: 0.95;
+}
+
+/* ✅ dim (pendant hover ou filtre) */
+.gantt-link--dim {
+  opacity: 0.12;
 }
 
 /* ===========================
@@ -123,15 +156,25 @@
   stroke: #0d6efd;
   stroke-width: 1.5;
   cursor: pointer;
+  transition: opacity 0.12s ease, stroke-width 0.12s ease;
 }
 
 .gantt-bar-bullet:hover {
   stroke-width: 2;
 }
 
-/* ✅ UX : bullet droit = resize */
 .gantt-bar-bullet-end {
   cursor: ew-resize;
+}
+
+.gantt-bullet--highlight {
+  stroke: rgba(255, 193, 7, 0.95);
+  stroke-width: 2.2;
+  opacity: 1;
+}
+
+.gantt-bullet--dim {
+  opacity: 0.2;
 }
 
 /* ===========================
@@ -181,11 +224,7 @@
   cursor: default;
 }
 
-/* ===== Alignement parfait table <-> Gantt (si réutilisé ailleurs) ===== */
-
-.roadmap-scroll-y {
-  /* --rowH est injecté depuis le HTML via [style.--rowH.px] */
-}
+.roadmap-scroll-y {}
 
 .roadmap-left-table table {
   border-collapse: separate;
@@ -218,4 +257,16 @@
 
 .roadmap-grid [title="Glisser pour redimensionner"]:hover {
   background: rgba(13, 110, 253, 0.12) !important;
+}
+.gantt-link-tooltip-bg {
+  fill: rgba(0, 0, 0, 0.82);
+}
+
+.gantt-link-tooltip-text {
+  fill: #ffffff;
+  font-size: 0.64rem;
+}
+.gantt-link-tooltip-bg,
+.gantt-link-tooltip-text {
+  pointer-events: none;
 }
