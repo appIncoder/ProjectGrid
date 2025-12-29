@@ -113,13 +113,13 @@
               </div>
 
               <!-- Col2 : Début -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+<div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash1">
                   <div style="display:flex; flex-direction:column;">
                     <input
                       type="date"
                       class="form-control form-control-sm"
-                      style="max-width: 160px;"
+                      style="width: 100%;"
                       [class.is-invalid]="!!tableDateErrors[t.id]"
                       [value]="getTaskStartIsoForTable(t)"
                       (change)="onTableStartDateChange(t, ($any($event.target).value))"
@@ -133,13 +133,13 @@
               </div>
 
               <!-- Col3 : Fin -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+<div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash2">
                   <div style="display:flex; flex-direction:column;">
                     <input
                       type="date"
                       class="form-control form-control-sm"
-                      style="max-width: 160px;"
+                      style="width: 100%;"
                       [class.is-invalid]="!!tableDateErrors[t.id]"
                       [value]="getTaskEndIsoForTable(t)"
                       (change)="onTableEndDateChange(t, ($any($event.target).value))"
