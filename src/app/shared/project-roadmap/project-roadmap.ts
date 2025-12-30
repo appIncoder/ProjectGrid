@@ -16,35 +16,19 @@ import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 
 import {
-  ActivityId,
-  ActivityStatus,
-  GanttActivityRow,
-  GanttLinkView,
-  GanttPhaseBand,
-  GanttTaskView,
-  PhaseId,
-  ProjectDetail,
-  Task,
-  TaskCategory,
+  ActivityId, ActivityStatus, GanttActivityRow,
+  GanttLinkView, GanttPhaseBand, GanttTaskView,
+  PhaseId, ProjectDetail, Task,
+  TaskCategory, DependencyType, GanttDependency,
+  EditableDependencyRow, RoadmapLinkView,
+  PeriodPreset, HoverHint, LinkTooltip,
+  ViewMode
 } from '../../models';
+
 
 import { ProjectService } from '../../services/project.service';
 
-type HoverHint = { x: number; y: number; text: string };
 type TaskScheduleOverride = { startDayIndex: number; endDayIndex: number };
-type PeriodPreset = '3m' | '6m' | '12m' | 'custom';
-
-type DependencyType = 'F2S' | 'F2F' | 'S2S';
-type GanttDependency = { fromId: string; toId: string; type?: DependencyType };
-
-type EditableDependencyRow = { toId: string; type: DependencyType };
-
-// ✅ Vue enrichie pour gérer hover/filtre sans toucher aux models partagés
-type RoadmapLinkView = GanttLinkView & {
-  key: string;
-  type: DependencyType;
-};
-type LinkTooltip = { x: number; y: number; text: string };
 
 @Component({
   selector: 'app-project-roadmap',
@@ -57,9 +41,13 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   @Input() project: ProjectDetail | null = null;
 
   @ViewChild('taskEditModal', { static: false }) taskEditModalTpl?: TemplateRef<any>;
-
   @ViewChild('ganttScroll', { static: false }) ganttScrollRef?: ElementRef<HTMLElement>;
-linkTooltip: LinkTooltip | null = null;
+
+  linkTooltip: LinkTooltip | null = null;
+
+  // ✅ Patch minimal : viewMode + setter
+  viewMode: ViewMode = 'split';
+
   // ===== Layout (lignes)
   readonly headerRow1Height = 44;
   readonly headerRow2Height = 32;
@@ -92,12 +80,33 @@ linkTooltip: LinkTooltip | null = null;
   get colPhaseW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[3]); }
   get colProgW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[4]); }
 
-  get tableInnerGridTemplate(): string {
-    return `${this.colTaskW}px ${this.colStartW}px ${this.colEndW}px ${this.colPhaseW}px ${this.colProgW}px`;
-  }
+// ✅ Colonnes additionnelles (uniquement en focusLeft)
+readonly colLinkTypeW = 170;
+readonly colLinkedTaskW = 280;
+
+get tableInnerGridTemplate(): string {
+  const base = `${this.colTaskW}px ${this.colStartW}px ${this.colEndW}px ${this.colPhaseW}px ${this.colProgW}px`;
+  if (this.viewMode !== 'focusLeft') return base;
+  return `${base} ${this.colLinkTypeW}px ${this.colLinkedTaskW}px`;
+}
 
   private getMinTablePanelWidthPx(): number {
     return Math.max(240, Math.round(window.innerWidth * this.minPanelPercentOfScreen));
+  }
+
+  // ✅ Patch minimal : changement de mode sans toucher aux colonnes
+  setViewMode(mode: ViewMode): void {
+    this.viewMode = mode;
+
+    if (mode === 'split') return;
+
+    if (mode === 'focusLeft') {
+      this.tablePanelWidthPx = Math.min(this.maxTablePanelWidthPx, Math.round(window.innerWidth * 0.70));
+      return;
+    }
+
+    // focusRight
+    this.tablePanelWidthPx = Math.max(this.getMinTablePanelWidthPx(), Math.round(window.innerWidth * 0.22));
   }
 
   // ===== Timeline (Gantt)
@@ -125,8 +134,6 @@ linkTooltip: LinkTooltip | null = null;
 
   ganttActivityRows: GanttActivityRow[] = [];
   ganttTasksView: GanttTaskView[] = [];
-
-  // ✅ on stocke des RoadmapLinkView (hover + type + key)
   ganttLinksView: RoadmapLinkView[] = [];
 
   ganttWidth = 0;
@@ -134,7 +141,6 @@ linkTooltip: LinkTooltip | null = null;
   ganttBodyHeight = 0;
 
   ganttStartDate: Date | null = null;
-
   todayDayIndex: number | null = null;
 
   private readonly fallbackDependencies: GanttDependency[] = [
@@ -169,14 +175,7 @@ linkTooltip: LinkTooltip | null = null;
     technologie: false,
   };
 
-  // =======================
-  // Overrides planning (local)
-  // =======================
   private scheduleOverrides: Record<string, TaskScheduleOverride> = {};
-
-  // =======================
-  // UX validation date (table)
-  // =======================
   tableDateErrors: Record<string, string> = {};
 
   private setTableDateError(taskId: string, msg: string): void {
@@ -186,9 +185,6 @@ linkTooltip: LinkTooltip | null = null;
     }, 3500);
   }
 
-  // =======================
-  // Drag & drop + resize
-  // =======================
   private dragMode: 'move' | 'resize-end' = 'move';
 
   draggingTask: GanttTaskView | null = null;
@@ -204,14 +200,10 @@ linkTooltip: LinkTooltip | null = null;
 
   private taskByRowIndex: Record<number, GanttTaskView> = {};
 
-  // ✅ Période affichée (UI)
   periodPreset: PeriodPreset = '6m';
   customMonths = 6;
   customStartIso = '';
 
-  // =======================
-  // ✅ Modal édition
-  // =======================
   taskStatusOptions: { value: ActivityStatus; label: string }[] = [
     { value: 'todo', label: 'À faire (blanc)' },
     { value: 'inprogress', label: 'En cours (orange)' },
@@ -248,17 +240,12 @@ linkTooltip: LinkTooltip | null = null;
   editedDependencies: EditableDependencyRow[] = [];
   editError: string | null = null;
 
-  // ✅ clic vs drag
   private clickCandidateTask: GanttTaskView | null = null;
 
-  // =======================
-  // ✅ Hover / Focus liens
-  // =======================
   hoveredLinkKey: string | null = null;
   hoveredFromId: string | null = null;
   hoveredToId: string | null = null;
 
-  // ✅ Filtre “afficher uniquement les liens de la tâche”
   filterLinksInGantt = false;
   private filterTaskId: string | null = null;
 
@@ -306,6 +293,13 @@ linkTooltip: LinkTooltip | null = null;
     const minPanel = this.getMinTablePanelWidthPx();
     if (this.tablePanelWidthPx < minPanel) this.tablePanelWidthPx = minPanel;
   }
+
+  // ... ✅ TOUT LE RESTE DE TON FICHIER TS EST INCHANGÉ ...
+  // (je ne recolle pas ici le reste pour éviter une “régression de copie” et parce que tu l’as déjà fourni)
+
+  // ⚠️ À conserver tel quel : toutes tes méthodes existantes (gantt, deps, modal, drag, etc.)
+
+
 
   // =======================
   // Divider draggable
@@ -496,6 +490,105 @@ linkTooltip: LinkTooltip | null = null;
     const deps = (Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : []) as GanttDependency[];
     return deps.length ? deps : this.fallbackDependencies;
   }
+private getPrimaryDependencyForTask(fromId: string): GanttDependency | null {
+  const deps = this.getProjectDependencies();
+  const matches = deps.filter(d => String(d.fromId) === String(fromId));
+  return matches.length ? matches[0] : null;
+}
+
+getInlineDepType(task: GanttTaskView): DependencyType {
+  const dep = this.getPrimaryDependencyForTask(task.id);
+  return (dep?.type ?? 'F2S') as DependencyType;
+}
+
+getInlineDepToId(task: GanttTaskView): string {
+  const dep = this.getPrimaryDependencyForTask(task.id);
+  return dep?.toId ? String(dep.toId) : '';
+}
+
+getLinkableTasksFor(taskId: string): Task[] {
+  const all = this.getAllTasksFlat();
+  return all.filter(t => t.id !== taskId);
+}
+onInlineDepTypeChange(task: GanttTaskView, type: DependencyType): void {
+  if (!this.project) return;
+  this.ensureProjectDependenciesContainer();
+
+  const toId = this.getInlineDepToId(task);
+  // si pas de cible sélectionnée, on ne crée pas de lien juste en changeant le type
+  if (!toId) return;
+
+  this.upsertPrimaryDependency(task.id, toId, type);
+}
+
+onInlineDepToChange(task: GanttTaskView, toId: string): void {
+  if (!this.project) return;
+  this.ensureProjectDependenciesContainer();
+
+  const cleanTo = (toId ?? '').trim();
+
+  // suppression si vide
+  if (!cleanTo) {
+    this.removePrimaryDependency(task.id);
+    return;
+  }
+
+  // garde-fous
+  if (cleanTo === task.id) {
+    this.setTableDateError(task.id, "Une activité ne peut pas dépendre d’elle-même.");
+    return;
+  }
+
+  const exists = this.getAllTasksFlat().some(t => t.id === cleanTo);
+  if (!exists) {
+    this.setTableDateError(task.id, "L’activité liée n’existe pas.");
+    return;
+  }
+
+  const type = this.getInlineDepType(task);
+  this.upsertPrimaryDependency(task.id, cleanTo, type);
+}
+
+private upsertPrimaryDependency(fromId: string, toId: string, type: DependencyType): void {
+  if (!this.project) return;
+  const anyProj = this.project as any;
+  const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+
+  // Toutes les deps de la tâche
+  const fromDeps = allDeps.filter(d => String(d.fromId) === String(fromId));
+  const others = allDeps.filter(d => String(d.fromId) !== String(fromId));
+
+  if (!fromDeps.length) {
+    anyProj.ganttDependencies = [...others, { fromId, toId, type }];
+  } else {
+    // Remplace uniquement la "primary" (1ère), conserve les autres
+    const [primary, ...rest] = fromDeps;
+    const updatedPrimary: GanttDependency = { ...primary, fromId, toId, type };
+    anyProj.ganttDependencies = [...others, updatedPrimary, ...rest];
+  }
+
+  // refresh visuel
+  this.depsSignature = this.computeDepsSignature();
+  this.updateGanttLinks();
+}
+
+private removePrimaryDependency(fromId: string): void {
+  if (!this.project) return;
+  const anyProj = this.project as any;
+  const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+
+  const fromDeps = allDeps.filter(d => String(d.fromId) === String(fromId));
+  const others = allDeps.filter(d => String(d.fromId) !== String(fromId));
+
+  if (!fromDeps.length) return;
+
+  // enlève uniquement la "primary" (1ère), conserve les autres
+  const [, ...rest] = fromDeps;
+  anyProj.ganttDependencies = [...others, ...rest];
+
+  this.depsSignature = this.computeDepsSignature();
+  this.updateGanttLinks();
+}
 
   private computeDepsSignature(): string {
     const deps = this.getProjectDependencies() ?? [];

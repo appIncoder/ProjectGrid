@@ -49,3 +49,15 @@ export type GanttLinkView = {
   toId: string;
   path: string;
 };
+
+export type EditableDependencyRow = { 
+  toId: string; 
+  type: DependencyType 
+};
+
+export type RoadmapLinkView = GanttLinkView & {
+  key: string;
+  type: DependencyType;
+};
+
+export type ViewMode = 'split' | 'focusLeft' | 'focusRight';

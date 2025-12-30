@@ -1,1 +1,171 @@
-<p>account-page works!</p>
+<div class="account-page">
+  <header class="header">
+    <h2>Mon compte</h2>
+    <p class="subtitle">Gérez votre profil et vos paramètres de sécurité.</p>
+  </header>
+
+  <form [formGroup]="form" class="grid">
+    <!-- ===================== Profil ===================== -->
+    <section class="card">
+      <div class="card-title">
+        <h3>Profil</h3>
+      </div>
+
+      <div class="avatar-row">
+        <div class="avatar">
+          <img *ngIf="avatarUrl; else placeholder" [src]="avatarUrl" alt="Avatar" />
+          <ng-template #placeholder>
+            <div class="placeholder">👤</div>
+          </ng-template>
+        </div>
+
+        <div class="avatar-actions">
+          <label class="btn">
+            Changer l’avatar
+            <input type="file" accept="image/*" (change)="onAvatarFileSelected($event)" hidden />
+          </label>
+          <button type="button" class="btn" (click)="removeAvatar()">Supprimer</button>
+          <p class="hint">Formats image. Stockage local (base64).</p>
+        </div>
+      </div>
+
+      <label class="row">
+        <span class="label">Username</span>
+        <input class="control" type="text" formControlName="username" placeholder="ex: jdupont" />
+      </label>
+      <div class="error" *ngIf="form.get('username')?.touched && form.get('username')?.invalid">
+        Username requis (min 3 caractères).
+      </div>
+
+      <label class="row">
+        <span class="label">Prénom</span>
+        <input class="control" type="text" formControlName="firstName" />
+      </label>
+
+      <label class="row">
+        <span class="label">Nom</span>
+        <input class="control" type="text" formControlName="lastName" />
+      </label>
+
+      <label class="row">
+        <span class="label">Adresse mail</span>
+        <input class="control" type="email" formControlName="email" placeholder="ex: nom@domaine.com" />
+      </label>
+      <div class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
+        Email invalide.
+      </div>
+
+      <label class="row">
+        <span class="label">Rôle</span>
+        <select class="control" formControlName="role">
+          <option *ngFor="let r of roles" [value]="r.value">{{ r.label }}</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span class="label">Type de profil</span>
+        <select class="control" formControlName="profileType">
+          <option *ngFor="let p of profileTypes" [value]="p.value">{{ p.label }}</option>
+        </select>
+      </label>
+    </section>
+
+    <!-- ===================== Sécurité ===================== -->
+    <section class="card">
+      <div class="card-title security-title">
+        <h3>Sécurité</h3>
+        <button type="button" class="btn small" (click)="togglePasswordVisibility()">
+          {{ showPassword ? 'Masquer' : 'Afficher' }}
+        </button>
+      </div>
+
+      <p class="hint">
+        Pour changer le mot de passe, saisissez l’actuel + le nouveau (min 8 caractères).
+      </p>
+
+      <label class="row">
+        <span class="label">Mot de passe actuel</span>
+        <input
+          class="control"
+          [type]="showPassword ? 'text' : 'password'"
+          formControlName="currentPassword"
+          autocomplete="current-password"
+        />
+      </label>
+
+      <label class="row">
+        <span class="label">Nouveau mot de passe</span>
+        <input
+          class="control"
+          [type]="showPassword ? 'text' : 'password'"
+          formControlName="newPassword"
+          autocomplete="new-password"
+        />
+      </label>
+
+      <label class="row">
+        <span class="label">Confirmer</span>
+        <input
+          class="control"
+          [type]="showPassword ? 'text' : 'password'"
+          formControlName="confirmNewPassword"
+          autocomplete="new-password"
+        />
+      </label>
+
+<div class="error" *ngIf="form.touched && form.errors?.['currentPasswordRequired']">
+  Le mot de passe actuel est requis.
+</div>
+<div class="error" *ngIf="form.touched && form.errors?.['newPasswordWeak']">
+  Nouveau mot de passe trop faible (min 8 caractères).
+</div>
+<div class="error" *ngIf="form.touched && form.errors?.['newPasswordMismatch']">
+  La confirmation ne correspond pas.
+</div>
+
+    </section>
+  </form>
+
+  <footer class="actions">
+    <button type="button" class="btn" (click)="reset()">Réinitialiser</button>
+    <button type="button" class="btn primary" (click)="save()">Enregistrer</button>
+
+    <span class="status ok" *ngIf="savedState === 'saved'">✅ Sauvegardé</span>
+    <span class="status err" *ngIf="savedState === 'error'">⚠️ Vérifie les champs</span>
+  </footer>
+</div>
+
+<style>
+  .account-page { padding: 16px; max-width: 1100px; margin: 0 auto; }
+  .header h2 { margin: 0 0 6px 0; }
+  .subtitle { margin: 0 0 14px 0; color: #555; }
+
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+  .card { grid-column: span 12; border: 1px solid #e6e6e6; border-radius: 12px; padding: 14px; background: #fff; }
+  @media (min-width: 900px) { .card { grid-column: span 6; } }
+
+  .card-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-title h3 { margin: 0; font-size: 16px; }
+
+  .avatar-row { display: grid; grid-template-columns: 88px 1fr; gap: 12px; align-items: center; margin-bottom: 12px; }
+  .avatar { width: 88px; height: 88px; border-radius: 16px; border: 1px solid #e5e5e5; overflow: hidden; display: grid; place-items: center; background: #fafafa; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .placeholder { font-size: 34px; color: #777; }
+
+  .avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn { border: 1px solid #d0d0d0; background: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
+  .btn.small { padding: 6px 10px; border-radius: 10px; }
+  .btn.primary { border-color: #2a6; background: #2a6; color: #fff; }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin: 10px 0; }
+  .label { color: #333; }
+  .control { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid #dcdcdc; background: #fff; }
+
+  .hint { margin: 6px 0 0 0; color: #666; font-size: 12px; }
+  .error { margin-top: -6px; color: #a35; font-size: 12px; }
+
+  .actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .status { margin-left: 6px; font-size: 13px; }
+  .status.ok { color: #2a6; }
+  .status.err { color: #a35; }
+</style>

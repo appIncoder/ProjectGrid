@@ -1,1 +1,182 @@
-<p>settings-page works!</p>
+<div class="settings-page">
+  <header class="settings-header">
+    <h2>Paramètres</h2>
+
+    <div class="settings-subtitle" *ngIf="project?.name; else noProject">
+      Projet sélectionné : <strong>{{ project?.name }}</strong>
+    </div>
+    <ng-template #noProject>
+      <div class="settings-subtitle warning">
+        Aucun projet sélectionné (les paramètres ne peuvent pas être sauvegardés).
+      </div>
+    </ng-template>
+  </header>
+
+  <form [formGroup]="form" class="settings-grid">
+    <!-- ===================== params.model.ts ===================== -->
+    <section class="card">
+      <div class="card-title">
+        <div class="badge">params.model.ts</div>
+        <h3>Affichage &amp; interactions</h3>
+      </div>
+
+      <label class="row">
+        <span class="label">Période par défaut (Roadmap)</span>
+        <select class="control" formControlName="periodPreset">
+          <option *ngFor="let p of periodPresets" [value]="p.value">{{ p.label }}</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span class="label">Hover hints (info au survol)</span>
+        <input type="checkbox" formControlName="hoverHintsEnabled" />
+      </label>
+
+      <label class="row">
+        <span class="label">Tooltips sur les liens</span>
+        <input type="checkbox" formControlName="linkTooltipsEnabled" />
+      </label>
+    </section>
+
+    <!-- ===================== gantt.model.ts ===================== -->
+    <section class="card">
+      <div class="card-title">
+        <div class="badge">gantt.model.ts</div>
+        <h3>Gantt &amp; dépendances</h3>
+      </div>
+
+      <label class="row">
+        <span class="label">Mode d’affichage</span>
+        <select class="control" formControlName="viewMode">
+          <option *ngFor="let m of viewModes" [value]="m.value">
+            {{ m.label }} — {{ m.hint }}
+          </option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span class="label">Type de lien par défaut</span>
+        <select class="control" formControlName="defaultDependencyType">
+          <option *ngFor="let t of dependencyTypes" [value]="t.value">{{ t.label }}</option>
+        </select>
+      </label>
+
+      <p class="hint">
+        Conseil : ce type par défaut sert lors de la création d’un lien (si tu n’imposes pas un choix).
+      </p>
+    </section>
+
+    <!-- ===================== project.model.ts ===================== -->
+    <section class="card">
+      <div class="card-title">
+        <div class="badge">project.model.ts</div>
+        <h3>Données du projet</h3>
+      </div>
+
+      <label class="row">
+        <span class="label">Nom</span>
+        <input class="control" type="text" formControlName="projectName" />
+      </label>
+
+      <label class="row">
+        <span class="label">Description</span>
+        <textarea class="control" rows="4" formControlName="projectDescription"></textarea>
+      </label>
+
+      <p class="hint">
+        Ici c’est “local-only” dans cette version. La persistance Firebase se ferait via ton service.
+      </p>
+    </section>
+  </form>
+
+  <footer class="actions">
+    <button type="button" class="btn" (click)="resetToDefaults()">
+      Réinitialiser
+    </button>
+
+    <button type="button" class="btn primary" (click)="save()" [disabled]="!project?.id">
+      Enregistrer
+    </button>
+
+    <span class="status ok" *ngIf="savedState === 'saved'">✅ Sauvegardé</span>
+    <span class="status err" *ngIf="savedState === 'error'">⚠️ Impossible de sauvegarder</span>
+  </footer>
+</div>
+
+<style>
+  .settings-page { padding: 16px; max-width: 1100px; margin: 0 auto; }
+  .settings-header h2 { margin: 0 0 6px 0; }
+  .settings-subtitle { color: #555; margin-bottom: 14px; }
+  .settings-subtitle.warning { color: #a35; }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 12px;
+  }
+  .card {
+    grid-column: span 12;
+    border: 1px solid #e6e6e6;
+    border-radius: 12px;
+    padding: 14px;
+    background: #fff;
+  }
+  @media (min-width: 900px) {
+    .card { grid-column: span 4; }
+  }
+
+  .card-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .card-title h3 { margin: 0; font-size: 16px; }
+  .badge {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f2f2f2;
+    color: #444;
+    border: 1px solid #e5e5e5;
+    white-space: nowrap;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+  }
+  .label { color: #333; }
+  .control {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid #dcdcdc;
+    background: #fff;
+  }
+  textarea.control { resize: vertical; }
+  input[type="checkbox"] { transform: scale(1.1); justify-self: start; }
+
+  .hint { margin: 8px 0 0 0; color: #666; font-size: 12px; }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .btn {
+    border: 1px solid #d0d0d0;
+    background: #fff;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .btn.primary {
+    border-color: #2a6;
+    background: #2a6;
+    color: #fff;
+  }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .status { margin-left: 6px; font-size: 13px; }
+  .status.ok { color: #2a6; }
+  .status.err { color: #a35; }
+</style>

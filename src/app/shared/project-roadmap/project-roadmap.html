@@ -6,6 +6,19 @@
       <h3 class="h6 mb-0">Roadmap – Diagramme de Gantt ({{ getPeriodLabel() }})</h3>
 
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <!-- ✅ Modes d’affichage -->
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary" (click)="setViewMode('split')" [class.active]="viewMode==='split'">
+            Split
+          </button>
+          <button class="btn btn-outline-secondary" (click)="setViewMode('focusLeft')" [class.active]="viewMode==='focusLeft'">
+            Agrandir table
+          </button>
+          <button class="btn btn-outline-secondary" (click)="setViewMode('focusRight')" [class.active]="viewMode==='focusRight'">
+            Agrandir Gantt
+          </button>
+        </div>
+
         <select
           class="form-select form-select-sm"
           style="width: 170px;"
@@ -60,7 +73,7 @@
       <div
         style="
           display: grid;
-          grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px 1fr;
+          grid-template-columns: {{tablePanelWidthPx}}px {{viewMode==='split' ? dividerW : 0}}px 1fr;
           align-items: start;
           background: #fff;
           font-size: 0.72rem;
@@ -73,10 +86,12 @@
         <div style="overflow-x: auto; overflow-y: hidden;">
           <div
             [style.gridTemplateColumns]="tableInnerGridTemplate"
-            style="display: grid; width: max-content; min-width: 100%;"
+            [style.minWidth]="viewMode==='focusLeft' ? 'auto' : '100%'"
+            style="display: grid; width: max-content;"
           >
             <!-- ROW 1 tableau vide -->
-            <div style="grid-column: 1 / span 5; height: 44px;"></div>
+            <div [style.gridColumn]="viewMode==='focusLeft' ? '1 / span 7' : '1 / span 5'" style="height: 44px;"></div>
+
 
             <!-- ROW 2 : titres -->
             <div style="height: 32px; display:flex; align-items:center; min-width: 220px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
@@ -94,6 +109,15 @@
             <div style="height: 32px; display:flex; align-items:center; min-width: 120px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
               Progression
             </div>
+<div *ngIf="viewMode==='focusLeft'"
+     style="height: 32px; display:flex; align-items:center; min-width: 170px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
+  Type de lien
+</div>
+
+<div *ngIf="viewMode==='focusLeft'"
+     style="height: 32px; display:flex; align-items:center; min-width: 280px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
+  Activité liée
+</div>
 
             <!-- BODY -->
             <ng-container *ngFor="let row of ganttActivityRows">
@@ -113,7 +137,7 @@
               </div>
 
               <!-- Col2 : Début -->
-<div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
+              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash1">
                   <div style="display:flex; flex-direction:column;">
                     <input
@@ -133,7 +157,7 @@
               </div>
 
               <!-- Col3 : Fin -->
-<div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
+              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash2">
                   <div style="display:flex; flex-direction:column;">
                     <input
@@ -179,14 +203,48 @@
                 </ng-container>
                 <ng-template #dash4><span class="text-muted">—</span></ng-template>
               </div>
+
+              <!-- Col6 : Type de lien (focusLeft uniquement) -->
+<div *ngIf="viewMode==='focusLeft'"
+     style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+  <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash5">
+    <select class="form-select form-select-sm"
+            style="width: 100%;"
+            [ngModel]="getInlineDepType(t)"
+            (ngModelChange)="onInlineDepTypeChange(t, $event)">
+      <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
+        {{ opt.label }}
+      </option>
+    </select>
+  </ng-container>
+  <ng-template #dash5><span class="text-muted">—</span></ng-template>
+</div>
+
+<!-- Col7 : Activité liée (focusLeft uniquement) -->
+<div *ngIf="viewMode==='focusLeft'"
+     style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+  <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash6">
+    <select class="form-select form-select-sm"
+            style="width: 100%;"
+            [ngModel]="getInlineDepToId(t)"
+            (ngModelChange)="onInlineDepToChange(t, $event)">
+      <option value="">—</option>
+      <option *ngFor="let x of getLinkableTasksFor(t.id)" [value]="x.id">
+        {{ x.label }}
+      </option>
+    </select>
+  </ng-container>
+  <ng-template #dash6><span class="text-muted">—</span></ng-template>
+</div>
+
             </ng-container>
           </div>
         </div>
 
         <!-- =======================
-             DIVIDER (draggable)
+             DIVIDER (draggable) - seulement en split
              ======================= -->
-        <div style="position: relative; height: 100%; background:#fff;">
+        <div *ngIf="viewMode==='split'" style="position: relative; height: 100%; background:#fff;">
           <div style="position:absolute; left: 4px; top:0; bottom:0; width:1px; background:#e9ecef;"></div>
           <div
             title="Glisser (min = 25% écran). Ensuite, scrolle le tableau."
@@ -202,9 +260,10 @@
             "
           ></div>
         </div>
+        <div *ngIf="viewMode!=='split'"></div>
 
         <!-- =======================
-             PANNEAU GANTT (scroll X indépendant)
+             PANNEAU GANTT (inchangé)
              ======================= -->
         <div #ganttScroll style="overflow-x: auto; overflow-y: hidden;">
           <div style="width: max-content; min-width: 100%;">
@@ -334,66 +393,36 @@
                 </text>
               </g>
 
-              <!-- ✅ Liens (hover + focus + filtre) -->
-<!-- Liens -->
-<g *ngFor="let link of ganttLinksView">
-  <path
-    [attr.class]="getLinkCssClass(link)"
-    [attr.d]="link.path"
-    marker-end="url(#ganttArrowBody)"
-    (mouseenter)="onLinkMouseEnter(link)"
-    (mouseleave)="onLinkMouseLeave()"
-  ></path>
-</g>
+              <!-- Liens -->
+              <g *ngFor="let link of ganttLinksView">
+                <path
+                  [attr.class]="getLinkCssClass(link)"
+                  [attr.d]="link.path"
+                  marker-end="url(#ganttArrowBody)"
+                  (mouseenter)="onLinkMouseEnter(link)"
+                  (mouseleave)="onLinkMouseLeave()"
+                ></path>
+              </g>
 
-<!-- Tâches -->
-<g *ngFor="let task of ganttTasksView">
-  <!-- rect + bullets + label -->
-</g>
-
-<!-- Hints dates -->
-<g *ngIf="hoverHints.start as hs">…</g>
-<g *ngIf="hoverHints.end as he">…</g>
-
-<!-- ✅ TOOLTIP LIEN : TOUJOURS EN DERNIER -->
-<g *ngIf="linkTooltip as lt">
-  <rect
-    class="gantt-link-tooltip-bg"
-    [attr.x]="lt.x - 160"
-    [attr.y]="lt.y - 18"
-    rx="6"
-    ry="6"
-    width="320"
-    height="24"
-  ></rect>
-  <text
-    class="gantt-link-tooltip-text"
-    [attr.x]="lt.x - 152"
-    [attr.y]="lt.y - 2"
-  >
-    {{ lt.text }}
-  </text>
-</g>
-
-<!-- Tooltip lien (hover) -->
-<g *ngIf="linkTooltip as lt">
-  <rect
-    class="gantt-link-tooltip-bg"
-    [attr.x]="lt.x - 160"
-    [attr.y]="lt.y - 18"
-    rx="6"
-    ry="6"
-    width="320"
-    height="24"
-  ></rect>
-  <text
-    class="gantt-link-tooltip-text"
-    [attr.x]="lt.x - 152"
-    [attr.y]="lt.y - 2"
-  >
-    {{ lt.text }}
-  </text>
-</g>
+              <!-- ✅ TOOLTIP LIEN (dernier) -->
+              <g *ngIf="linkTooltip as lt">
+                <rect
+                  class="gantt-link-tooltip-bg"
+                  [attr.x]="lt.x - 160"
+                  [attr.y]="lt.y - 18"
+                  rx="6"
+                  ry="6"
+                  width="320"
+                  height="24"
+                ></rect>
+                <text
+                  class="gantt-link-tooltip-text"
+                  [attr.x]="lt.x - 152"
+                  [attr.y]="lt.y - 2"
+                >
+                  {{ lt.text }}
+                </text>
+              </g>
 
               <!-- Tâches -->
               <g *ngFor="let task of ganttTasksView">
@@ -410,7 +439,6 @@
                   (mousedown)="onGanttBarMouseDown($event, task)"
                 ></rect>
 
-                <!-- bullet gauche = move -->
                 <circle
                   [attr.class]="
                     'gantt-bar-bullet gantt-bar-bullet-start'
@@ -425,7 +453,6 @@
                   (mouseleave)="hideHints()"
                 ></circle>
 
-                <!-- bullet droit = resize fin -->
                 <circle
                   [attr.class]="
                     'gantt-bar-bullet gantt-bar-bullet-end'
@@ -473,7 +500,7 @@
   </div>
 </div>
 
-<!-- ✅ Modal Roadmap : même popup + dépendances + filtre d’affichage des liens -->
+<!-- ✅ Modal Roadmap : inchangé -->
 <ng-template #taskEditModal let-modal>
   <div class="modal-header py-2">
     <h5 class="modal-title fs-6">Modifier l’activité</h5>
@@ -485,13 +512,11 @@
       {{ editError }}
     </div>
 
-    <!-- Nom -->
     <div class="mb-3">
       <label class="form-label form-label-sm">Nom de l’activité</label>
       <input class="form-control form-control-sm" [(ngModel)]="editedTaskLabel" />
     </div>
 
-    <!-- Statut -->
     <div class="mb-3">
       <label class="form-label form-label-sm">Statut</label>
       <select class="form-select form-select-sm" [(ngModel)]="editedTaskStatus">
@@ -501,7 +526,6 @@
       </select>
     </div>
 
-    <!-- Dates -->
     <div class="row g-2 mb-3">
       <div class="col-6">
         <label class="form-label form-label-sm">Date de début</label>
@@ -513,7 +537,6 @@
       </div>
     </div>
 
-    <!-- Catégorie -->
     <div class="mb-3">
       <label class="form-label form-label-sm">Catégorie</label>
       <select class="form-select form-select-sm" [(ngModel)]="editedCategory">
@@ -523,7 +546,6 @@
       </select>
     </div>
 
-    <!-- Phase -->
     <div class="mb-3">
       <label class="form-label form-label-sm">Phase</label>
       <select class="form-select form-select-sm" [(ngModel)]="editedPhase">
@@ -536,7 +558,6 @@
       </div>
     </div>
 
-    <!-- ✅ Dépendances + filtre -->
     <div class="mb-0">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <label class="form-label form-label-sm mb-0">Dépendances (liens)</label>
