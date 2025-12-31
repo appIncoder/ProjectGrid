@@ -16,19 +16,38 @@ import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 
 import {
-  ActivityId, ActivityStatus, GanttActivityRow,
-  GanttLinkView, GanttPhaseBand, GanttTaskView,
-  PhaseId, ProjectDetail, Task,
-  TaskCategory, DependencyType, GanttDependency,
-  EditableDependencyRow, RoadmapLinkView,
-  PeriodPreset, HoverHint, LinkTooltip,
-  ViewMode
+  ActivityId,
+  ActivityStatus,
+  GanttActivityRow,
+  GanttPhaseBand,
+  GanttTaskView,
+  PhaseId,
+  ProjectDetail,
+  Task,
+  TaskCategory,
+  DependencyType,
+  GanttDependency,
+  EditableDependencyRow,
+  RoadmapLinkView,
+  PeriodPreset,
+  HoverHint,
+  LinkTooltip,
+  ViewMode,
 } from '../../models';
-
 
 import { ProjectService } from '../../services/project.service';
 
 type TaskScheduleOverride = { startDayIndex: number; endDayIndex: number };
+
+// ✅ Contraintes (stockées sur Task via (task as any).constraints)
+type TaskConstraints = {
+  startNoEarlierThan?: string; // ISO YYYY-MM-DD
+  startNoLaterThan?: string;   // ISO YYYY-MM-DD
+  endNoEarlierThan?: string;   // ISO YYYY-MM-DD
+  endNoLaterThan?: string;     // ISO YYYY-MM-DD
+};
+
+type ScheduleNode = { id: string; start: number; end: number; duration: number };
 
 @Component({
   selector: 'app-project-roadmap',
@@ -45,7 +64,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   linkTooltip: LinkTooltip | null = null;
 
-  // ✅ Patch minimal : viewMode + setter
+  // ✅ Mode d’affichage
   viewMode: ViewMode = 'split';
 
   // ===== Layout (lignes)
@@ -64,7 +83,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   readonly minPanelPercentOfScreen = 0.25;
   readonly maxTablePanelWidthPx = 900;
 
-  // ===== Largeur "contenu tableau" (5 colonnes)
+  // ===== Largeur "contenu tableau"
   private readonly tableColRatios = [
     0.4,  // Tâches
     0.25, // Début
@@ -80,21 +99,19 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   get colPhaseW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[3]); }
   get colProgW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[4]); }
 
-// ✅ Colonnes additionnelles (uniquement en focusLeft)
-readonly colLinkTypeW = 170;
-readonly colLinkedTaskW = 280;
+  // ✅ Colonnes additionnelles (toujours visibles si ton HTML les affiche toujours)
+  readonly colLinkTypeW = 170;
+  readonly colLinkedTaskW = 280;
 
-get tableInnerGridTemplate(): string {
-  const base = `${this.colTaskW}px ${this.colStartW}px ${this.colEndW}px ${this.colPhaseW}px ${this.colProgW}px`;
-  if (this.viewMode !== 'focusLeft') return base;
-  return `${base} ${this.colLinkTypeW}px ${this.colLinkedTaskW}px`;
-}
+  get tableInnerGridTemplate(): string {
+    const base = `${this.colTaskW}px ${this.colStartW}px ${this.colEndW}px ${this.colPhaseW}px ${this.colProgW}px`;
+    return `${base} ${this.colLinkTypeW}px ${this.colLinkedTaskW}px`;
+  }
 
   private getMinTablePanelWidthPx(): number {
     return Math.max(240, Math.round(window.innerWidth * this.minPanelPercentOfScreen));
   }
 
-  // ✅ Patch minimal : changement de mode sans toucher aux colonnes
   setViewMode(mode: ViewMode): void {
     this.viewMode = mode;
 
@@ -200,10 +217,15 @@ get tableInnerGridTemplate(): string {
 
   private taskByRowIndex: Record<number, GanttTaskView> = {};
 
+  // ===== Période
   periodPreset: PeriodPreset = '6m';
   customMonths = 6;
   customStartIso = '';
 
+  // ===== Popup: “afficher/masquer plus d’infos”
+  showMoreInfos = false;
+
+  // ===== Options UI
   taskStatusOptions: { value: ActivityStatus; label: string }[] = [
     { value: 'todo', label: 'À faire (blanc)' },
     { value: 'inprogress', label: 'En cours (orange)' },
@@ -236,6 +258,9 @@ get tableInnerGridTemplate(): string {
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
   editedPhase: PhaseId | null = null;
+
+  // ✅ Contraintes éditées (dans “plus d’infos”)
+  editedConstraints: TaskConstraints = {};
 
   editedDependencies: EditableDependencyRow[] = [];
   editError: string | null = null;
@@ -294,13 +319,6 @@ get tableInnerGridTemplate(): string {
     if (this.tablePanelWidthPx < minPanel) this.tablePanelWidthPx = minPanel;
   }
 
-  // ... ✅ TOUT LE RESTE DE TON FICHIER TS EST INCHANGÉ ...
-  // (je ne recolle pas ici le reste pour éviter une “régression de copie” et parce que tu l’as déjà fourni)
-
-  // ⚠️ À conserver tel quel : toutes tes méthodes existantes (gantt, deps, modal, drag, etc.)
-
-
-
   // =======================
   // Divider draggable
   // =======================
@@ -335,7 +353,7 @@ get tableInnerGridTemplate(): string {
   }
 
   // =======================
-  // ✅ UI période
+  // UI période
   // =======================
   getPeriodLabel(): string {
     switch (this.periodPreset) {
@@ -379,7 +397,7 @@ get tableInnerGridTemplate(): string {
   }
 
   // =======================
-  // ✅ Centrer sur aujourd'hui
+  // Centrer sur aujourd'hui
   // =======================
   centerOnToday(): void {
     if (!this.ganttStartDate) this.buildGanttCalendar();
@@ -490,105 +508,100 @@ get tableInnerGridTemplate(): string {
     const deps = (Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : []) as GanttDependency[];
     return deps.length ? deps : this.fallbackDependencies;
   }
-private getPrimaryDependencyForTask(fromId: string): GanttDependency | null {
-  const deps = this.getProjectDependencies();
-  const matches = deps.filter(d => String(d.fromId) === String(fromId));
-  return matches.length ? matches[0] : null;
-}
 
-getInlineDepType(task: GanttTaskView): DependencyType {
-  const dep = this.getPrimaryDependencyForTask(task.id);
-  return (dep?.type ?? 'F2S') as DependencyType;
-}
-
-getInlineDepToId(task: GanttTaskView): string {
-  const dep = this.getPrimaryDependencyForTask(task.id);
-  return dep?.toId ? String(dep.toId) : '';
-}
-
-getLinkableTasksFor(taskId: string): Task[] {
-  const all = this.getAllTasksFlat();
-  return all.filter(t => t.id !== taskId);
-}
-onInlineDepTypeChange(task: GanttTaskView, type: DependencyType): void {
-  if (!this.project) return;
-  this.ensureProjectDependenciesContainer();
-
-  const toId = this.getInlineDepToId(task);
-  // si pas de cible sélectionnée, on ne crée pas de lien juste en changeant le type
-  if (!toId) return;
-
-  this.upsertPrimaryDependency(task.id, toId, type);
-}
-
-onInlineDepToChange(task: GanttTaskView, toId: string): void {
-  if (!this.project) return;
-  this.ensureProjectDependenciesContainer();
-
-  const cleanTo = (toId ?? '').trim();
-
-  // suppression si vide
-  if (!cleanTo) {
-    this.removePrimaryDependency(task.id);
-    return;
+  private getPrimaryDependencyForTask(fromId: string): GanttDependency | null {
+    const deps = this.getProjectDependencies();
+    const matches = deps.filter(d => String(d.fromId) === String(fromId));
+    return matches.length ? matches[0] : null;
   }
 
-  // garde-fous
-  if (cleanTo === task.id) {
-    this.setTableDateError(task.id, "Une activité ne peut pas dépendre d’elle-même.");
-    return;
+  getInlineDepType(task: GanttTaskView): DependencyType {
+    const dep = this.getPrimaryDependencyForTask(task.id);
+    return (dep?.type ?? 'F2S') as DependencyType;
   }
 
-  const exists = this.getAllTasksFlat().some(t => t.id === cleanTo);
-  if (!exists) {
-    this.setTableDateError(task.id, "L’activité liée n’existe pas.");
-    return;
+  getInlineDepToId(task: GanttTaskView): string {
+    const dep = this.getPrimaryDependencyForTask(task.id);
+    return dep?.toId ? String(dep.toId) : '';
   }
 
-  const type = this.getInlineDepType(task);
-  this.upsertPrimaryDependency(task.id, cleanTo, type);
-}
-
-private upsertPrimaryDependency(fromId: string, toId: string, type: DependencyType): void {
-  if (!this.project) return;
-  const anyProj = this.project as any;
-  const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
-
-  // Toutes les deps de la tâche
-  const fromDeps = allDeps.filter(d => String(d.fromId) === String(fromId));
-  const others = allDeps.filter(d => String(d.fromId) !== String(fromId));
-
-  if (!fromDeps.length) {
-    anyProj.ganttDependencies = [...others, { fromId, toId, type }];
-  } else {
-    // Remplace uniquement la "primary" (1ère), conserve les autres
-    const [primary, ...rest] = fromDeps;
-    const updatedPrimary: GanttDependency = { ...primary, fromId, toId, type };
-    anyProj.ganttDependencies = [...others, updatedPrimary, ...rest];
+  getLinkableTasksFor(taskId: string): Task[] {
+    const all = this.getAllTasksFlat();
+    return all.filter(t => t.id !== taskId);
   }
 
-  // refresh visuel
-  this.depsSignature = this.computeDepsSignature();
-  this.updateGanttLinks();
-}
+  onInlineDepTypeChange(task: GanttTaskView, type: DependencyType): void {
+    if (!this.project) return;
+    this.ensureProjectDependenciesContainer();
 
-private removePrimaryDependency(fromId: string): void {
-  if (!this.project) return;
-  const anyProj = this.project as any;
-  const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+    const toId = this.getInlineDepToId(task);
+    if (!toId) return;
 
-  const fromDeps = allDeps.filter(d => String(d.fromId) === String(fromId));
-  const others = allDeps.filter(d => String(d.fromId) !== String(fromId));
+    this.upsertPrimaryDependency(task.id, toId, type);
+  }
 
-  if (!fromDeps.length) return;
+  onInlineDepToChange(task: GanttTaskView, toId: string): void {
+    if (!this.project) return;
+    this.ensureProjectDependenciesContainer();
 
-  // enlève uniquement la "primary" (1ère), conserve les autres
-  const [, ...rest] = fromDeps;
-  anyProj.ganttDependencies = [...others, ...rest];
+    const cleanTo = (toId ?? '').trim();
 
-  this.depsSignature = this.computeDepsSignature();
-  this.updateGanttLinks();
-}
+    if (!cleanTo) {
+      this.removePrimaryDependency(task.id);
+      return;
+    }
+
+    if (cleanTo === task.id) {
+      this.setTableDateError(task.id, "Une activité ne peut pas dépendre d’elle-même.");
+      return;
+    }
+
+    const exists = this.getAllTasksFlat().some(t => t.id === cleanTo);
+    if (!exists) {
+      this.setTableDateError(task.id, "L’activité liée n’existe pas.");
+      return;
+    }
+
+    const type = this.getInlineDepType(task);
+    this.upsertPrimaryDependency(task.id, cleanTo, type);
+  }
+
+  private upsertPrimaryDependency(fromId: string, toId: string, type: DependencyType): void {
+    if (!this.project) return;
+    const anyProj = this.project as any;
+    const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+
+    const fromDeps = allDeps.filter(d => String(d.fromId) === String(fromId));
+    const others = allDeps.filter(d => String(d.fromId) !== String(fromId));
+
+    if (!fromDeps.length) {
+      anyProj.ganttDependencies = [...others, { fromId, toId, type }];
+    } else {
+      const [primary, ...rest] = fromDeps;
+      const updatedPrimary: GanttDependency = { ...primary, fromId, toId, type };
+      anyProj.ganttDependencies = [...others, updatedPrimary, ...rest];
+    }
+
+    this.depsSignature = this.computeDepsSignature();
+    this.updateGanttLinks();
+  }
+
+  private removePrimaryDependency(fromId: string): void {
+    if (!this.project) return;
+    const anyProj = this.project as any;
+    const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+
+    const fromDeps = allDeps.filter(d => String(d.fromId) === String(fromId));
+    const others = allDeps.filter(d => String(d.fromId) !== String(fromId));
+
+    if (!fromDeps.length) return;
+
+    const [, ...rest] = fromDeps;
+    anyProj.ganttDependencies = [...others, ...rest];
+
+    this.depsSignature = this.computeDepsSignature();
+    this.updateGanttLinks();
+  }
 
   private computeDepsSignature(): string {
     const deps = this.getProjectDependencies() ?? [];
@@ -596,6 +609,50 @@ private removePrimaryDependency(fromId: string): void {
       .map(d => ({ fromId: String(d.fromId), toId: String(d.toId), type: (d.type ?? 'F2S') as DependencyType }))
       .sort((a, b) => (a.fromId + a.toId + a.type).localeCompare(b.fromId + b.toId + b.type));
     return JSON.stringify(norm);
+  }
+
+  // =======================
+  // ✅ Contraintes (helpers)
+  // =======================
+  private getConstraintsFromTask(task: Task | null): TaskConstraints | null {
+    if (!task) return null;
+    const anyT = task as any;
+    const c = anyT.constraints as TaskConstraints | undefined;
+    if (!c) return null;
+    return {
+      startNoEarlierThan: c.startNoEarlierThan || undefined,
+      startNoLaterThan: c.startNoLaterThan || undefined,
+      endNoEarlierThan: c.endNoEarlierThan || undefined,
+      endNoLaterThan: c.endNoLaterThan || undefined,
+    };
+  }
+
+  private setConstraintsOnTask(task: Task, c: TaskConstraints): void {
+    const anyT = task as any;
+    const cleaned: TaskConstraints = {
+      startNoEarlierThan: c.startNoEarlierThan || undefined,
+      startNoLaterThan: c.startNoLaterThan || undefined,
+      endNoEarlierThan: c.endNoEarlierThan || undefined,
+      endNoLaterThan: c.endNoLaterThan || undefined,
+    };
+
+    const hasAny =
+      !!cleaned.startNoEarlierThan ||
+      !!cleaned.startNoLaterThan ||
+      !!cleaned.endNoEarlierThan ||
+      !!cleaned.endNoLaterThan;
+
+    if (!hasAny) {
+      delete anyT.constraints;
+      return;
+    }
+    anyT.constraints = cleaned;
+  }
+
+  private isoToDayIndexOrNull(iso: string, base: Date | null): number | null {
+    if (!base) return null;
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    return this.projectService.parseIsoDateToDayIndex(iso, base);
   }
 
   // =======================
@@ -887,7 +944,7 @@ private removePrimaryDependency(fromId: string): void {
   }
 
   // =======================
-  // ✅ Liens Gantt (F2S + F2F + S2S) + hover + filtre
+  // Liens Gantt + hover + filtre
   // =======================
   private makeLinkKey(fromId: string, toId: string, type: DependencyType): string {
     return `${fromId}__${toId}__${type}`;
@@ -911,15 +968,12 @@ private removePrimaryDependency(fromId: string): void {
   }
 
   isTaskHighlighted(taskId: string): boolean {
-    // Hover > filtre
     if (this.hoveredFromId && this.hoveredToId) {
       return taskId === this.hoveredFromId || taskId === this.hoveredToId;
     }
 
     if (this.filterLinksInGantt && this.filterTaskId) {
-      return this.isLinkRelatedToTask(taskId, taskId, this.filterTaskId) // true uniquement si id==filter
-        ? true
-        : this.isAnyLinkRelatedToTask(taskId, this.filterTaskId);
+      return taskId === this.filterTaskId || this.isAnyLinkRelatedToTask(taskId, this.filterTaskId);
     }
 
     return false;
@@ -927,17 +981,17 @@ private removePrimaryDependency(fromId: string): void {
 
   private isAnyLinkRelatedToTask(taskId: string, focusTaskId: string): boolean {
     const deps = this.getProjectDependencies();
-    return deps.some(d => this.isLinkRelatedToTask(String(d.fromId), String(d.toId), focusTaskId) &&
-      (String(d.fromId) === taskId || String(d.toId) === taskId));
+    return deps.some(d =>
+      this.isLinkRelatedToTask(String(d.fromId), String(d.toId), focusTaskId) &&
+      (String(d.fromId) === taskId || String(d.toId) === taskId)
+    );
   }
 
   isTaskDimmed(taskId: string): boolean {
-    // pendant hover: on atténue les tâches non concernées
     if (this.hoveredFromId && this.hoveredToId) {
       return !(taskId === this.hoveredFromId || taskId === this.hoveredToId);
     }
 
-    // filtre actif: on atténue tout ce qui n’est pas relié à la tâche focus
     if (this.filterLinksInGantt && this.filterTaskId) {
       const isRelated = this.isAnyLinkRelatedToTask(taskId, this.filterTaskId) || taskId === this.filterTaskId;
       return !isRelated;
@@ -952,11 +1006,9 @@ private removePrimaryDependency(fromId: string): void {
     const isHovered = this.hoveredLinkKey === link.key;
     const hoverActive = !!this.hoveredLinkKey;
 
-    // hover
     if (isHovered) classes.push('gantt-link--hover');
     else if (hoverActive) classes.push('gantt-link--dim');
 
-    // filtre
     if (this.filterLinksInGantt && this.filterTaskId) {
       const related = this.isLinkRelatedToTask(link.fromId, link.toId, this.filterTaskId);
       if (!related) classes.push('gantt-link--dim');
@@ -966,45 +1018,42 @@ private removePrimaryDependency(fromId: string): void {
     return classes.join(' ');
   }
 
-onLinkMouseEnter(link: RoadmapLinkView): void {
-  this.hoveredLinkKey = link.key;
-  this.hoveredFromId = link.fromId;
-  this.hoveredToId = link.toId;
+  onLinkMouseEnter(link: RoadmapLinkView): void {
+    this.hoveredLinkKey = link.key;
+    this.hoveredFromId = link.fromId;
+    this.hoveredToId = link.toId;
 
-  // Texte tooltip
-  const fromLabel = this.ganttTasksView.find(t => t.id === link.fromId)?.label ?? link.fromId;
-  const toLabel = this.ganttTasksView.find(t => t.id === link.toId)?.label ?? link.toId;
-  const typeLabel =
-    link.type === 'F2S' ? 'Finish → Start (F2S)' :
-    link.type === 'F2F' ? 'Finish → Finish (F2F)' :
-    'Start → Start (S2S)';
+    const fromLabel = this.ganttTasksView.find(t => t.id === link.fromId)?.label ?? link.fromId;
+    const toLabel = this.ganttTasksView.find(t => t.id === link.toId)?.label ?? link.toId;
+    const typeLabel =
+      link.type === 'F2S' ? 'Finish → Start (F2S)' :
+      link.type === 'F2F' ? 'Finish → Finish (F2F)' :
+      'Start → Start (S2S)';
 
-  const text = `${typeLabel} : ${fromLabel} → ${toLabel}`;
+    const text = `${typeLabel} : ${fromLabel} → ${toLabel}`;
 
-  // Position tooltip : on prend le "milieu" de la ligne (approx) via la moyenne des X des barres
-  const fromTask = this.ganttTasksView.find(t => t.id === link.fromId);
-  const toTask = this.ganttTasksView.find(t => t.id === link.toId);
+    const fromTask = this.ganttTasksView.find(t => t.id === link.fromId);
+    const toTask = this.ganttTasksView.find(t => t.id === link.toId);
 
-  const x =
-    fromTask && toTask
-      ? Math.round((fromTask.x + fromTask.width / 2 + (toTask.x + toTask.width / 2)) / 2)
-      : 120;
+    const x =
+      fromTask && toTask
+        ? Math.round((fromTask.x + fromTask.width / 2 + (toTask.x + toTask.width / 2)) / 2)
+        : 120;
 
-  const y =
-    fromTask && toTask
-      ? Math.round((fromTask.y + fromTask.height / 2 + (toTask.y + toTask.height / 2)) / 2) - 18
-      : 30;
+    const y =
+      fromTask && toTask
+        ? Math.round((fromTask.y + fromTask.height / 2 + (toTask.y + toTask.height / 2)) / 2) - 18
+        : 30;
 
-  this.linkTooltip = { x, y, text };
-}
+    this.linkTooltip = { x, y, text };
+  }
 
-onLinkMouseLeave(): void {
-  this.hoveredLinkKey = null;
-  this.hoveredFromId = null;
-  this.hoveredToId = null;
-  this.linkTooltip = null;
-}
-
+  onLinkMouseLeave(): void {
+    this.hoveredLinkKey = null;
+    this.hoveredFromId = null;
+    this.hoveredToId = null;
+    this.linkTooltip = null;
+  }
 
   onFilterLinksToggle(): void {
     if (this.filterLinksInGantt) {
@@ -1019,7 +1068,6 @@ onLinkMouseLeave(): void {
   private updateGanttLinks(): void {
     const depsAll = this.getProjectDependencies();
 
-    // ✅ filtre (si activé)
     const deps = (this.filterLinksInGantt && this.filterTaskId)
       ? depsAll.filter(d => this.isLinkRelatedToTask(String(d.fromId), String(d.toId), this.filterTaskId!))
       : depsAll;
@@ -1047,7 +1095,6 @@ onLinkMouseLeave(): void {
       const xOut = startX + (fromSide === 'start' ? -hMargin : +hMargin);
       const xIn = endX + (toSide === 'start' ? -hMargin : +hMargin);
 
-      // ✅ yMain : prioriser un couloir ENTRE les 2 activités si possible
       const fromTop = from.y;
       const fromBottom = from.y + from.height;
       const toTop = to.y;
@@ -1102,6 +1149,227 @@ onLinkMouseLeave(): void {
   }
 
   // =======================
+  // ✅ Recalculer (snap contraintes + deps)
+  // =======================
+  recalculateSchedule(): void {
+    if (!this.project || !this.ganttStartDate) return;
+
+    // Base: toutes les tâches (hors synthèses)
+    const tasksFlat = this.getAllTasksFlat();
+    if (!tasksFlat.length) return;
+
+    // 1) Construire schedule nodes initiaux (depuis overrides si existants, sinon depuis dates/phase)
+    const schedules = new Map<string, ScheduleNode>();
+
+    const totalDays0 = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
+    for (const t of tasksFlat) {
+      const id = String(t.id);
+
+      // durée actuelle = (end-start) depuis override/date/phase
+      let start = 0;
+      let end = 0;
+
+      const ov = this.scheduleOverrides[id];
+      if (ov) {
+        start = ov.startDayIndex;
+        end = ov.endDayIndex;
+      } else {
+        // fallback sur dates du modèle si présentes
+        const s = this.projectService.parseIsoDateToDayIndex((t as any).startDate ?? '', this.ganttStartDate);
+        const e = this.projectService.parseIsoDateToDayIndex((t as any).endDate ?? '', this.ganttStartDate);
+
+        if (s !== null || e !== null) {
+          start = (s ?? 0);
+          end = (e ?? (start + (this.projectService.daysPerMonth - 1)));
+        } else {
+          // fallback sur phase
+          const ph: PhaseId = ((t as any).phase ?? 'Phase1') as PhaseId;
+          const mi = this.projectService.phaseToMonthIndex[ph] ?? 0;
+          start = mi * this.projectService.daysPerMonth;
+          end = start + (this.projectService.daysPerMonth - 1);
+        }
+      }
+
+      start = Math.max(0, start);
+      end = Math.max(start, end);
+
+      // timeline peut s’étendre
+      if (end >= totalDays0) this.ensureTimelineForEndDay(end);
+
+      schedules.set(id, {
+        id,
+        start,
+        end,
+        duration: Math.max(0, end - start),
+      });
+    }
+
+    // 2) Graphe dépendances
+    const deps = this.getProjectDependencies()
+      .map(d => ({
+        from: String(d.fromId),
+        to: String(d.toId),
+        type: (d.type ?? 'F2S') as DependencyType,
+      }))
+      .filter(d => schedules.has(d.from) && schedules.has(d.to) && d.from !== d.to);
+
+    const incoming = new Map<string, Array<{ from: string; type: DependencyType }>>();
+    const outgoing = new Map<string, Array<{ to: string; type: DependencyType }>>();
+    const indeg = new Map<string, number>();
+
+    for (const id of schedules.keys()) {
+      incoming.set(id, []);
+      outgoing.set(id, []);
+      indeg.set(id, 0);
+    }
+
+    for (const d of deps) {
+      incoming.get(d.to)!.push({ from: d.from, type: d.type });
+      outgoing.get(d.from)!.push({ to: d.to, type: d.type });
+      indeg.set(d.to, (indeg.get(d.to) ?? 0) + 1);
+    }
+
+    // 3) Topo-sort (Kahn). En cas de cycle, on garde un ordre “stable”
+    const queue: string[] = [];
+    for (const [id, k] of indeg.entries()) {
+      if (k === 0) queue.push(id);
+    }
+    queue.sort();
+
+    const topo: string[] = [];
+    while (queue.length) {
+      const id = queue.shift()!;
+      topo.push(id);
+
+      for (const e of outgoing.get(id) ?? []) {
+        const to = e.to;
+        indeg.set(to, (indeg.get(to) ?? 0) - 1);
+        if (indeg.get(to) === 0) {
+          queue.push(to);
+          queue.sort();
+        }
+      }
+    }
+
+    // Cycle -> ajoute les restants
+    if (topo.length < schedules.size) {
+      const missing = [...schedules.keys()].filter(x => !topo.includes(x));
+      missing.sort();
+      topo.push(...missing);
+      this.setTableDateError('recalc', 'Attention : dépendances cycliques détectées (ordre approximatif).');
+    }
+
+    // 4) Forward pass avec SNAP contraintes
+    for (const id of topo) {
+      const node = schedules.get(id)!;
+
+      const task = tasksFlat.find(x => String(x.id) === id) ?? null;
+      const c = this.getConstraintsFromTask(task);
+
+      const cStartMin = c?.startNoEarlierThan ? this.isoToDayIndexOrNull(c.startNoEarlierThan, this.ganttStartDate) : null;
+      const cStartMax = c?.startNoLaterThan ? this.isoToDayIndexOrNull(c.startNoLaterThan, this.ganttStartDate) : null;
+      const cEndMin   = c?.endNoEarlierThan   ? this.isoToDayIndexOrNull(c.endNoEarlierThan, this.ganttStartDate) : null;
+      const cEndMax   = c?.endNoLaterThan     ? this.isoToDayIndexOrNull(c.endNoLaterThan, this.ganttStartDate) : null;
+
+      // 1) Dépendances -> bornes "earliest"
+      let earliestStart = 0;
+      let earliestEnd = 0;
+
+      for (const inc of incoming.get(id) ?? []) {
+        const from = schedules.get(inc.from);
+        if (!from) continue;
+
+        if (inc.type === 'F2S') earliestStart = Math.max(earliestStart, from.end + 1);
+        else if (inc.type === 'S2S') earliestStart = Math.max(earliestStart, from.start);
+        else if (inc.type === 'F2F') earliestEnd = Math.max(earliestEnd, from.end);
+      }
+
+      // 2) Contraintes -> bornes earliest / latest
+      if (cStartMin !== null) earliestStart = Math.max(earliestStart, cStartMin);
+      if (cEndMin !== null) earliestEnd = Math.max(earliestEnd, cEndMin);
+
+      // end >= earliestEnd => start >= earliestEnd - duration
+      earliestStart = Math.max(earliestStart, earliestEnd - node.duration);
+
+      // latestStart
+      let latestStart = Number.POSITIVE_INFINITY;
+      if (cStartMax !== null) latestStart = Math.min(latestStart, cStartMax);
+      if (cEndMax !== null) latestStart = Math.min(latestStart, cEndMax - node.duration);
+
+      if (!Number.isFinite(latestStart)) latestStart = Number.POSITIVE_INFINITY;
+
+      // 3) Choix "snap"
+      const hasAnyConstraint = !!(cStartMin || cStartMax || cEndMin || cEndMax);
+
+      let targetStart = node.start; // défaut: conserver
+      if (hasAnyConstraint) {
+        if (cStartMin !== null || cEndMin !== null) {
+          // ASAP (colle au plus tôt)
+          targetStart = earliestStart;
+        } else if (cStartMax !== null || cEndMax !== null) {
+          // ALAP (colle au plus tard)
+          targetStart = latestStart;
+        }
+      }
+
+      // 4) Clamp dans fenêtre
+      if (latestStart !== Number.POSITIVE_INFINITY && latestStart < earliestStart) {
+        this.setTableDateError(id, "Contraintes/dépendances incompatibles (fenêtre impossible).");
+        targetStart = earliestStart;
+      } else {
+        if (latestStart !== Number.POSITIVE_INFINITY) {
+          targetStart = this.clamp(targetStart, earliestStart, latestStart);
+        } else {
+          // pas de borne haute -> juste au moins earliestStart
+          targetStart = Math.max(targetStart, earliestStart);
+        }
+      }
+
+      let start = targetStart;
+      let end = start + node.duration;
+
+      // Extend timeline si besoin
+      if (end >= (this.ganttMonthsCount * this.projectService.daysPerMonth)) this.ensureTimelineForEndDay(end);
+      const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+
+      start = this.clamp(start, 0, totalDays - 1);
+      end = this.clamp(end, start, totalDays - 1);
+
+      schedules.set(id, { id, start, end, duration: node.duration });
+    }
+
+    // 5) Appliquer sur le GanttView + scheduleOverrides + sync vers modèle
+    for (const [id, s] of schedules.entries()) {
+      const view = this.ganttTasksView.find(v => String(v.id) === id);
+      if (!view) continue;
+
+      view.startDayIndex = s.start;
+      view.endDayIndex = s.end;
+
+      const mStart = this.dayIndexToMonthIndex(s.start);
+      const mEnd = this.dayIndexToMonthIndex(s.end);
+
+      view.monthIndex = mStart;
+      view.startMonthIndex = mStart;
+      view.endMonthIndex = mEnd;
+      view.phase = this.monthIndexToPhaseId(mStart);
+
+      view.x = this.ganttLeftPadding + s.start * this.dayWidth + this.taskInnerMargin;
+      view.width = (s.end - s.start + 1) * this.dayWidth - 2 * this.taskInnerMargin;
+
+      this.scheduleOverrides[id] = { startDayIndex: s.start, endDayIndex: s.end };
+
+      // sync dates ISO dans la matrice via service
+      this.syncTaskDatesToModel(view);
+    }
+
+    // 6) Recalcule synthèses + liens
+    for (const a of this.orderedActivities) this.updateSummaryForActivity(a);
+    this.updateGanttLinks();
+  }
+
+  // =======================
   // Table helpers
   // =======================
   getRowDisplayLabel(row: GanttActivityRow): string {
@@ -1140,7 +1408,7 @@ onLinkMouseLeave(): void {
     const dayIndex =
       task.endDayIndex ??
       (task.endMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth +
-        (this.projectService.daysPerMonth - 1);
+      (this.projectService.daysPerMonth - 1);
     return this.projectService.toIsoDate(this.projectService.addDays(this.ganttStartDate, dayIndex));
   }
 
@@ -1290,13 +1558,12 @@ onLinkMouseLeave(): void {
         ? this.previewEndDayIndex
         : task.endDayIndex ??
           (task.endMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth +
-            (this.projectService.daysPerMonth - 1);
+          (this.projectService.daysPerMonth - 1);
 
     const d = this.projectService.addDays(this.ganttStartDate, dayIndex);
     return d.toLocaleDateString('fr-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
-  // ✅ Conversion robuste: écran -> repère SVG
   private getMouseXInSvg(event: MouseEvent): number {
     const svg = event.currentTarget as SVGSVGElement | null;
     if (!svg) return event.clientX;
@@ -1368,7 +1635,7 @@ onLinkMouseLeave(): void {
     const end =
       task.endDayIndex ??
       (task.endMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth +
-        (this.projectService.daysPerMonth - 1);
+      (this.projectService.daysPerMonth - 1);
 
     this.resizeFixedStartDayIndex = start;
     this.previewStartDayIndex = start;
@@ -1503,7 +1770,7 @@ onLinkMouseLeave(): void {
   }
 
   // =======================
-  // ✅ Modal Roadmap
+  // Modal Roadmap
   // =======================
   private findContextForTaskId(taskId: string): { activityId: ActivityId; phase: PhaseId; task: Task } | null {
     const base = this.baseTasks.find(b => b.task.id === taskId);
@@ -1532,16 +1799,19 @@ onLinkMouseLeave(): void {
     this.editedCategory = (ctx.task as any).category ?? 'projectManagement';
     this.editedPhase = (ctx.task as any).phase ?? ctx.phase;
 
+    // ✅ charge contraintes
+    this.editedConstraints = this.getConstraintsFromTask(ctx.task) ?? {};
+
     this.ensureProjectDependenciesContainer();
     const deps = this.getProjectDependencies().filter(d => d.fromId === ctx.task.id);
     this.editedDependencies = deps.map(d => ({ toId: d.toId, type: d.type ?? 'F2S' }));
 
-    // ✅ si filtre actif, on focus cette tâche
     if (this.filterLinksInGantt) {
       this.filterTaskId = ctx.task.id;
       this.updateGanttLinks();
     }
 
+    this.showMoreInfos = false;
     this.editError = null;
     this.modalService.open(this.taskEditModalTpl, { size: 'lg', centered: true });
   }
@@ -1573,6 +1843,10 @@ onLinkMouseLeave(): void {
     this.editedDependencies.splice(index, 1);
   }
 
+  toggleMoreInfos(): void {
+    this.showMoreInfos = !this.showMoreInfos;
+  }
+
   saveTaskEdit(modal: any): void {
     if (!this.project || !this.taskBeingEdited || !this.editingActivityId || !this.editingPhase || !this.editedPhase) {
       modal.dismiss();
@@ -1595,6 +1869,14 @@ onLinkMouseLeave(): void {
         return;
       }
     }
+
+    // ✅ Valide contraintes (cohérence simple)
+    const constraints: TaskConstraints = {
+      startNoEarlierThan: (this.editedConstraints.startNoEarlierThan ?? '').trim() || undefined,
+      startNoLaterThan: (this.editedConstraints.startNoLaterThan ?? '').trim() || undefined,
+      endNoEarlierThan: (this.editedConstraints.endNoEarlierThan ?? '').trim() || undefined,
+      endNoLaterThan: (this.editedConstraints.endNoLaterThan ?? '').trim() || undefined,
+    };
 
     const curTaskId = this.taskBeingEdited.id;
     const linkableIds = new Set(this.getLinkableTasks().map(t => t.id));
@@ -1621,6 +1903,10 @@ onLinkMouseLeave(): void {
       seen.add(key);
     }
 
+    // ✅ appliquer contraintes sur la tâche (persistées dans la matrice)
+    this.setConstraintsOnTask(this.taskBeingEdited, constraints);
+
+    // ✅ deps -> project.ganttDependencies
     this.ensureProjectDependenciesContainer();
     const anyProj = this.project as any;
     const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
@@ -1628,6 +1914,7 @@ onLinkMouseLeave(): void {
     const added: GanttDependency[] = cleaned.map(r => ({ fromId: curTaskId, toId: r.toId, type: r.type }));
     anyProj.ganttDependencies = [...kept, ...added];
 
+    // ✅ updateTask (ne touche pas aux contraintes)
     this.projectService.updateTask({
       projectId: this.project.id,
       activityId: this.editingActivityId,
@@ -1643,10 +1930,10 @@ onLinkMouseLeave(): void {
       phase: this.editedPhase,
     });
 
+    // ✅ rebuild
     this.buildRoadmap();
     this.depsSignature = this.computeDepsSignature();
 
-    // ✅ si filtre actif, on garde le focus sur la tâche éditée
     if (this.filterLinksInGantt) {
       this.filterTaskId = curTaskId;
     }

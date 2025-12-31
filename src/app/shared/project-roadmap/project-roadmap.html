@@ -6,15 +6,20 @@
       <h3 class="h6 mb-0">Roadmap – Diagramme de Gantt ({{ getPeriodLabel() }})</h3>
 
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <!-- ✅ Modes d’affichage -->
+        <!-- Modes d’affichage (Split supprimé) -->
         <div class="btn-group btn-group-sm">
-          <button class="btn btn-outline-secondary" (click)="setViewMode('split')" [class.active]="viewMode==='split'">
-            Split
-          </button>
-          <button class="btn btn-outline-secondary" (click)="setViewMode('focusLeft')" [class.active]="viewMode==='focusLeft'">
+          <button
+            class="btn btn-outline-secondary"
+            (click)="setViewMode('focusLeft')"
+            [class.active]="viewMode==='focusLeft'"
+          >
             Agrandir table
           </button>
-          <button class="btn btn-outline-secondary" (click)="setViewMode('focusRight')" [class.active]="viewMode==='focusRight'">
+          <button
+            class="btn btn-outline-secondary"
+            (click)="setViewMode('focusRight')"
+            [class.active]="viewMode==='focusRight'"
+          >
             Agrandir Gantt
           </button>
         </div>
@@ -55,6 +60,11 @@
         <button class="btn btn-sm btn-primary" (click)="centerOnToday()">
           Centrer sur aujourd&apos;hui
         </button>
+
+        <!-- ✅ Recalcul dépendances + contraintes -->
+        <button class="btn btn-sm btn-outline-success" (click)="recalculateSchedule()">
+          Recalculer
+        </button>
       </div>
     </div>
 
@@ -69,11 +79,11 @@
         background: #fff;
       "
     >
-      <!-- Layout principal : tableau (viewport) + divider + gantt (viewport) -->
+      <!-- Layout principal : tableau + divider + gantt -->
       <div
         style="
           display: grid;
-          grid-template-columns: {{tablePanelWidthPx}}px {{viewMode==='split' ? dividerW : 0}}px 1fr;
+          grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px 1fr;
           align-items: start;
           background: #fff;
           font-size: 0.72rem;
@@ -86,12 +96,10 @@
         <div style="overflow-x: auto; overflow-y: hidden;">
           <div
             [style.gridTemplateColumns]="tableInnerGridTemplate"
-            [style.minWidth]="viewMode==='focusLeft' ? 'auto' : '100%'"
             style="display: grid; width: max-content;"
           >
             <!-- ROW 1 tableau vide -->
-            <div [style.gridColumn]="viewMode==='focusLeft' ? '1 / span 7' : '1 / span 5'" style="height: 44px;"></div>
-
+            <div [style.gridColumn]="'1 / span 7'" style="height: 44px;"></div>
 
             <!-- ROW 2 : titres -->
             <div style="height: 32px; display:flex; align-items:center; min-width: 220px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
@@ -109,15 +117,14 @@
             <div style="height: 32px; display:flex; align-items:center; min-width: 120px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
               Progression
             </div>
-<div *ngIf="viewMode==='focusLeft'"
-     style="height: 32px; display:flex; align-items:center; min-width: 170px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-  Type de lien
-</div>
 
-<div *ngIf="viewMode==='focusLeft'"
-     style="height: 32px; display:flex; align-items:center; min-width: 280px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-  Activité liée
-</div>
+            <!-- Toujours affichées -->
+            <div style="height: 32px; display:flex; align-items:center; min-width: 170px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
+              Type de lien
+            </div>
+            <div style="height: 32px; display:flex; align-items:center; min-width: 280px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
+              Activité liée
+            </div>
 
             <!-- BODY -->
             <ng-container *ngFor="let row of ganttActivityRows">
@@ -204,47 +211,49 @@
                 <ng-template #dash4><span class="text-muted">—</span></ng-template>
               </div>
 
-              <!-- Col6 : Type de lien (focusLeft uniquement) -->
-<div *ngIf="viewMode==='focusLeft'"
-     style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-  <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash5">
-    <select class="form-select form-select-sm"
-            style="width: 100%;"
-            [ngModel]="getInlineDepType(t)"
-            (ngModelChange)="onInlineDepTypeChange(t, $event)">
-      <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
-        {{ opt.label }}
-      </option>
-    </select>
-  </ng-container>
-  <ng-template #dash5><span class="text-muted">—</span></ng-template>
-</div>
+              <!-- Col6 : Type de lien -->
+              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash5">
+                  <select
+                    class="form-select form-select-sm"
+                    style="width: 100%;"
+                    [ngModel]="getInlineDepType(t)"
+                    (ngModelChange)="onInlineDepTypeChange(t, $event)"
+                  >
+                    <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </ng-container>
+                <ng-template #dash5><span class="text-muted">—</span></ng-template>
+              </div>
 
-<!-- Col7 : Activité liée (focusLeft uniquement) -->
-<div *ngIf="viewMode==='focusLeft'"
-     style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-  <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash6">
-    <select class="form-select form-select-sm"
-            style="width: 100%;"
-            [ngModel]="getInlineDepToId(t)"
-            (ngModelChange)="onInlineDepToChange(t, $event)">
-      <option value="">—</option>
-      <option *ngFor="let x of getLinkableTasksFor(t.id)" [value]="x.id">
-        {{ x.label }}
-      </option>
-    </select>
-  </ng-container>
-  <ng-template #dash6><span class="text-muted">—</span></ng-template>
-</div>
+              <!-- Col7 : Activité liée -->
+              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash6">
+                  <select
+                    class="form-select form-select-sm"
+                    style="width: 100%;"
+                    [ngModel]="getInlineDepToId(t)"
+                    (ngModelChange)="onInlineDepToChange(t, $event)"
+                  >
+                    <option value="">—</option>
+                    <option *ngFor="let x of getLinkableTasksFor(t.id)" [value]="x.id">
+                      {{ x.label }}
+                    </option>
+                  </select>
+                </ng-container>
+                <ng-template #dash6><span class="text-muted">—</span></ng-template>
+              </div>
 
             </ng-container>
           </div>
         </div>
 
         <!-- =======================
-             DIVIDER (draggable) - seulement en split
+             DIVIDER (draggable) - toujours visible
              ======================= -->
-        <div *ngIf="viewMode==='split'" style="position: relative; height: 100%; background:#fff;">
+        <div style="position: relative; height: 100%; background:#fff;">
           <div style="position:absolute; left: 4px; top:0; bottom:0; width:1px; background:#e9ecef;"></div>
           <div
             title="Glisser (min = 25% écran). Ensuite, scrolle le tableau."
@@ -260,25 +269,17 @@
             "
           ></div>
         </div>
-        <div *ngIf="viewMode!=='split'"></div>
 
         <!-- =======================
              PANNEAU GANTT (inchangé)
              ======================= -->
         <div #ganttScroll style="overflow-x: auto; overflow-y: hidden;">
           <div style="width: max-content; min-width: 100%;">
+
             <!-- Row 1 : milestones + phases -->
             <svg class="gantt-svg" [attr.width]="ganttViewportWidth" [attr.height]="headerRow1Height" style="display:block;">
               <defs>
-                <marker
-                  id="ganttArrow"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto"
-                >
+                <marker id="ganttArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                   <path d="M 0 0 L 10 5 L 0 10 z"></path>
                 </marker>
               </defs>
@@ -288,7 +289,8 @@
                   class="gantt-milestone-dot"
                   [attr.cx]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
                   [attr.cy]="18"
-                  r="4"></circle>
+                  r="4"
+                ></circle>
                 <text
                   class="gantt-milestone-text"
                   [attr.x]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
@@ -305,7 +307,8 @@
                   [attr.x]="ganttLeftPadding + band.startMonthIndex * ganttColWidth"
                   [attr.y]="28"
                   [attr.width]="(band.endMonthIndex - band.startMonthIndex + 1) * ganttColWidth"
-                  [attr.height]="10"></rect>
+                  [attr.height]="10"
+                ></rect>
                 <text
                   class="gantt-phase-text"
                   [attr.x]="ganttLeftPadding + (band.startMonthIndex + band.endMonthIndex + 1) * ganttColWidth / 2"
@@ -342,15 +345,7 @@
               (mouseleave)="onGanttMouseUp($event)"
             >
               <defs>
-                <marker
-                  id="ganttArrowBody"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto"
-                >
+                <marker id="ganttArrowBody" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
                   <path d="M 0 0 L 10 5 L 0 10 z"></path>
                 </marker>
               </defs>
@@ -362,7 +357,8 @@
                   [attr.x1]="ganttLeftPadding + colIndex * ganttColWidth"
                   [attr.y1]="0"
                   [attr.x2]="ganttLeftPadding + colIndex * ganttColWidth"
-                  [attr.y2]="ganttBodyHeight"></line>
+                  [attr.y2]="ganttBodyHeight"
+                ></line>
               </g>
 
               <!-- Grille horizontale (lignes) -->
@@ -372,7 +368,8 @@
                   [attr.x1]="0"
                   [attr.y1]="r.rowIndex * bodyRowHeight"
                   [attr.x2]="ganttViewportWidth"
-                  [attr.y2]="r.rowIndex * bodyRowHeight"></line>
+                  [attr.y2]="r.rowIndex * bodyRowHeight"
+                ></line>
               </g>
 
               <!-- Ligne Today -->
@@ -404,7 +401,7 @@
                 ></path>
               </g>
 
-              <!-- ✅ TOOLTIP LIEN (dernier) -->
+              <!-- Tooltip lien -->
               <g *ngIf="linkTooltip as lt">
                 <rect
                   class="gantt-link-tooltip-bg"
@@ -479,28 +476,53 @@
 
               <!-- hints -->
               <g *ngIf="hoverHints.start as hs">
-                <rect class="gantt-hint-bg" [attr.x]="hs.x" [attr.y]="hs.y - 18" rx="3" ry="3" width="90" height="20"></rect>
-                <text class="gantt-hint-text" [attr.x]="hs.x + 4" [attr.y]="hs.y - 5" style="font-size: 0.60rem;">
+                <rect
+                  class="gantt-hint-bg"
+                  [attr.x]="hs.x"
+                  [attr.y]="hs.y - 18"
+                  rx="3"
+                  ry="3"
+                  width="90"
+                  height="20"
+                ></rect>
+                <text
+                  class="gantt-hint-text"
+                  [attr.x]="hs.x + 4"
+                  [attr.y]="hs.y - 5"
+                  style="font-size: 0.60rem;"
+                >
                   {{ hs.text }}
                 </text>
               </g>
 
               <g *ngIf="hoverHints.end as he">
-                <rect class="gantt-hint-bg" [attr.x]="he.x" [attr.y]="he.y - 18" rx="3" ry="3" width="90" height="20"></rect>
-                <text class="gantt-hint-text" [attr.x]="he.x + 4" [attr.y]="he.y - 5" style="font-size: 0.60rem;">
+                <rect
+                  class="gantt-hint-bg"
+                  [attr.x]="he.x"
+                  [attr.y]="he.y - 18"
+                  rx="3"
+                  ry="3"
+                  width="90"
+                  height="20"
+                ></rect>
+                <text
+                  class="gantt-hint-text"
+                  [attr.x]="he.x + 4"
+                  [attr.y]="he.y - 5"
+                  style="font-size: 0.60rem;"
+                >
                   {{ he.text }}
                 </text>
               </g>
             </svg>
           </div>
         </div>
-
       </div>
     </div>
   </div>
 </div>
 
-<!-- ✅ Modal Roadmap : inchangé -->
+<!-- ✅ Modal Roadmap -->
 <ng-template #taskEditModal let-modal>
   <div class="modal-header py-2">
     <h5 class="modal-title fs-6">Modifier l’activité</h5>
@@ -512,6 +534,7 @@
       {{ editError }}
     </div>
 
+    <!-- Zone “essentielle” -->
     <div class="mb-3">
       <label class="form-label form-label-sm">Nom de l’activité</label>
       <input class="form-control form-control-sm" [(ngModel)]="editedTaskLabel" />
@@ -553,69 +576,110 @@
           {{ p }}
         </option>
       </select>
-      <div class="form-text small">
-        Changer la phase déplacera l’activité vers la cellule correspondante.
-      </div>
     </div>
 
-    <div class="mb-0">
-      <div class="d-flex align-items-center justify-content-between mb-2">
-        <label class="form-label form-label-sm mb-0">Dépendances (liens)</label>
+    <!-- Toggle “plus d’infos” -->
+    <div class="d-flex align-items-center justify-content-between border-top pt-2 mt-2">
+      <div class="small text-muted">Contraintes &amp; dépendances</div>
 
-        <div class="d-flex align-items-center gap-2">
-          <div class="form-check form-switch m-0">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              id="filterLinksInGantt"
-              [(ngModel)]="filterLinksInGantt"
-              (change)="onFilterLinksToggle()"
-            />
-            <label class="form-check-label small" for="filterLinksInGantt">
-              Afficher uniquement les liens de cette activité dans le Gantt
-            </label>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="toggleMoreInfos()">
+        {{ showMoreInfos ? 'Masquer plus d’infos' : 'Afficher plus d’infos' }}
+      </button>
+    </div>
+
+    <!-- Contenu avancé masqué/affiché -->
+    <div *ngIf="showMoreInfos" class="mt-3">
+
+      <!-- Contraintes -->
+      <div class="border rounded-3 p-2 mb-3">
+        <div class="fw-semibold small mb-2">Contraintes de date (optionnel)</div>
+
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label form-label-sm">Doit commencer au plus tôt</label>
+            <input type="date" class="form-control form-control-sm"
+                   [(ngModel)]="editedConstraints.startNoEarlierThan" />
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm">Doit commencer au plus tard</label>
+            <input type="date" class="form-control form-control-sm"
+                   [(ngModel)]="editedConstraints.startNoLaterThan" />
           </div>
 
-          <button type="button" class="btn btn-sm btn-outline-primary" (click)="addDependencyRow()">
-            + Ajouter un lien
-          </button>
+          <div class="col-6">
+            <label class="form-label form-label-sm">Doit se terminer au plus tôt</label>
+            <input type="date" class="form-control form-control-sm"
+                   [(ngModel)]="editedConstraints.endNoEarlierThan" />
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm">Doit se terminer au plus tard</label>
+            <input type="date" class="form-control form-control-sm"
+                   [(ngModel)]="editedConstraints.endNoLaterThan" />
+          </div>
+        </div>
+
+        <div class="form-text small mt-2">
+          Les contraintes sont appliquées via <b>Recalculer</b> (écran principal).
+          En mode “snap”, la tâche se colle au plus tôt (min) ou au plus tard (max) selon les contraintes présentes.
         </div>
       </div>
 
-      <div *ngIf="editedDependencies.length === 0" class="text-muted small">
-        Aucun lien défini pour cette activité.
-      </div>
+      <!-- Dépendances -->
+      <div class="mb-0">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <label class="form-label form-label-sm mb-0">Dépendances (liens)</label>
 
-      <div *ngFor="let dep of editedDependencies; index as i" class="row g-2 align-items-end mb-2">
-        <div class="col-5">
-          <label class="form-label form-label-sm">Type de lien</label>
-          <select class="form-select form-select-sm" [(ngModel)]="dep.type">
-            <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
+          <div class="d-flex align-items-center gap-2">
+            <div class="form-check form-switch m-0">
+              <input class="form-check-input" type="checkbox" id="filterLinksInGantt"
+                     [(ngModel)]="filterLinksInGantt" (change)="onFilterLinksToggle()" />
+              <label class="form-check-label small" for="filterLinksInGantt">
+                Filtrer le Gantt sur cette activité
+              </label>
+            </div>
+
+            <button type="button" class="btn btn-sm btn-outline-primary" (click)="addDependencyRow()">
+              + Ajouter
+            </button>
+          </div>
         </div>
 
-        <div class="col-6">
-          <label class="form-label form-label-sm">Activité liée</label>
-          <select class="form-select form-select-sm" [(ngModel)]="dep.toId">
-            <option value="">— sélectionner —</option>
-            <option *ngFor="let t of getLinkableTasks()" [value]="t.id">
-              {{ t.label }}
-            </option>
-          </select>
+        <div *ngIf="editedDependencies.length === 0" class="text-muted small">
+          Aucun lien défini.
         </div>
 
-        <div class="col-1 d-flex justify-content-end">
-          <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer" (click)="removeDependencyRow(i)">
-            ×
-          </button>
+        <div *ngFor="let dep of editedDependencies; index as i" class="row g-2 align-items-end mb-2">
+          <div class="col-5">
+            <label class="form-label form-label-sm">Type de lien</label>
+            <select class="form-select form-select-sm" [(ngModel)]="dep.type">
+              <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-6">
+            <label class="form-label form-label-sm">Activité liée</label>
+            <select class="form-select form-select-sm" [(ngModel)]="dep.toId">
+              <option value="">— sélectionner —</option>
+              <option *ngFor="let t of getLinkableTasks()" [value]="t.id">
+                {{ t.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-1 d-flex justify-content-end">
+            <button type="button" class="btn btn-sm btn-outline-danger" title="Supprimer" (click)="removeDependencyRow(i)">
+              ×
+            </button>
+          </div>
+        </div>
+
+        <div class="form-text small">
+          F2S = la cible démarre après la fin de la source • F2F = elles finissent ensemble • S2S = elles démarrent ensemble.
         </div>
       </div>
 
-      <div class="form-text small">
-        F2S = la tâche cible démarre après la fin de la source • F2F = elles finissent ensemble • S2S = elles démarrent ensemble.
-      </div>
     </div>
   </div>
 

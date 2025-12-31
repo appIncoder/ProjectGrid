@@ -255,9 +255,10 @@
   font-weight: 600;
 }
 
-.roadmap-grid [title="Glisser pour redimensionner"]:hover {
+.roadmap-grid [title="Glisser pour redimensionner le tableau"]:hover {
   background: rgba(13, 110, 253, 0.12) !important;
 }
+
 .gantt-link-tooltip-bg {
   fill: rgba(0, 0, 0, 0.82);
 }
@@ -266,6 +267,7 @@
   fill: #ffffff;
   font-size: 0.64rem;
 }
+
 .gantt-link-tooltip-bg,
 .gantt-link-tooltip-text {
   pointer-events: none;
