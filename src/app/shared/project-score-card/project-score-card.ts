@@ -11,14 +11,14 @@ import {
   ProjectDetail,
   Task,
   TaskCategory,
+  DependencyType,
+  GanttDependency,
+  EditableDependencyRow,
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
 
-// ✅ Types de dépendances
-type DependencyType = 'F2S' | 'F2F' | 'S2S';
-type GanttDependency = { fromId: string; toId: string; type?: DependencyType };
-type EditableDependencyRow = { toId: string; type: DependencyType };
+// Dependency types are imported from models/gantt.model
 
 @Component({
   selector: 'app-project-score-card',

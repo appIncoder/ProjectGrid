@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BudgetLine, BudgetSummary } from '../../models/project-models';
+import { BudgetLine, BudgetSummary } from '../../models';
 
 @Component({
   selector: 'app-project-budget',

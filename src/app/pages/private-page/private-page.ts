@@ -3,26 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
 import { ProjectService } from '../../services/project.service'; // adapte le chemin
-
-type PhaseId = 'Phase1' | 'Phase2' | 'Phase3' | 'Phase4' | 'Phase5' | 'Phase6';
-type ActivityId = 'projet' | 'metier' | 'changement' | 'technologie';
-type ActivityStatus = 'done' | 'todo' | 'inprogress' | 'notdone';
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;    
-  role: string;
-  status: string;
-  health: 'good' | 'warning' | 'critical';
-  projectManager: string;
-  sponsor: string;
-  currentPhase: PhaseId;
-  changePractitioner: string;
-  businessVisionary: string;
-  technicalExpert: string;
-  activityMatrix: Record<ActivityId, Record<PhaseId, ActivityStatus>>;
-}
+import type { PhaseId, ActivityId, ActivityStatus, Project } from '../../models';
 
 @Component({
   selector: 'app-private-page',

@@ -3,9 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { RiskCellItem, RiskLevel, TopRisk } from '../../models/project-models';
-
-export type RiskStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'RESOLVED' | 'CLOSED';
+import { RiskCellItem, RiskLevel, TopRisk, RiskStatus, TopRiskExtended } from '../../models';
 
 export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   OPEN: 'Ouvert',
@@ -13,11 +11,6 @@ export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   ON_HOLD: 'En attente',
   RESOLVED: 'Résolu',
   CLOSED: 'Fermé',
-};
-
-type TopRiskExtended = TopRisk & {
-  status?: RiskStatus;
-  residualRiskId?: string | null;
 };
 
 @Component({

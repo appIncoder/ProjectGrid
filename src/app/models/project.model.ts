@@ -40,6 +40,8 @@ export type ProjectDetail = {
   name: string;
   description: string; // ✅ AJOUT ICI (obligatoire)
   phases: PhaseId[];
+  // optional metadata for phases (used by the roadmap)
+  phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
   activities: Record<ActivityId, ActivityDefinition>;
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
 
@@ -69,6 +71,43 @@ export interface TopRisk {
   level: RiskLevel;
   owner: string;
   dueDate: string;
+}
+
+export type RiskStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'RESOLVED' | 'CLOSED';
+
+export type TopRiskExtended = TopRisk & {
+  status?: RiskStatus;
+  residualRiskId?: string | null;
+};
+
+/* ----- Projects (summary) ----- */
+export type Health = 'good' | 'warning' | 'critical';
+export type ProjectStatus = 'Planifié' | 'En cours' | 'En pause' | 'Clôturé';
+
+export interface ProjectListItem {
+  id: string;
+  name: string;
+  owner: string;
+  role: string;
+  status: ProjectStatus;
+  health: Health;
+  currentPhase: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  role: string;
+  status: string;
+  health: Health;
+  projectManager: string;
+  sponsor: string;
+  currentPhase: PhaseId;
+  changePractitioner: string;
+  businessVisionary: string;
+  technicalExpert: string;
+  activityMatrix: Record<ActivityId, Record<PhaseId, ActivityStatus>>;
 }
 
 /* ----- Budget ----- */

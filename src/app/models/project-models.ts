@@ -2,7 +2,7 @@
 
 export type PhaseId = 'Phase1' | 'Phase2' | 'Phase3' | 'Phase4' | 'Phase5' | 'Phase6';
 export type ActivityId = 'projet' | 'metier' | 'changement' | 'technologie';
-
+  export * from './project.model';
 export type ActivityStatus =
   | 'todo'
   | 'inprogress'
@@ -38,7 +38,7 @@ export interface ProjectDetail {
   phases: PhaseId[];
 
   // ✅ nouveau : métadonnées des phases
-  phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
+ // phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
 
   activities: Record<ActivityId, ActivityDefinition>;
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
@@ -65,6 +65,43 @@ export interface TopRisk {
   dueDate: string;
 }
 
+export type RiskStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'RESOLVED' | 'CLOSED';
+
+export type TopRiskExtended = TopRisk & {
+  status?: RiskStatus;
+  residualRiskId?: string | null;
+};
+
+/* ----- Projects (summary) ----- */
+export type Health = 'good' | 'warning' | 'critical';
+export type ProjectStatus = 'Planifié' | 'En cours' | 'En pause' | 'Clôturé';
+
+export interface ProjectListItem {
+  id: string;
+  name: string;
+  owner: string;
+  role: string;
+  status: ProjectStatus;
+  health: Health;
+  currentPhase: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  role: string;
+  status: string;
+  health: Health;
+  projectManager: string;
+  sponsor: string;
+  currentPhase: PhaseId;
+  changePractitioner: string;
+  businessVisionary: string;
+  technicalExpert: string;
+  activityMatrix: Record<ActivityId, Record<PhaseId, ActivityStatus>>;
+}
+
 /* ----- Budget ----- */
 export interface BudgetSummary {
   initial: number;
@@ -87,76 +124,6 @@ export interface GanttActivityRow {
   activityId: ActivityId;
   label: string;
   rowIndex: number;
-  isHeader: boolean;   // ⬅️ nouveau : true = ligne titre, false = ligne détail
+  // Compatibility re-export for legacy imports. Prefer importing from './project.model'.
 }
 
-
-export interface GanttTaskView {
-  id: string;
-  label: string;
-  activityId: ActivityId;
-  phase: PhaseId;
-  rowIndex: number;
-
-  // Mois "principal" (utile pour phases / dépendances)
-  monthIndex: number;
-
-  // Coordonnées/tailles dans le SVG
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-
-  // Pour les calculs de dates et la durée
-  startMonthIndex?: number;
-  endMonthIndex?: number;
-
-  // Indices de jours relatifs au début de la période Gantt (ganttStartDate)
-  // 0 = premier jour du Gantt, 1 = +1 jour, etc.
-  startDayIndex?: number;
-  endDayIndex?: number;
-}
-
-
-export interface GanttLinkView {
-  fromId: string;
-  toId: string;
-  path: string;
-}
-
-export interface GanttPhaseBand {
-  id: PhaseId;
-  label: string;
-  startMonthIndex: number;
-  endMonthIndex: number;
-}
-
-export type TaskCategory =
-  | 'projectManagement'
-  | 'businessManagement'
-  | 'changeManagement'
-  | 'technologyManagement';
-
-/* ----- Scorecard / tâches ----- */
-export interface Task {
-  id: string;
-  label: string;
-  status: ActivityStatus;
-
-  // ✅ nouveaux champs
-  startDate?: string; // format "YYYY-MM-DD"
-  endDate?: string;   // format "YYYY-MM-DD"
-  category?: TaskCategory;
-
-  // IMPORTANT : une tâche "vit" dans une phase de la matrice
-  phase?: PhaseId;
-}
-
-export interface PhaseDefinition {
-  id: PhaseId;
-  label?: string;
-
-  // format ISO "YYYY-MM-DD" (cohérent avec <input type="date">)
-  startDate: string;
-  endDate: string;
-}

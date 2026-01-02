@@ -9,19 +9,7 @@ import {
   ValidationErrors,
 } from '@angular/forms';
 
-type ProfileType = 'standard' | 'manager' | 'admin' | 'guest';
-type AccountRole = 'User' | 'PMO' | 'Admin' | 'Viewer';
-
-type AccountModel = {
-  avatarDataUrl?: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: AccountRole;
-  profileType: ProfileType;
-  passwordLastChangedAt?: string;
-};
+import type { ProfileType, AccountRole, AccountModel } from '../../models';
 
 const STORAGE_KEY = 'projectgrid:account';
 

@@ -5,14 +5,7 @@ import { FormBuilder, ReactiveFormsModule, FormGroup } from '@angular/forms';
 import type { PeriodPreset } from '../../models/params.model';
 import type { DependencyType, ViewMode } from '../../models/gantt.model';
 import type { ProjectDetail } from '../../models/project.model';
-
-type ProjectSettings = {
-  periodPreset: PeriodPreset;
-  viewMode: ViewMode;
-  hoverHintsEnabled: boolean;
-  linkTooltipsEnabled: boolean;
-  defaultDependencyType: DependencyType;
-};
+import type { ProjectSettings } from '../../models';
 
 const DEFAULT_SETTINGS: ProjectSettings = {
   periodPreset: '6m',

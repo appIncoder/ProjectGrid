@@ -28,6 +28,9 @@ import {
   DependencyType,
   GanttDependency,
   EditableDependencyRow,
+  TaskScheduleOverride,
+  TaskConstraints,
+  ScheduleNode,
   RoadmapLinkView,
   PeriodPreset,
   HoverHint,
@@ -37,17 +40,7 @@ import {
 
 import { ProjectService } from '../../services/project.service';
 
-type TaskScheduleOverride = { startDayIndex: number; endDayIndex: number };
-
-// ✅ Contraintes (stockées sur Task via (task as any).constraints)
-type TaskConstraints = {
-  startNoEarlierThan?: string; // ISO YYYY-MM-DD
-  startNoLaterThan?: string;   // ISO YYYY-MM-DD
-  endNoEarlierThan?: string;   // ISO YYYY-MM-DD
-  endNoLaterThan?: string;     // ISO YYYY-MM-DD
-};
-
-type ScheduleNode = { id: string; start: number; end: number; duration: number };
+// Task schedule/constraints types imported from models/gantt.model.ts
 
 @Component({
   selector: 'app-project-roadmap',

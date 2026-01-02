@@ -3,40 +3,9 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 
 import type { ProjectDetail } from '../../models/project.model';
+import type { KanbanStatus, LaneId, KanbanResource, KanbanCard, SprintInfo, Lane } from '../../models/kanban.model';
 
-/** Statuts Kanban */
-export type KanbanStatus = 'todo' | 'inprogress' | 'waiting' | 'done';
-
-/** Une “lane” = une grande catégorie (ex: projet/metier/...) */
-export type LaneId = string;
-
-/** Ressource (personne ou équipe) */
-export type KanbanResource = {
-  id: string;
-  name: string;          // "Alice Dupont"
-  kind?: 'person' | 'team';
-  avatarUrl?: string;    // optionnel
-};
-
-/** Carte Kanban */
-export type KanbanCard = {
-  id: string;
-  title: string;
-  description?: string;
-  assignees?: KanbanResource[];
-  status: KanbanStatus;
-  laneId: LaneId;
-};
-
-/** Sprint header */
-export type SprintInfo = {
-  name: string;
-  goal?: string;
-  start?: string; // ISO ou texte
-  end?: string;   // ISO ou texte
-};
-
-type Lane = { id: LaneId; label: string };
+// Lane type imported from models (see import above)
 
 const STATUSES: Array<{ id: KanbanStatus; label: string }> = [
   { id: 'todo', label: 'À faire' },

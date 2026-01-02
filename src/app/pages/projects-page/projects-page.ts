@@ -4,18 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
 import { Router, RouterModule } from '@angular/router';
 
-type Health = 'good' | 'warning' | 'critical';
-type ProjectStatus = 'Planifié' | 'En cours' | 'En pause' | 'Clôturé';
-
-interface ProjectListItem {
-  id: string;
-  name: string;
-  owner: string;
-  role: string;
-  status: ProjectStatus;
-  health: Health;
-  currentPhase: string;
-}
+import type { Health, ProjectStatus, ProjectListItem } from '../../models';
 
 @Component({
   selector: 'app-projects-page',

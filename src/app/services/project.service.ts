@@ -1,12 +1,5 @@
 import { Injectable } from '@angular/core';
-import {
-  ActivityId,
-  PhaseId,
-  ProjectDetail,
-  Task,
-  TaskCategory,
-  ActivityStatus,
-} from '../models/project-models';
+import { ActivityId, PhaseId, ProjectDetail, Task, TaskCategory, ActivityStatus } from '../models';
 
 export interface ProjectActionPayload {
   projectId: string;

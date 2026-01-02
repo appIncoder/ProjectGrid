@@ -55,6 +55,17 @@ export type EditableDependencyRow = {
   type: DependencyType 
 };
 
+export type TaskScheduleOverride = { startDayIndex: number; endDayIndex: number };
+
+export type TaskConstraints = {
+  startNoEarlierThan?: string; // ISO YYYY-MM-DD
+  startNoLaterThan?: string;   // ISO YYYY-MM-DD
+  endNoEarlierThan?: string;   // ISO YYYY-MM-DD
+  endNoLaterThan?: string;     // ISO YYYY-MM-DD
+};
+
+export type ScheduleNode = { id: string; start: number; end: number; duration: number };
+
 export type RoadmapLinkView = GanttLinkView & {
   key: string;
   type: DependencyType;
