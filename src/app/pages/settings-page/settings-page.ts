@@ -30,11 +30,25 @@ const DEFAULT_SETTINGS: ProjectSettings = {
 })
 export class SettingsPage implements OnInit, OnChanges {
   @Input() project: ProjectDetail | null = null;
-
+  dependencyType: DependencyType[] = ['F2S', 'F2F', 'S2S'];
   form!: FormGroup; // 👈 initialisé plus tard
-  savedState: 'idle' | 'saved' | 'error' = 'idle';
+  savedState: 'idle' | 'saved' | 'error' = 'idle'; 
 
-  constructor(private fb: FormBuilder) {}
+// Options pour le select "Période"
+readonly periodPresets: Array<{ value: PeriodPreset; label: string }> = [
+  { value: '3m', label: '3 mois' }, 
+  { value: '6m', label: '6 mois' }, 
+  { value: '12m', label: '1 an' },
+  { value: 'custom', label: 'Personnalisée' }, 
+];
+
+readonly viewModes: Array<{ value: ViewMode; label: string }> = [
+  { value: 'split', label: 'Split' },
+  { value: 'focusLeft', label: 'Agrandir table' },
+  { value: 'focusRight', label: 'Agrandir Gantt' },
+];
+
+  constructor(private fb: FormBuilder) { }
 
   ngOnInit(): void {
     this.form = this.fb.group({

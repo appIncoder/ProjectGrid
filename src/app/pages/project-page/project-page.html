@@ -51,6 +51,26 @@
         Roadmap
       </button>
     </li>
+        <li class="nav-item">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'board'" 
+        type="button"
+        (click)="setTab('board')">
+        Board 
+      </button>
+    </li>
+
+    <!-- ✅ Nouveau tab : Ressources -->
+    <li class="nav-item">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'ressources'"
+        type="button"
+        (click)="setTab('ressources')">
+        Ressources
+      </button>
+    </li>
   </ul>
 
   <!-- Contenu des onglets : composants indépendants -->
@@ -76,5 +96,14 @@
     *ngIf="activeTab === 'roadmap'"
     [project]="project">
   </app-project-roadmap>
-
+  <app-project-board
+    *ngIf="activeTab === 'board'"
+    [project]="project"> 
+  </app-project-board>
+ 
+  <!-- ✅ Onglet 6 : Ressources -->
+  <app-project-ressources
+    *ngIf="activeTab === 'ressources'"
+    [project]="project">
+  </app-project-ressources>
 </div>

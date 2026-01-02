@@ -49,7 +49,7 @@
         <span class="label">Mode d’affichage</span>
         <select class="control" formControlName="viewMode">
           <option *ngFor="let m of viewModes" [value]="m.value">
-            {{ m.label }} — {{ m.hint }}
+            {{ m.value }} — {{ m.label }}
           </option>
         </select>
       </label>
@@ -57,9 +57,9 @@
       <label class="row">
         <span class="label">Type de lien par défaut</span>
         <select class="control" formControlName="defaultDependencyType">
-          <option *ngFor="let t of dependencyTypes" [value]="t.value">{{ t.label }}</option>
+          <option *ngFor="let t of dependencyType" [value]="t">{{ t }}</option>
         </select>
-      </label>
+      </label> 
 
       <p class="hint">
         Conseil : ce type par défaut sert lors de la création d’un lien (si tu n’imposes pas un choix).

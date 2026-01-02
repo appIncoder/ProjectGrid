@@ -14,13 +14,13 @@ export type ActivityStatus =
 
 
 
-export type ProjectTab = 'scorecard' | 'risks' | 'budget' | 'roadmap';
+//export type ProjectTab = 'scorecard' | 'risks' | 'budget' | 'roadmap';
 
 /* ----- Scorecard / tâches ----- */
 export interface Task {
   id: string;
   label: string;
-  status: ActivityStatus;
+  status: ActivityStatus; 
 }
 
 export interface ActivityDefinition {

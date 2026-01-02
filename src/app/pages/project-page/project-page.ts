@@ -11,13 +11,15 @@ import {
   ProjectDetail,
   ProjectTab,
   Task,
-} from '../../models/project-models';
+} from '../../models'; 
 
 // Composants d’onglet
 import { ProjectScorecard } from '../../shared/project-score-card/project-score-card';
 import { ProjectRisks } from '../../shared/project-risks/project-risks';
 import { ProjectBudget } from '../../shared/project-budget/project-budget';
 import { ProjectRoadmap } from '../../shared/project-roadmap/project-roadmap';
+import { ProjectBoard } from '../../shared/project-board/project-board';
+import { ProjectRessources } from '../../shared/project-ressources/project-ressources';
 
 @Component({
   selector: 'app-project-page',
@@ -29,6 +31,8 @@ import { ProjectRoadmap } from '../../shared/project-roadmap/project-roadmap';
     ProjectRisks,
     ProjectBudget,
     ProjectRoadmap,
+    ProjectBoard,
+    ProjectRessources,
   ],
   templateUrl: './project-page.html',
   styleUrls: ['./project-page.scss'],

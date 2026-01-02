@@ -1,0 +1,83 @@
+<div class="card project-board">
+
+  <!-- En-tête Sprint -->
+  <div class="card-body pb-2">
+    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+      <div>
+        <h3 class="h6 mb-1">Sprint : {{ sprint?.name }}</h3>
+        <div class="text-muted small" *ngIf="sprint?.goal">
+          <strong>Goal :</strong> {{ sprint.goal }}
+        </div>
+      </div>
+
+      <div class="text-muted small text-end">
+        <div *ngIf="sprint?.start"><strong>Début :</strong> {{ sprint.start }}</div>
+        <div *ngIf="sprint?.end"><strong>Fin :</strong> {{ sprint.end }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body pt-2">
+    <!-- Lanes -->
+<div class="lane" *ngFor="let lane of lanes; trackBy: trackByLaneId">
+  <!-- Lane header -->
+  <div class="lane-header">
+    <div class="d-flex align-items-center justify-content-between gap-2">
+      <div class="fw-semibold">{{ lane.label }}</div>
+
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary lane-toggle"
+        (click)="toggleLane(lane.id)"
+        [attr.aria-expanded]="!isLaneCollapsed(lane.id)">
+        <span *ngIf="isLaneCollapsed(lane.id)">▸ Ouvrir</span>
+        <span *ngIf="!isLaneCollapsed(lane.id)">▾ Fermer</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 4 colonnes (masquées si lane repliée) -->
+  <div class="lane-grid" *ngIf="!isLaneCollapsed(lane.id)">
+    <div class="col" *ngFor="let st of statuses; trackBy: trackByStatusId">
+      <div class="col-header">
+        <span class="col-title">{{ st.label }}</span>
+        <span class="badge text-bg-light">{{ laneBuckets[lane.id]?.[st.id]?.length ?? 0 }}</span>
+      </div>
+
+      <div
+        class="dropzone"
+        cdkDropList
+        [id]="dropListId(lane.id, st.id)"
+        [cdkDropListData]="laneBuckets[lane.id][st.id]"
+        [cdkDropListConnectedTo]="connectedListsForLane(lane.id)"
+        (cdkDropListDropped)="onDrop(lane.id, st.id, $event)">
+
+        <div
+          class="kanban-card"
+          *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
+          cdkDrag>
+
+          <div class="kanban-card-title">{{ c.title }}</div>
+
+          <div class="assignees" *ngIf="c.assignees?.length">
+            <div class="avatar" *ngFor="let a of c.assignees">
+              <img *ngIf="a.avatarUrl" [src]="a.avatarUrl" [alt]="a.name" />
+              <span *ngIf="!a.avatarUrl">{{ initials(a.name) }}</span>
+            </div>
+          </div>
+
+          <div class="kanban-card-desc text-muted" *ngIf="c.description">
+            {{ c.description }}
+          </div>
+        </div>
+
+        <div class="empty-hint text-muted small" *ngIf="(laneBuckets[lane.id][st.id]?.length ?? 0) === 0">
+          Déposer ici…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  </div>
+</div>
