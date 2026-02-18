@@ -12,17 +12,13 @@ export const routes: Routes = [
   {
     path: '',
     component: HomePage,
-    title: 'Accueil'
+    title: 'Accueil',
+    pathMatch: 'full',
   },
   {
     path: 'login',
     component: LoginPage,
     title: 'Connexion'
-  },
-  {
-    path: 'projects',
-    component: PrivatePage,
-    title: 'Mes projets'
   },
   {
     path: 'settings',
@@ -43,6 +39,11 @@ export const routes: Routes = [
     path: 'projects',
     component: ProjectsPage,
     title: 'Mes projets'
+  },
+  {
+    path: 'projects-overview',
+    component: PrivatePage,
+    title: 'Vue projets'
   },
   { path: 'project/:id', 
     component: ProjectPage ,

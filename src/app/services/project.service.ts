@@ -1,5 +1,15 @@
+// src/app/services/project.service.ts
 import { Injectable } from '@angular/core';
-import { ActivityId, PhaseId, ProjectDetail, Task, TaskCategory, ActivityStatus } from '../models';
+import type {
+  ActivityId,
+  PhaseId,
+  ProjectDetail,
+  Task,
+  TaskCategory,
+  ActivityStatus,
+} from '../models';
+
+const DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
 
 export interface ProjectActionPayload {
   projectId: string;
@@ -15,18 +25,19 @@ export interface UpdateTaskPayload {
   label?: string;
   status?: ActivityStatus;
   startDate?: string; // "YYYY-MM-DD"
-  endDate?: string;   // "YYYY-MM-DD"
+  endDate?: string; // "YYYY-MM-DD"
   category?: TaskCategory;
-  toPhase?: PhaseId;  // déplacement éventuel
-  phase?: PhaseId;    // (optionnel) cohérence
+
+  toPhase?: PhaseId; // déplacement éventuel
+  phase?: PhaseId;   // cohérence (optionnel)
 }
 
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
-  // ===== Mini store temporaire (en attendant Firebase)
+  // Mini store (en attendant un store global / backend temps réel)
   private projects = new Map<string, ProjectDetail>();
 
-  // ===== Règles planning centralisées
+  // Règles planning
   readonly daysPerMonth = 30;
   readonly phaseToMonthIndex: Record<PhaseId, number> = {
     Phase1: 0,
@@ -37,41 +48,18 @@ export class ProjectService {
     Phase6: 5,
   };
 
-private ensurePhaseDefinitions(project: ProjectDetail): void {
-  if (project.phaseDefinitions) return;
-
-  const ganttStart = this.getDefaultGanttStartDate();
-
-  const defs: Record<PhaseId, any> = {} as any;
-  for (const phase of project.phases) {
-    const monthIndex = this.phaseToMonthIndex[phase] ?? 0;
-
-    const startDayIndex = monthIndex * this.daysPerMonth;
-    const endDayIndex = startDayIndex + (this.daysPerMonth - 1);
-
-    defs[phase] = {
-      id: phase,
-      label: phase,
-      startDate: this.toIsoDate(this.addDays(ganttStart, startDayIndex)),
-      endDate: this.toIsoDate(this.addDays(ganttStart, endDayIndex)),
-    };
-  }
-
-  project.phaseDefinitions = defs;
-}
-
-
   // -----------------------------
   // Store / registration
   // -----------------------------
   registerProject(project: ProjectDetail): void {
-    this.projects.set(project.id, project);
+    if (!project || !project.id) return;
+
+    // ✅ normalisation / cohérence
     this.ensurePhaseDefinitions(project);
-    this.seedMissingTaskDates(project.id);
+    this.seedMissingTaskDates(project);
 
-
-    // ✅ important : seed des dates par défaut dès que le projet est disponible
-    this.seedMissingTaskDates(project.id);
+    // ✅ store
+    this.projects.set(project.id, project);
   }
 
   getProject(projectId: string): ProjectDetail | undefined {
@@ -79,14 +67,14 @@ private ensurePhaseDefinitions(project: ProjectDetail): void {
   }
 
   // -----------------------------
-  // Actions (existantes)
+  // Actions (placeholders)
   // -----------------------------
   pauseProject(payload: ProjectActionPayload): void {
-    console.log('Service: pauseProject', payload);
+    console.log('[ProjectService] pauseProject', payload);
   }
 
   archiveProject(payload: ProjectActionPayload): void {
-    console.log('Service: archiveProject', payload);
+    console.log('[ProjectService] archiveProject', payload);
   }
 
   // -----------------------------
@@ -94,7 +82,6 @@ private ensurePhaseDefinitions(project: ProjectDetail): void {
   // -----------------------------
   getDefaultGanttStartDate(): Date {
     const now = new Date();
-    // identique à ProjectRoadmap.buildGanttCalendar()
     return new Date(now.getFullYear(), now.getMonth(), 1);
   }
 
@@ -142,28 +129,61 @@ private ensurePhaseDefinitions(project: ProjectDetail): void {
   }
 
   // -----------------------------
-  // Seed / coherence
+  // Robustesse: phases
   // -----------------------------
-  seedMissingTaskDates(projectId: string): void {
-    const project = this.projects.get(projectId);
-    if (!project) return;
+  private ensurePhaseDefinitions(project: ProjectDetail): void {
+    // 1) phases déjà OK
+    if (Array.isArray((project as any).phases) && project.phases.length) return;
 
-    for (const activityId of Object.keys(project.taskMatrix) as ActivityId[]) {
-      const byPhase = project.taskMatrix[activityId];
-
-      for (const phase of project.phases) {
-        const tasks = byPhase?.[phase] ?? [];
-
-        for (const task of tasks) {
-          // phase cohérente
-          if (!task.phase) task.phase = phase;
-
-          // seed dates si manquantes
-          if (!task.startDate || !task.endDate) {
-            const def = this.computeDefaultTaskDatesForPhase(phase);
-            task.startDate = task.startDate ?? def.startDate;
-            task.endDate = task.endDate ?? def.endDate;
+    // 2) tenter de reconstruire depuis taskMatrix
+    const tm: any = (project as any).taskMatrix;
+    if (tm && typeof tm === 'object') {
+      const activityIds = Object.keys(tm);
+      if (activityIds.length) {
+        const firstActivity = tm[activityIds[0]];
+        if (firstActivity && typeof firstActivity === 'object') {
+          const phaseKeys = Object.keys(firstActivity) as PhaseId[];
+          if (phaseKeys.length) {
+            project.phases = phaseKeys;
+            return;
           }
+        }
+      }
+    }
+
+    // 3) fallback
+    project.phases = DEFAULT_PHASES;
+  }
+
+  // -----------------------------
+  // Seed / cohérence (dates)
+  // -----------------------------
+  private seedMissingTaskDates(project: ProjectDetail): void {
+    const taskMatrix: any = (project as any)?.taskMatrix;
+    if (!taskMatrix || typeof taskMatrix !== 'object') return;
+
+    const phases: PhaseId[] =
+      Array.isArray(project.phases) && project.phases.length ? project.phases : DEFAULT_PHASES;
+
+    for (const activityId of Object.keys(taskMatrix ?? {})) {
+      const phaseMap = taskMatrix?.[activityId];
+      if (!phaseMap || typeof phaseMap !== 'object') continue;
+
+      for (const phaseId of phases) {
+        const tasks = phaseMap?.[phaseId];
+        if (!Array.isArray(tasks)) continue;
+
+        const defaults = this.computeDefaultTaskDatesForPhase(phaseId);
+
+        for (const task of tasks as Task[]) {
+          if (!task || typeof task !== 'object') continue;
+
+          // ✅ seed ISO dates si manquantes
+          task.startDate = task.startDate ?? defaults.startDate;
+          task.endDate = task.endDate ?? defaults.endDate;
+
+          // ✅ cohérence phase (utile dans d’autres vues)
+          (task as any).phase = (task as any).phase ?? phaseId;
         }
       }
     }
@@ -176,11 +196,11 @@ private ensurePhaseDefinitions(project: ProjectDetail): void {
     const project = this.projects.get(payload.projectId);
     if (!project) return;
 
-    const row = project.taskMatrix[payload.activityId];
+    const row = project.taskMatrix?.[payload.activityId];
     if (!row) return;
 
     const fromList = row[payload.fromPhase] ?? [];
-    const task = fromList.find(t => t.id === payload.taskId);
+    const task = fromList.find((t) => t.id === payload.taskId);
     if (!task) return;
 
     // MAJ champs
@@ -189,72 +209,72 @@ private ensurePhaseDefinitions(project: ProjectDetail): void {
 
     if (payload.startDate !== undefined) task.startDate = payload.startDate || undefined;
     if (payload.endDate !== undefined) task.endDate = payload.endDate || undefined;
-    if (payload.category !== undefined) task.category = payload.category;
+
+    if (payload.category !== undefined) (task as any).category = payload.category;
 
     // Phase explicite (cohérence)
-    if (payload.phase !== undefined) task.phase = payload.phase;
+    if (payload.phase !== undefined) (task as any).phase = payload.phase;
 
-    // Déplacement phase (taskMatrix)
+    // Déplacement phase
     if (payload.toPhase && payload.toPhase !== payload.fromPhase) {
       const toList = row[payload.toPhase] ?? [];
 
-      row[payload.fromPhase] = fromList.filter(t => t.id !== payload.taskId);
+      row[payload.fromPhase] = fromList.filter((t) => t.id !== payload.taskId);
 
-      if (!toList.some(t => t.id === payload.taskId)) {
+      if (!toList.some((t) => t.id === payload.taskId)) {
         toList.push(task);
       }
       row[payload.toPhase] = toList;
 
-      task.phase = payload.toPhase;
+      (task as any).phase = payload.toPhase;
     } else {
-      task.phase = task.phase ?? payload.fromPhase;
+      (task as any).phase = (task as any).phase ?? payload.fromPhase;
     }
   }
 
   // -----------------------------
   // Gantt -> Task (dates)
   // -----------------------------
-syncGanttDayIndexesToTask(params: {
-  projectId: string;
-  taskId: string;
-  ganttStartDate: Date;
-  startDayIndex?: number;
-  endDayIndex?: number;
-}): void {
-  const project = this.projects.get(params.projectId);
-  if (!project) return;
+  syncGanttDayIndexesToTask(params: {
+    projectId: string;
+    taskId: string;
+    ganttStartDate: Date;
+    startDayIndex?: number;
+    endDayIndex?: number;
+  }): void {
+    const project = this.projects.get(params.projectId);
+    if (!project) return;
 
-  const located = this.findTaskById(project, params.taskId);
-  if (!located) return;
+    const located = this.findTaskById(project, params.taskId);
+    if (!located) return;
 
-  const s = params.startDayIndex ?? 0;
-  const e = params.endDayIndex ?? s + (this.daysPerMonth - 1);
+    const s = params.startDayIndex ?? 0;
+    const e = params.endDayIndex ?? s + (this.daysPerMonth - 1);
 
-  const startIso = this.toIsoDate(this.addDays(params.ganttStartDate, s));
-  const endIso = this.toIsoDate(this.addDays(params.ganttStartDate, e));
+    const startIso = this.toIsoDate(this.addDays(params.ganttStartDate, s));
+    const endIso = this.toIsoDate(this.addDays(params.ganttStartDate, e));
 
-  located.task.startDate = startIso;
-  located.task.endDate = endIso;
+    located.task.startDate = startIso;
+    located.task.endDate = endIso;
 
-  // cohérence (utile si tu affiches la phase ailleurs)
-  located.task.phase = located.task.phase ?? located.phase;
-}
-
-
-  private findTaskById(project: ProjectDetail, taskId: string): {
-  activityId: ActivityId;
-  phase: PhaseId;
-  task: Task;
-} | null {
-  for (const activityId of Object.keys(project.taskMatrix) as ActivityId[]) {
-    const byPhase = project.taskMatrix[activityId];
-    for (const phase of project.phases) {
-      const tasks = byPhase?.[phase] ?? [];
-      const found = tasks.find(t => t.id === taskId);
-      if (found) return { activityId, phase, task: found };
-    }
+    (located.task as any).phase = (located.task as any).phase ?? located.phase;
   }
-  return null;
-}
 
+  private findTaskById(
+    project: ProjectDetail,
+    taskId: string
+  ): { activityId: ActivityId; phase: PhaseId; task: Task } | null {
+    const phases: PhaseId[] =
+      Array.isArray(project.phases) && project.phases.length ? project.phases : DEFAULT_PHASES;
+
+    for (const activityId of Object.keys(project.taskMatrix ?? {}) as ActivityId[]) {
+      const byPhase = project.taskMatrix[activityId];
+      for (const phase of phases) {
+        const tasks = byPhase?.[phase] ?? [];
+        const found = tasks.find((t) => t.id === taskId);
+        if (found) return { activityId, phase, task: found };
+      }
+    }
+    return null;
+  }
 }

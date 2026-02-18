@@ -2,7 +2,7 @@
   <div class="card-body">
     <h5 class="card-title mb-3">Connexion</h5>
 
-    <form (ngSubmit)="onSubmit()">
+    <form (ngSubmit)="onSubmit()" autocomplete="off">
       <div class="mb-3">
         <label for="username" class="form-label">Nom d'utilisateur</label>
         <input id="username"
@@ -10,6 +10,10 @@
                type="text"
                [(ngModel)]="model.username"
                name="username"
+               autocomplete="off"
+               autocapitalize="off"
+               autocorrect="off"
+               spellcheck="false"
                required>
       </div>
 
@@ -20,6 +24,7 @@
                type="password"
                [(ngModel)]="model.password"
                name="password"
+               autocomplete="new-password"
                required>
       </div>
 

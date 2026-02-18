@@ -1,2 +1,125 @@
-.task-pill.status-onhold { background: #0d6efd; color: #fff; }        // bleu Bootstrap
-.task-pill.status-notapplicable { background: #adb5bd; color: #fff; } // gris Bootstrap
+:host {
+  --scorecard-row-height: 6.4rem;
+  --scorecard-cell-pad-y: 0.3rem;
+  --scorecard-cell-pad-x: 0.4rem;
+  --scorecard-grid-height: calc((var(--scorecard-row-height) * 4) + 3rem);
+}
+
+.scorecard-table-wrap {
+  margin-bottom: 0;
+  max-height: var(--scorecard-grid-height);
+  overflow: auto;
+}
+
+.scorecard-table {
+  width: 100%;
+  table-layout: fixed;
+  margin-bottom: 0;
+}
+
+.activity-matrix-detail th,
+.activity-matrix-detail td {
+  vertical-align: top;
+  padding: var(--scorecard-cell-pad-y) var(--scorecard-cell-pad-x);
+}
+
+.activity-header-col {
+  width: 20%;
+  min-width: 180px;
+}
+
+.activity-row {
+  height: var(--scorecard-row-height);
+}
+
+.activity-cell,
+.phase-cell {
+  height: var(--scorecard-row-height);
+}
+
+.activity-name {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-bottom: 0.12rem;
+}
+
+.activity-owner {
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.cell-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.16rem;
+  height: calc(var(--scorecard-row-height) - (var(--scorecard-cell-pad-y) * 2));
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.task-pill {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid #000;
+  padding: 0.1rem 0.38rem;
+  font-size: 0.72rem;
+  line-height: 1.22;
+  text-align: left;
+}
+
+.status-done {
+  background: #28a745;
+  border-color: #28a745;
+  color: #fff;
+}
+
+.status-todo {
+  background: #fff;
+  border-color: #000;
+  color: #000;
+}
+
+.status-inprogress {
+  background: #fd7e14;
+  border-color: #fd7e14;
+  color: #fff;
+}
+
+.status-onhold {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.status-notdone {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+.status-notapplicable {
+  background: #adb5bd;
+  border-color: #adb5bd;
+  color: #fff;
+}
+
+.no-task {
+  margin: auto 0;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 991.98px) {
+  :host {
+    --scorecard-row-height: 5.6rem;
+    --scorecard-grid-height: calc((var(--scorecard-row-height) * 4) + 2.6rem);
+  }
+
+  .activity-header-col {
+    min-width: 150px;
+  }
+}

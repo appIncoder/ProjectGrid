@@ -4,15 +4,15 @@
   <div class="card-body pb-2">
     <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
       <div>
-        <h3 class="h6 mb-1">Sprint : {{ sprint?.name }}</h3>
-        <div class="text-muted small" *ngIf="sprint?.goal">
+        <h3 class="h6 mb-1">Sprint : {{ sprint.name }}</h3>
+        <div class="text-muted small" *ngIf="sprint.goal">
           <strong>Goal :</strong> {{ sprint.goal }}
         </div>
       </div>
 
       <div class="text-muted small text-end">
-        <div *ngIf="sprint?.start"><strong>Début :</strong> {{ sprint.start }}</div>
-        <div *ngIf="sprint?.end"><strong>Fin :</strong> {{ sprint.end }}</div>
+        <div *ngIf="sprint.start"><strong>Début :</strong> {{ sprint.start }}</div>
+        <div *ngIf="sprint.end"><strong>Fin :</strong> {{ sprint.end }}</div>
       </div>
     </div>
   </div>
@@ -55,7 +55,9 @@
         <div
           class="kanban-card"
           *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
-          cdkDrag>
+          cdkDrag
+          [cdkDragPreviewContainer]="'parent'"
+          (click)="openTaskEditModal(taskEditModal, c)">
 
           <div class="kanban-card-title">{{ c.title }}</div>
 
@@ -69,6 +71,23 @@
           <div class="kanban-card-desc text-muted" *ngIf="c.description">
             {{ c.description }}
           </div>
+
+          <ng-template cdkDragPreview>
+            <div class="kanban-card drag-preview-card">
+              <div class="kanban-card-title">{{ c.title }}</div>
+
+              <div class="assignees" *ngIf="c.assignees?.length">
+                <div class="avatar" *ngFor="let a of c.assignees">
+                  <img *ngIf="a.avatarUrl" [src]="a.avatarUrl" [alt]="a.name" />
+                  <span *ngIf="!a.avatarUrl">{{ initials(a.name) }}</span>
+                </div>
+              </div>
+
+              <div class="kanban-card-desc text-muted" *ngIf="c.description">
+                {{ c.description }}
+              </div>
+            </div>
+          </ng-template>
         </div>
 
         <div class="empty-hint text-muted small" *ngIf="(laneBuckets[lane.id][st.id]?.length ?? 0) === 0">
@@ -78,6 +97,28 @@
     </div>
   </div>
 </div>
+
+<ng-template #taskEditModal let-modal>
+  <app-project-task-edit-modal
+    [editError]="editError"
+    [(editedTaskLabel)]="editedTaskLabel"
+    [(editedTaskStatus)]="editedTaskStatus"
+    [(editedStartDate)]="editedStartDate"
+    [(editedEndDate)]="editedEndDate"
+    [(editedCategory)]="editedCategory"
+    [(editedPhase)]="editedPhase"
+    [taskStatusOptions]="taskStatusOptions"
+    [taskCategoryOptions]="taskCategoryOptions"
+    [dependencyTypeOptions]="dependencyTypeOptions"
+    [phases]="project?.phases ?? []"
+    [editedDependencies]="editedDependencies"
+    [linkableTasks]="getLinkableTasks()"
+    (addDependency)="addDependencyRow()"
+    (removeDependency)="removeDependencyRow($event)"
+    (cancel)="modal.dismiss()"
+    (save)="saveTaskEdit(modal)"
+  ></app-project-task-edit-modal>
+</ng-template>
 
   </div>
 </div>

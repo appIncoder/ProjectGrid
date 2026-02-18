@@ -1,109 +1,96 @@
-<div class="project-page-container" *ngIf="project as p">
+<div class="project-page-container">
 
-  <!-- Header du projet -->
-  <div class="project-header card mb-3">
-    <div class="card-body">
-      <h2 class="h5 mb-1">{{ p.name }}</h2>
-      <p class="project-description mb-2">
-        {{ p.description }}
-      </p>
-      <p class="text-muted small mb-0">
-        Vue détaillée du projet : scorecard, risques, budget et roadmap.
-      </p>
-    </div>
+  <!-- États -->
+  <div *ngIf="isLoading" class="text-muted small mb-2">
+    Chargement du projet…
   </div>
 
-  <!-- Onglets -->
-  <ul class="nav nav-tabs project-tabs mb-3">
-    <li class="nav-item">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'scorecard'"
-        type="button"
-        (click)="setTab('scorecard')">
-        Scorecard
-      </button>
-    </li>
-    <li class="nav-item">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'risks'"
-        type="button"
-        (click)="setTab('risks')">
-        Gestion des risques
-      </button>
-    </li>
-    <li class="nav-item">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'budget'"
-        type="button"
-        (click)="setTab('budget')">
-        Gestion du budget
-      </button>
-    </li>
-    <li class="nav-item">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'roadmap'"
-        type="button"
-        (click)="setTab('roadmap')">
-        Roadmap
-      </button>
-    </li>
-        <li class="nav-item">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'board'" 
-        type="button"
-        (click)="setTab('board')">
-        Board 
-      </button>
-    </li>
+  <div *ngIf="loadError" class="alert alert-danger py-2 small mb-2 d-flex align-items-center justify-content-between">
+    <span>{{ loadError }}</span>
+    <button class="btn btn-sm btn-outline-light" type="button" (click)="reload()" [disabled]="isLoading">
+      ↻ Réessayer
+    </button>
+  </div>
 
-    <!-- ✅ Nouveau tab : Ressources -->
-    <li class="nav-item">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'ressources'"
-        type="button"
-        (click)="setTab('ressources')">
-        Ressources
-      </button>
-    </li>
-  </ul>
+  <!-- ✅ Contenu seulement si project existe -->
+  <ng-container *ngIf="project as p">
 
-  <!-- Contenu des onglets : composants indépendants -->
+    <div class="project-page-shell">
+      <!-- Header du projet -->
+      <div class="project-header card mb-3">
+        <div class="card-body">
+          <h2 class="h5 mb-1">{{ p.name }}</h2>
+          <p class="project-description mb-2">
+            {{ p.description }}
+          </p>
+          <div class="project-meta">
+            <span class="project-meta-item">ID: {{ p.id }}</span>
+            <span class="project-meta-item">Vue détaillée active</span>
+          </div>
+        </div>
+      </div>
 
-  <!-- Onglet 1 : Scorecard -->
-  <app-project-score-card
-    *ngIf="activeTab === 'scorecard'"
-    [project]="project">
-  </app-project-score-card>
+      <!-- Onglets -->
+      <div class="project-tabs-wrap mb-3">
+        <ul class="nav nav-tabs project-tabs">
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="activeTab === 'scorecard'" type="button" (click)="setTab('scorecard')">
+              Scorecard
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="activeTab === 'risks'" type="button" (click)="setTab('risks')">
+              Gestion des risques
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="activeTab === 'budget'" type="button" (click)="setTab('budget')">
+              Gestion du budget
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="activeTab === 'roadmap'" type="button" (click)="setTab('roadmap')">
+              Roadmap
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="activeTab === 'board'" type="button" (click)="setTab('board')">
+              Board
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" [class.active]="activeTab === 'ressources'" type="button" (click)="setTab('ressources')">
+              Ressources
+            </button>
+          </li>
+        </ul>
+      </div>
 
-  <!-- Onglet 2 : Gestion des risques -->
-  <app-project-risks
-    *ngIf="activeTab === 'risks'">
-  </app-project-risks>
+      <div class="project-tab-panel">
+        <!-- Onglet 1 : Scorecard -->
+        <app-project-score-card *ngIf="activeTab === 'scorecard'" [project]="p"></app-project-score-card>
 
-  <!-- Onglet 3 : Gestion du budget -->
-  <app-project-budget
-    *ngIf="activeTab === 'budget'">
-  </app-project-budget>
+        <!-- Onglet 2 : Gestion des risques -->
+        <app-project-risks *ngIf="activeTab === 'risks'"></app-project-risks>
 
-  <!-- Onglet 4 : Roadmap / Gantt -->
-  <app-project-roadmap
-    *ngIf="activeTab === 'roadmap'"
-    [project]="project">
-  </app-project-roadmap>
-  <app-project-board
-    *ngIf="activeTab === 'board'"
-    [project]="project"> 
-  </app-project-board>
- 
-  <!-- ✅ Onglet 6 : Ressources -->
-  <app-project-ressources
-    *ngIf="activeTab === 'ressources'"
-    [project]="project">
-  </app-project-ressources>
+        <!-- Onglet 3 : Gestion du budget -->
+        <app-project-budget *ngIf="activeTab === 'budget'"></app-project-budget>
+
+        <!-- Onglet 4 : Roadmap / Gantt -->
+        <app-project-roadmap *ngIf="activeTab === 'roadmap'" [project]="p"></app-project-roadmap>
+
+        <!-- Onglet 5 : Board -->
+        <app-project-board *ngIf="activeTab === 'board'" [project]="p"></app-project-board>
+
+        <!-- Onglet 6 : Ressources -->
+        <app-project-ressources *ngIf="activeTab === 'ressources'" [project]="p"></app-project-ressources>
+      </div>
+    </div>
+
+  </ng-container>
+
+  <!-- ✅ Si pas loading + pas d'erreur + pas de projet -->
+  <div *ngIf="!isLoading && !loadError && !project" class="text-muted small">
+    Aucun projet à afficher.
+  </div>
 </div>

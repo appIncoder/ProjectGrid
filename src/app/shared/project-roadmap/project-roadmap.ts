@@ -14,6 +14,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
+import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
 
 import {
   ActivityId,
@@ -41,11 +42,23 @@ import {
 import { ProjectService } from '../../services/project.service';
 
 // Task schedule/constraints types imported from models/gantt.model.ts
+type RoadmapColKey = 'task' | 'start' | 'end' | 'phase' | 'progress' | 'linkType' | 'linkedTask';
+type LinkAnchorSide = 'start' | 'end';
+
+type LinkDraft = {
+  fromTaskId: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  targetTaskId: string | null;
+  targetSide: LinkAnchorSide | null;
+};
 
 @Component({
   selector: 'app-project-roadmap',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModalModule],
+  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal],
   templateUrl: './project-roadmap.html',
   styleUrls: ['./project-roadmap.scss'],
 })
@@ -63,7 +76,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   // ===== Layout (lignes)
   readonly headerRow1Height = 44;
   readonly headerRow2Height = 32;
-  readonly bodyRowHeight = 32;
+  readonly bodyRowHeight = 36;
 
   // ===== Divider draggable
   readonly dividerW = 10;
@@ -77,24 +90,45 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   readonly maxTablePanelWidthPx = 900;
 
   // ===== Largeur "contenu tableau"
-  private readonly tableColRatios = [
-    0.4,  // Tâches
-    0.25, // Début
-    0.25, // Fin
-    0.2,  // Phase
-    0.2,  // Progression
-  ];
-  tableContentWidthPx = 600;
+  tableContentWidthPx = 0;
 
-  get colTaskW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[0]); }
-  get colStartW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[1]); }
-  get colEndW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[2]); }
-  get colPhaseW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[3]); }
-  get colProgW(): number { return Math.round(this.tableContentWidthPx * this.tableColRatios[4]); }
+  private readonly minColWidth: Record<RoadmapColKey, number> = {
+    task: 260,
+    start: 110,
+    end: 110,
+    phase: 140,
+    progress: 110,
+    linkType: 150,
+    linkedTask: 220,
+  };
 
-  // ✅ Colonnes additionnelles (toujours visibles si ton HTML les affiche toujours)
-  readonly colLinkTypeW = 170;
-  readonly colLinkedTaskW = 280;
+  private readonly maxColWidth: Record<RoadmapColKey, number> = {
+    task: 700,
+    start: 320,
+    end: 320,
+    phase: 400,
+    progress: 300,
+    linkType: 360,
+    linkedTask: 520,
+  };
+
+  colWidths: Record<RoadmapColKey, number> = {
+    task: 360,
+    start: 140,
+    end: 140,
+    phase: 160,
+    progress: 140,
+    linkType: 190,
+    linkedTask: 300,
+  };
+
+  get colTaskW(): number { return this.colWidths.task; }
+  get colStartW(): number { return this.colWidths.start; }
+  get colEndW(): number { return this.colWidths.end; }
+  get colPhaseW(): number { return this.colWidths.phase; }
+  get colProgW(): number { return this.colWidths.progress; }
+  get colLinkTypeW(): number { return this.colWidths.linkType; }
+  get colLinkedTaskW(): number { return this.colWidths.linkedTask; }
 
   get tableInnerGridTemplate(): string {
     const base = `${this.colTaskW}px ${this.colStartW}px ${this.colEndW}px ${this.colPhaseW}px ${this.colProgW}px`;
@@ -195,12 +229,18 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     }, 3500);
   }
 
-  private dragMode: 'move' | 'resize-end' = 'move';
+  private dragMode: 'move' | 'resize-end' | 'link-create' = 'move';
+
+  private columnResizing = false;
+  private resizingCol: RoadmapColKey | null = null;
+  private colResizeStartX = 0;
+  private colResizeStartW = 0;
 
   draggingTask: GanttTaskView | null = null;
   dragStartClientX = 0;
   dragStartTaskX = 0;
   dragHasMoved = false;
+  private dragStartClientY = 0;
 
   private resizeFixedStartDayIndex: number | null = null;
 
@@ -209,6 +249,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   private previewEndDayIndex: number | null = null;
 
   private taskByRowIndex: Record<number, GanttTaskView> = {};
+  linkDraft: LinkDraft | null = null;
+  readonly linkSnapDistancePx = 18;
 
   // ===== Période
   periodPreset: PeriodPreset = '6m';
@@ -271,7 +313,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   ngOnInit(): void {
     this.tablePanelWidthPx = 400;
-    this.tableContentWidthPx = 400;
+    this.recomputeTableContentWidth();
 
     const d = this.projectService.getDefaultGanttStartDate();
     this.customStartIso = this.projectService.toIsoDate(d);
@@ -328,21 +370,55 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   @HostListener('window:pointermove', ['$event'])
   onWindowPointerMove(event: PointerEvent): void {
-    if (!this.resizing) return;
+    if (this.resizing) {
+      const dx = event.clientX - this.resizeStartX;
+      let nextPanel = this.resizeStartPanelW + dx;
 
-    const dx = event.clientX - this.resizeStartX;
-    let nextPanel = this.resizeStartPanelW + dx;
+      const minPanel = this.getMinTablePanelWidthPx();
+      nextPanel = Math.max(minPanel, nextPanel);
+      nextPanel = Math.min(this.maxTablePanelWidthPx, nextPanel);
 
-    const minPanel = this.getMinTablePanelWidthPx();
-    nextPanel = Math.max(minPanel, nextPanel);
-    nextPanel = Math.min(this.maxTablePanelWidthPx, nextPanel);
+      this.tablePanelWidthPx = nextPanel;
+      return;
+    }
 
-    this.tablePanelWidthPx = nextPanel;
+    if (this.columnResizing && this.resizingCol) {
+      const dx = event.clientX - this.colResizeStartX;
+      const min = this.minColWidth[this.resizingCol];
+      const max = this.maxColWidth[this.resizingCol];
+      const next = this.clamp(this.colResizeStartW + dx, min, max);
+      this.colWidths[this.resizingCol] = next;
+      this.recomputeTableContentWidth();
+    }
   }
 
   @HostListener('window:pointerup')
   onWindowPointerUp(): void {
     this.resizing = false;
+    this.columnResizing = false;
+    this.resizingCol = null;
+  }
+
+  onColumnResizePointerDown(event: PointerEvent, col: RoadmapColKey): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.columnResizing = true;
+    this.resizingCol = col;
+    this.colResizeStartX = event.clientX;
+    this.colResizeStartW = this.colWidths[col];
+    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+  }
+
+  private recomputeTableContentWidth(): void {
+    this.tableContentWidthPx =
+      this.colWidths.task +
+      this.colWidths.start +
+      this.colWidths.end +
+      this.colWidths.phase +
+      this.colWidths.progress +
+      this.colWidths.linkType +
+      this.colWidths.linkedTask;
+    this.ganttViewportWidth = Math.max(this.ganttWidth, this.tableContentWidthPx * 2);
   }
 
   // =======================
@@ -1058,6 +1134,80 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.updateGanttLinks();
   }
 
+  private getLinkObstacles(excludeTaskIds: string[]): Array<{ left: number; right: number; top: number; bottom: number }> {
+    const exclude = new Set(excludeTaskIds.map((x) => String(x)));
+    const pad = 3;
+    return this.ganttTasksView
+      .filter((t) => !String(t.id).startsWith('summary-'))
+      .filter((t) => !exclude.has(String(t.id)))
+      .map((t) => ({
+        left: t.x - pad,
+        right: t.x + t.width + pad,
+        top: t.y - pad,
+        bottom: t.y + t.height + pad,
+      }));
+  }
+
+  private overlaps(a1: number, a2: number, b1: number, b2: number): boolean {
+    const minA = Math.min(a1, a2);
+    const maxA = Math.max(a1, a2);
+    const minB = Math.min(b1, b2);
+    const maxB = Math.max(b1, b2);
+    return maxA >= minB && maxB >= minA;
+  }
+
+  private segmentHitsObstacles(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    obstacles: Array<{ left: number; right: number; top: number; bottom: number }>
+  ): boolean {
+    const isHorizontal = Math.abs(y1 - y2) < 0.001;
+    const isVertical = Math.abs(x1 - x2) < 0.001;
+    if (!isHorizontal && !isVertical) return true;
+
+    for (const r of obstacles) {
+      if (isHorizontal) {
+        if (y1 >= r.top && y1 <= r.bottom && this.overlaps(x1, x2, r.left, r.right)) {
+          return true;
+        }
+      } else {
+        if (x1 >= r.left && x1 <= r.right && this.overlaps(y1, y2, r.top, r.bottom)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private polylineHitsObstacles(
+    points: Array<{ x: number; y: number }>,
+    obstacles: Array<{ left: number; right: number; top: number; bottom: number }>
+  ): boolean {
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      if (this.segmentHitsObstacles(a.x, a.y, b.x, b.y, obstacles)) return true;
+    }
+    return false;
+  }
+
+  private polylineLength(points: Array<{ x: number; y: number }>): number {
+    let len = 0;
+    for (let i = 1; i < points.length; i++) {
+      len += Math.abs(points[i].x - points[i - 1].x) + Math.abs(points[i].y - points[i - 1].y);
+    }
+    return len;
+  }
+
+  private pointsToPath(points: Array<{ x: number; y: number }>): string {
+    if (!points.length) return '';
+    const head = `M ${points[0].x} ${points[0].y}`;
+    const tail = points.slice(1).map((p) => `L ${p.x} ${p.y}`).join(' ');
+    return `${head} ${tail}`.trim();
+  }
+
   private updateGanttLinks(): void {
     const depsAll = this.getProjectDependencies();
 
@@ -1067,7 +1217,17 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     const links: RoadmapLinkView[] = [];
     const hMargin = 10;
-    const vGap = Math.max(10, Math.round(this.bodyRowHeight * 0.55));
+    const laneGap = Math.max(8, Math.round(this.bodyRowHeight * 0.25));
+    const barClearance = 24;
+    const allRealTasks = this.ganttTasksView.filter((t) => !String(t.id).startsWith('summary-'));
+    const globalMinX = allRealTasks.length
+      ? Math.min(...allRealTasks.map((t) => t.x))
+      : this.ganttLeftPadding + 20;
+    const globalMaxX = allRealTasks.length
+      ? Math.max(...allRealTasks.map((t) => t.x + t.width))
+      : this.ganttLeftPadding + this.ganttColWidth;
+    const leftEscape = Math.max(4, Math.round(globalMinX - barClearance));
+    const rightEscape = Math.round(globalMaxX + barClearance);
 
     for (const dep of deps) {
       const from = this.ganttTasksView.find(t => t.id === dep.fromId);
@@ -1087,47 +1247,82 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
       const xOut = startX + (fromSide === 'start' ? -hMargin : +hMargin);
       const xIn = endX + (toSide === 'start' ? -hMargin : +hMargin);
+      const obstacles = this.getLinkObstacles([String(from.id), String(to.id)]);
 
-      const fromTop = from.y;
-      const fromBottom = from.y + from.height;
-      const toTop = to.y;
-      const toBottom = to.y + to.height;
+      const yMid = Math.round((startY + endY) / 2);
+      const yUpper = Math.min(startY, endY) - laneGap;
+      const yLower = Math.max(startY, endY) + laneGap;
 
-      const fromIsAbove = fromTop < toTop;
+      const candidates: Array<Array<{ x: number; y: number }>> = [
+        // Short candidate: direct horizontal corridor at source Y.
+        [
+          { x: startX, y: startY },
+          { x: xOut, y: startY },
+          { x: xIn, y: startY },
+          { x: xIn, y: endY },
+          { x: endX, y: endY },
+        ],
+        // Short candidate: direct at target Y.
+        [
+          { x: startX, y: startY },
+          { x: xOut, y: startY },
+          { x: xOut, y: endY },
+          { x: xIn, y: endY },
+          { x: endX, y: endY },
+        ],
+        // Mid corridor.
+        [
+          { x: startX, y: startY },
+          { x: xOut, y: startY },
+          { x: xOut, y: yMid },
+          { x: xIn, y: yMid },
+          { x: xIn, y: endY },
+          { x: endX, y: endY },
+        ],
+        // Slightly above.
+        [
+          { x: startX, y: startY },
+          { x: xOut, y: startY },
+          { x: xOut, y: yUpper },
+          { x: xIn, y: yUpper },
+          { x: xIn, y: endY },
+          { x: endX, y: endY },
+        ],
+        // Slightly below.
+        [
+          { x: startX, y: startY },
+          { x: xOut, y: startY },
+          { x: xOut, y: yLower },
+          { x: xIn, y: yLower },
+          { x: xIn, y: endY },
+          { x: endX, y: endY },
+        ],
+      ];
 
-      const betweenTop = fromIsAbove ? (fromBottom + vGap) : (toBottom + vGap);
-      const betweenBottom = fromIsAbove ? (toTop - vGap) : (fromTop - vGap);
+      const clearCandidates = candidates.filter((pts) => !this.polylineHitsObstacles(pts, obstacles));
+      let chosen: Array<{ x: number; y: number }> | null = null;
 
-      let yMain: number | null = null;
-
-      if (betweenBottom > betweenTop) {
-        yMain = Math.round((betweenTop + betweenBottom) / 2);
+      if (clearCandidates.length) {
+        chosen = clearCandidates.sort((aPts, bPts) => this.polylineLength(aPts) - this.polylineLength(bPts))[0];
+      } else {
+        // Fallback long route only if needed.
+        const xEscapeFrom = fromSide === 'start' ? leftEscape : rightEscape;
+        const xEscapeTo = toSide === 'start' ? leftEscape : rightEscape;
+        const yLane = startY <= endY ? (Math.floor(startY / this.bodyRowHeight) + 1) * this.bodyRowHeight - 3
+                                     : Math.floor(endY / this.bodyRowHeight) * this.bodyRowHeight - 3;
+        chosen = [
+          { x: startX, y: startY },
+          { x: xOut, y: startY },
+          { x: xEscapeFrom, y: startY },
+          { x: xEscapeFrom, y: yLane },
+          { x: xEscapeTo, y: yLane },
+          { x: xEscapeTo, y: endY },
+          { x: xIn, y: endY },
+          { x: endX, y: endY },
+        ];
       }
 
-      if (yMain === null) {
-        const minTop = Math.min(fromTop, toTop);
-        const maxBottom = Math.max(fromBottom, toBottom);
-
-        const yAbove = minTop - vGap;
-        const yBelow = maxBottom + vGap;
-
-        const toCenterY = to.y + to.height / 2;
-        const distAbove = Math.abs(toCenterY - yAbove);
-        const distBelow = Math.abs(toCenterY - yBelow);
-
-        yMain = distAbove >= distBelow ? yAbove : yBelow;
-
-        if (yMain > minTop && yMain < maxBottom) yMain = yAbove;
-      }
-
-      const path = [
-        `M ${startX} ${startY}`,
-        `L ${xOut} ${startY}`,
-        `L ${xOut} ${yMain}`,
-        `L ${xIn} ${yMain}`,
-        `L ${xIn} ${endY}`,
-        `L ${endX} ${endY}`,
-      ].join(' ');
+      const path = this.pointsToPath(chosen);
 
       links.push({
         fromId: dep.fromId,
@@ -1365,6 +1560,84 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   // =======================
   // Table helpers
   // =======================
+  getTotalLeafTaskCount(): number {
+    return this.ganttTasksView.filter((t) => !String(t.id).startsWith('summary-')).length;
+  }
+
+  getCollapsedGroupCount(): number {
+    return this.orderedActivities.filter((id) => this.activityCollapse[id]).length;
+  }
+
+  getActivityGroupCount(): number {
+    return this.orderedActivities.length;
+  }
+
+  getActivityTaskCount(activityId: ActivityId): number {
+    return this.ganttTasksView.filter((t) => t.activityId === activityId && !String(t.id).startsWith('summary-')).length;
+  }
+
+  getActivityProgressPercent(activityId: ActivityId): number {
+    const tasks = this.ganttTasksView.filter((t) => t.activityId === activityId && !String(t.id).startsWith('summary-'));
+    if (!tasks.length) return 0;
+    const total = tasks.reduce((acc, t) => acc + this.getTaskProgressPercent(t), 0);
+    return Math.round(total / tasks.length);
+  }
+
+  getActivityCssClass(activityId: ActivityId): string {
+    return `activity-${activityId}`;
+  }
+
+  getActivityCode(activityId: ActivityId): string {
+    switch (activityId) {
+      case 'projet':
+        return 'PRJ';
+      case 'metier':
+        return 'MET';
+      case 'changement':
+        return 'CHG';
+      case 'technologie':
+        return 'TEC';
+      default:
+        return 'ACT';
+    }
+  }
+
+  getTaskBarClass(task: GanttTaskView): string {
+    const base = task.id.startsWith('summary-') ? 'gantt-bar gantt-bar-summary' : 'gantt-bar';
+    const activityClass = `gantt-bar--${task.activityId}`;
+    const highlight = this.isTaskHighlighted(task.id) ? ' gantt-bar--highlight' : '';
+    const dim = this.isTaskDimmed(task.id) ? ' gantt-bar--dim' : '';
+    return `${base} ${activityClass}${highlight}${dim}`;
+  }
+
+  getTaskBulletClass(task: GanttTaskView, side: 'start' | 'end'): string {
+    const sideClass = side === 'end' ? 'gantt-bar-bullet-end' : 'gantt-bar-bullet-start';
+    const activityClass = `gantt-bullet--${task.activityId}`;
+    const highlight = this.isTaskHighlighted(task.id) ? ' gantt-bullet--highlight' : '';
+    const dim = this.isTaskDimmed(task.id) ? ' gantt-bullet--dim' : '';
+    return `gantt-bar-bullet ${sideClass} ${activityClass}${highlight}${dim}`;
+  }
+
+  getTaskStatusText(task: GanttTaskView): string {
+    const base = this.baseTasks.find((b) => b.task.id === task.id)?.task;
+    const status = (base as any)?.status as ActivityStatus | undefined;
+    switch (status) {
+      case 'done':
+        return 'Done';
+      case 'inprogress':
+        return 'In progress';
+      case 'onhold':
+        return 'On hold';
+      case 'notdone':
+        return 'Not done';
+      case 'notapplicable':
+        return 'N/A';
+      case 'todo':
+      default:
+        return 'Todo';
+    }
+  }
+
   getRowDisplayLabel(row: GanttActivityRow): string {
     if (!row.isHeader) return '';
     const collapsed = this.activityCollapse[row.activityId];
@@ -1572,6 +1845,91 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     return loc.x;
   }
 
+  private getMouseYInSvg(event: MouseEvent): number {
+    const svg = event.currentTarget as SVGSVGElement | null;
+    if (!svg) return event.clientY;
+
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return event.clientY;
+
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+
+    const loc = pt.matrixTransform(ctm.inverse());
+    return loc.y;
+  }
+
+  private getTaskAnchor(task: GanttTaskView, side: LinkAnchorSide): { x: number; y: number } {
+    return {
+      x: side === 'start' ? task.x : task.x + task.width,
+      y: task.y + task.height / 2,
+    };
+  }
+
+  private findClosestLinkTarget(
+    mouseX: number,
+    mouseY: number,
+    fromTaskId: string
+  ): { taskId: string; side: LinkAnchorSide; x: number; y: number } | null {
+    let best: { taskId: string; side: LinkAnchorSide; x: number; y: number; d2: number } | null = null;
+    const maxD2 = this.linkSnapDistancePx * this.linkSnapDistancePx;
+
+    for (const t of this.ganttTasksView) {
+      if (String(t.id).startsWith('summary-')) continue;
+      if (String(t.id) === String(fromTaskId)) continue;
+
+      const startA = this.getTaskAnchor(t, 'start');
+      const endA = this.getTaskAnchor(t, 'end');
+
+      const d2Start = (startA.x - mouseX) * (startA.x - mouseX) + (startA.y - mouseY) * (startA.y - mouseY);
+      const d2End = (endA.x - mouseX) * (endA.x - mouseX) + (endA.y - mouseY) * (endA.y - mouseY);
+
+      if (d2Start <= maxD2 && (!best || d2Start < best.d2)) {
+        best = { taskId: t.id, side: 'start', x: startA.x, y: startA.y, d2: d2Start };
+      }
+      if (d2End <= maxD2 && (!best || d2End < best.d2)) {
+        best = { taskId: t.id, side: 'end', x: endA.x, y: endA.y, d2: d2End };
+      }
+    }
+
+    if (!best) return null;
+    return { taskId: best.taskId, side: best.side, x: best.x, y: best.y };
+  }
+
+  getLinkDraftPath(): string {
+    if (!this.linkDraft) return '';
+    const { fromX, fromY, toX, toY } = this.linkDraft;
+    const midX = fromX + (toX - fromX) * 0.45;
+    return `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
+  }
+
+  private clearLinkDraft(): void {
+    this.linkDraft = null;
+  }
+
+  private addDependencyFromLinkDrag(fromId: string, toId: string, side: LinkAnchorSide): void {
+    if (!this.project) return;
+    if (!fromId || !toId || fromId === toId) return;
+
+    this.ensureProjectDependenciesContainer();
+    const type: DependencyType = side === 'start' ? 'F2S' : 'F2F';
+    const anyProj = this.project as any;
+    const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+
+    const exists = allDeps.some(
+      (d) =>
+        String(d.fromId) === String(fromId) &&
+        String(d.toId) === String(toId) &&
+        String(d.type ?? 'F2S') === String(type)
+    );
+    if (exists) return;
+
+    anyProj.ganttDependencies = [...allDeps, { fromId, toId, type }];
+    this.depsSignature = this.computeDepsSignature();
+    this.updateGanttLinks();
+  }
+
   private computePreviewDaysFromX(task: GanttTaskView): void {
     const curStart =
       task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth;
@@ -1605,6 +1963,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     this.draggingTask = task;
     this.dragStartClientX = event.clientX;
+    this.dragStartClientY = event.clientY;
     this.dragStartTaskX = task.x;
     this.dragHasMoved = false;
 
@@ -1618,11 +1977,39 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   onGanttBarResizeEndMouseDown(event: MouseEvent, task: GanttTaskView): void {
     if (String(task.id).startsWith('summary-')) return;
 
+    // Par défaut : création de lien par drag depuis l'extrémité droite.
+    // Alt + drag conserve le redimensionnement de fin.
+    if (!event.altKey) {
+      this.dragMode = 'link-create';
+      this.clickCandidateTask = null;
+      this.draggingTask = task;
+      this.dragHasMoved = false;
+      this.dragStartClientX = event.clientX;
+      this.dragStartClientY = event.clientY;
+
+      const from = this.getTaskAnchor(task, 'end');
+      this.linkDraft = {
+        fromTaskId: task.id,
+        fromX: from.x,
+        fromY: from.y,
+        toX: from.x,
+        toY: from.y,
+        targetTaskId: null,
+        targetSide: null,
+      };
+
+      this.hideHints();
+      event.stopPropagation();
+      event.preventDefault();
+      return;
+    }
+
     this.dragMode = 'resize-end';
     this.clickCandidateTask = null;
 
     this.draggingTask = task;
     this.dragHasMoved = false;
+    this.dragStartClientY = event.clientY;
 
     const start = task.startDayIndex ?? (task.startMonthIndex ?? task.monthIndex ?? 0) * this.projectService.daysPerMonth;
     const end =
@@ -1652,6 +2039,37 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
       this.computePreviewDaysFromX(this.draggingTask);
       this.showHintsForDraggingTask(this.draggingTask);
+      return;
+    }
+
+    if (this.dragMode === 'link-create') {
+      const dx = event.clientX - this.dragStartClientX;
+      const dy = event.clientY - this.dragStartClientY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) this.dragHasMoved = true;
+
+      if (!this.linkDraft) return;
+
+      const mx = this.getMouseXInSvg(event);
+      const my = this.getMouseYInSvg(event);
+      const snap = this.findClosestLinkTarget(mx, my, this.linkDraft.fromTaskId);
+
+      if (snap) {
+        this.linkDraft = {
+          ...this.linkDraft,
+          toX: snap.x,
+          toY: snap.y,
+          targetTaskId: snap.taskId,
+          targetSide: snap.side,
+        };
+      } else {
+        this.linkDraft = {
+          ...this.linkDraft,
+          toX: mx,
+          toY: my,
+          targetTaskId: null,
+          targetSide: null,
+        };
+      }
       return;
     }
 
@@ -1690,6 +2108,27 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   onGanttMouseUp(event: MouseEvent): void {
     if (!this.draggingTask) return;
 
+    if (this.dragMode === 'link-create') {
+      if (
+        this.linkDraft &&
+        this.linkDraft.targetTaskId &&
+        this.linkDraft.targetSide
+      ) {
+        this.addDependencyFromLinkDrag(
+          this.linkDraft.fromTaskId,
+          this.linkDraft.targetTaskId,
+          this.linkDraft.targetSide
+        );
+      }
+
+      this.draggingTask = null;
+      this.dragMode = 'move';
+      this.resizeFixedStartDayIndex = null;
+      this.clearLinkDraft();
+      this.hideHints();
+      return;
+    }
+
     if (!this.dragHasMoved && this.dragMode === 'move' && this.clickCandidateTask) {
       const taskToOpen = this.clickCandidateTask;
 
@@ -1706,6 +2145,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       this.draggingTask = null;
       this.dragMode = 'move';
       this.resizeFixedStartDayIndex = null;
+      this.clearLinkDraft();
       this.hideHints();
       return;
     }
@@ -1757,6 +2197,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       this.draggingTask = null;
       this.dragMode = 'move';
       this.resizeFixedStartDayIndex = null;
+      this.clearLinkDraft();
       this.hideHints();
       return;
     }
@@ -1777,7 +2218,10 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     const ctx = this.findContextForTaskId(taskView.id);
     if (!ctx) return;
 
-    this.projectService.seedMissingTaskDates(this.project.id);
+    if (this.project?.taskMatrix) {
+  this.projectService.registerProject(this.project);
+}
+
 
     this.taskBeingEdited = ctx.task;
     this.editingActivityId = ctx.activityId;

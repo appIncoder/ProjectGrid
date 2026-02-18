@@ -2,6 +2,7 @@ import { Component, Input, OnChanges, SimpleChanges, TemplateRef } from '@angula
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
+import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
 
 import {
   ActivityDefinition,
@@ -23,8 +24,9 @@ import { ProjectService } from '../../services/project.service';
 @Component({
   selector: 'app-project-score-card',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModalModule],
+  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal],
   templateUrl: './project-score-card.html',
+  styleUrls: ['./project-score-card.scss'],
 })
 export class ProjectScorecard implements OnChanges {
   @Input() project: ProjectDetail | null = null;
@@ -178,9 +180,6 @@ export class ProjectScorecard implements OnChanges {
     task: Task
   ): void {
     if (!this.project) return;
-
-    // ✅ garantit que les dates existent même si Gantt jamais ouvert
-    this.projectService.seedMissingTaskDates(this.project.id);
 
     this.taskBeingEdited = task;
     this.editingActivityId = activityId;

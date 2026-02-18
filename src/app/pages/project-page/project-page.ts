@@ -1,17 +1,10 @@
-// project-page.ts
-
-import { Component, ViewEncapsulation } from '@angular/core';
+import { ChangeDetectorRef, Component, OnDestroy, OnInit, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
 
-import {
-  ActivityDefinition,
-  ActivityId,
-  PhaseId,
-  ProjectDetail,
-  ProjectTab,
-  Task,
-} from '../../models'; 
+import type { ProjectDetail, ProjectTab } from '../../models';
+import { ProjectDataService } from '../../services/project-data.service';
 
 // Composants d’onglet
 import { ProjectScorecard } from '../../shared/project-score-card/project-score-card';
@@ -36,134 +29,123 @@ import { ProjectRessources } from '../../shared/project-ressources/project-resso
   ],
   templateUrl: './project-page.html',
   styleUrls: ['./project-page.scss'],
-  // Styles globaux pour que les enfants les réutilisent
   encapsulation: ViewEncapsulation.None,
 })
-export class ProjectPage {
+export class ProjectPage implements OnInit, OnDestroy {
   project: ProjectDetail | null = null;
   activeTab: ProjectTab = 'scorecard';
 
-  private sampleProjects: ProjectDetail[] = [
-    {
-      id: 'proj-a',
-      name: 'Projet A – Plateforme opérationnelle',
-      description:
-        'Mise en place d’une nouvelle plateforme de suivi opérationnel pour les équipes métiers et IT.',
-      phases: ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'],
-      activities: {
-        projet:      { id: 'projet',      label: 'Gestion du projet',         owner: 'Alice Dupont' },
-        metier:      { id: 'metier',      label: 'Gestion du métier',         owner: 'Claire Leroy' },
-        changement:  { id: 'changement',  label: 'Gestion du changement',     owner: 'Bruno Martin' },
-        technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: 'David Lambert' },
-      },
-      taskMatrix: {
-        projet: {
-          Phase1: [
-            { id: 'p1-1', label: 'Charte projet', status: 'done' },
-            { id: 'p1-2', label: 'Nomination gouvernance', status: 'done' },
-          ],
-          Phase2: [
-            { id: 'p2-1', label: 'Plan de projet détaillé', status: 'inprogress' },
-            { id: 'p2-2', label: 'Plan de communication', status: 'todo' },
-          ],
-          Phase3: [
-            { id: 'p3-1', label: 'Suivi risques', status: 'inprogress' },
-          ],
-          Phase4: [
-            { id: 'p4-1', label: 'Comités de pilotage', status: 'todo' },
-          ],
-          Phase5: [
-            { id: 'p5-1', label: 'Préparation clôture', status: 'todo' },
-          ],
-          Phase6: [
-            { id: 'p6-1', label: 'Clôture administrative', status: 'notdone' },
-          ],
-        },
-        metier: {
-          Phase1: [
-            { id: 'm1-1', label: 'Clarification besoins', status: 'done' },
-          ],
-          Phase2: [
-            { id: 'm2-1', label: 'Priorisation fonctionnalités', status: 'inprogress' },
-            { id: 'm2-2', label: 'Scénarios métier', status: 'todo' },
-            { id: 'm2-3', label: 'Priorisation fonctionnalités', status: 'inprogress' },
-            { id: 'm2-4', label: 'Scénarios métier', status: 'todo' },
-          ],
-          Phase3: [
-            { id: 'm3-1', label: 'Validation maquettes', status: 'inprogress' },
-          ],
-          Phase4: [
-            { id: 'm4-1', label: 'Recette métier', status: 'todo' },
-          ],
-          Phase5: [
-            { id: 'm5-1', label: 'Validation Go / No-Go', status: 'todo' },
-          ],
-          Phase6: [
-            { id: 'm6-1', label: 'Retour d’expérience métier', status: 'notdone' },
-          ],
-        },
-        changement: {
-          Phase1: [
-            { id: 'c1-1', label: 'Analyse des impacts', status: 'todo' },
-          ],
-          Phase2: [
-            { id: 'c2-1', label: 'Plan de formation', status: 'todo' },
-            { id: 'c2-2', label: 'Carte des parties prenantes', status: 'todo' },
-          ],
-          Phase3: [
-            { id: 'c3-1', label: 'Sessions d’info', status: 'inprogress' },
-          ],
-          Phase4: [
-            { id: 'c4-1', label: 'Accompagnement terrain', status: 'todo' },
-          ],
-          Phase5: [
-            { id: 'c5-1', label: 'Mesure de l’adoption', status: 'todo' },
-          ],
-          Phase6: [
-            { id: 'c6-1', label: 'Stabilisation', status: 'notdone' },
-          ],
-        },
-        technologie: {
-          Phase1: [
-            { id: 't1-1', label: 'Architecture cible', status: 'done' },
-          ],
-          Phase2: [
-            { id: 't2-1', label: 'Spécifications techniques', status: 'inprogress' },
-            { id: 't2-2', label: 'Plan d’intégration', status: 'todo' },
-          ],
-          Phase3: [
-            { id: 't3-1', label: 'Développement', status: 'inprogress' },
-            { id: 't3-2', label: 'Tests techniques', status: 'todo' },
-          ],
-          Phase4: [
-            { id: 't4-1', label: 'Tests de performance', status: 'todo' },
-          ],
-          Phase5: [
-            { id: 't5-1', label: 'Déploiement', status: 'todo' },
-          ],
-          Phase6: [
-            { id: 't6-1', label: 'Support post-déploiement', status: 'todo' },
-          ],
-        },
-      },
-    },
-  ];
+  isLoading = false;
+  loadError: string | null = null;
 
-  constructor(private route: ActivatedRoute) {
-    const projectId = this.route.snapshot.paramMap.get('id');
-    this.loadProject(projectId);
+  private sub?: Subscription;
+  private destroyed = false;
+
+  constructor(
+    private route: ActivatedRoute,
+    private data: ProjectDataService,
+    private cdr: ChangeDetectorRef
+  ) {}
+
+  ngOnInit(): void {
+    // ✅ recharge si l'ID change (important quand on navigue entre projets)
+    this.sub = this.route.paramMap.subscribe((pm) => {
+      const projectId = pm.get('id');
+      void this.loadProject(projectId);
+    });
   }
 
-  private loadProject(projectId: string | null): void {
-    if (!projectId) {
-      this.project = this.sampleProjects[0] ?? null;
-    } else {
-      const found = this.sampleProjects.find((p) => p.id === projectId);
-      this.project = found ?? this.sampleProjects[0] ?? null;
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.sub?.unsubscribe();
+  }
+
+  async reload(): Promise<void> {
+    const projectId = this.route.snapshot.paramMap.get('id');
+    await this.loadProject(projectId);
+  }
+
+  private async loadProject(projectId: string | null): Promise<void> {
+    this.isLoading = true;
+    this.loadError = null;
+    this.project = null;
+
+    console.log('[ProjectPage] loadProject()', { projectId });
+
+    try {
+      const p = await this.data.getProjectById(projectId);
+
+      console.log('[ProjectPage] getProjectById result', { found: !!p, projectId });
+
+      if (!p) {
+        this.loadError = "Projet introuvable (ou réponse API invalide).";
+        this.project = null;
+        return;
+      }
+
+      this.project = this.normalizeForView(p, projectId);
+      this.activeTab = this.activeTab || 'scorecard';
+
+      console.log('[ProjectPage] project bound to template', {
+        id: this.project.id,
+        name: this.project.name,
+        phases: this.project.phases?.length ?? 0,
+        activities: Object.keys((this.project as any).activities ?? {}).length,
+        taskMatrixRows: Object.keys((this.project as any).taskMatrix ?? {}).length,
+      });
+    } catch (e) {
+      console.error('[ProjectPage] loadProject error', e);
+      this.loadError = "Impossible de charger le projet.";
+      this.project = null;
+    } finally {
+      this.isLoading = false;
+      if (!this.destroyed) {
+        this.cdr.detectChanges();
+      }
     }
   }
 
   setTab(tab: ProjectTab): void {
     this.activeTab = tab;
+  }
+
+  private normalizeForView(p: ProjectDetail, requestedId: string | null): ProjectDetail {
+    const phases = Array.isArray((p as any)?.phases) && (p as any).phases.length
+      ? (p as any).phases
+      : ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
+
+    const activities = ((p as any)?.activities && typeof (p as any).activities === 'object')
+      ? (p as any).activities
+      : {
+          projet: { id: 'projet', label: 'Gestion du projet', owner: '—' },
+          metier: { id: 'metier', label: 'Gestion du métier', owner: '—' },
+          changement: { id: 'changement', label: 'Gestion du changement', owner: '—' },
+          technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: '—' },
+        };
+
+    const taskMatrix = ((p as any)?.taskMatrix && typeof (p as any).taskMatrix === 'object')
+      ? { ...(p as any).taskMatrix }
+      : {};
+
+    for (const activityId of Object.keys(activities)) {
+      if (!taskMatrix[activityId] || typeof taskMatrix[activityId] !== 'object') {
+        taskMatrix[activityId] = {};
+      }
+      for (const phase of phases) {
+        if (!Array.isArray(taskMatrix[activityId][phase])) {
+          taskMatrix[activityId][phase] = [];
+        }
+      }
+    }
+
+    return {
+      ...p,
+      id: String((p as any)?.id ?? requestedId ?? ''),
+      name: String((p as any)?.name ?? `Projet ${(p as any)?.id ?? requestedId ?? ''}`),
+      description: String((p as any)?.description ?? ''),
+      phases,
+      activities,
+      taskMatrix,
+    } as ProjectDetail;
   }
 }
