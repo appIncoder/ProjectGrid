@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import type {
@@ -9,6 +9,7 @@ import type {
   PhaseId,
   Task,
   TaskCategory,
+  UserRef,
 } from '../../models';
 
 @Component({
@@ -19,6 +20,11 @@ import type {
   styleUrls: ['./project-task-edit-modal.scss'],
 })
 export class ProjectTaskEditModal {
+  @ViewChild('assignmentsQuickWrap', { static: false }) assignmentsQuickWrap?: ElementRef<HTMLElement>;
+
+  assignPopoverField: 'reporter' | 'accountant' | 'responsible' | null = null;
+  pendingAssignUserId = '';
+
   @Input() editError: string | null = null;
 
   @Input() editedTaskLabel = '';
@@ -39,11 +45,21 @@ export class ProjectTaskEditModal {
   @Input() editedPhase: PhaseId | null = null;
   @Output() editedPhaseChange = new EventEmitter<PhaseId | null>();
 
+  @Input() editedReporterId = '';
+  @Output() editedReporterIdChange = new EventEmitter<string>();
+
+  @Input() editedAccountantId = '';
+  @Output() editedAccountantIdChange = new EventEmitter<string>();
+
+  @Input() editedResponsibleId = '';
+  @Output() editedResponsibleIdChange = new EventEmitter<string>();
+
   @Input() taskStatusOptions: { value: ActivityStatus; label: string }[] = [];
   @Input() taskCategoryOptions: { value: TaskCategory; label: string }[] = [];
   @Input() dependencyTypeOptions: { value: DependencyType; label: string }[] = [];
 
   @Input() phases: PhaseId[] = [];
+  @Input() users: UserRef[] = [];
   @Input() editedDependencies: EditableDependencyRow[] = [];
   @Input() linkableTasks: Task[] = [];
 
@@ -52,4 +68,85 @@ export class ProjectTaskEditModal {
 
   @Output() cancel = new EventEmitter<void>();
   @Output() save = new EventEmitter<void>();
+
+  openAssignPopover(field: 'reporter' | 'accountant' | 'responsible'): void {
+    this.assignPopoverField = field;
+    this.pendingAssignUserId = this.getAssignValue(field);
+  }
+
+  closeAssignPopover(): void {
+    this.assignPopoverField = null;
+    this.pendingAssignUserId = '';
+  }
+
+  applyAssignFromPopover(): void {
+    if (!this.assignPopoverField) return;
+    this.setAssignValue(this.assignPopoverField, this.pendingAssignUserId);
+    this.closeAssignPopover();
+  }
+
+  clearAssignFromPopover(): void {
+    if (!this.assignPopoverField) return;
+    this.setAssignValue(this.assignPopoverField, '');
+    this.closeAssignPopover();
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.assignPopoverField) return;
+    const target = event.target as Node | null;
+    const wrapEl = this.assignmentsQuickWrap?.nativeElement;
+    if (!target || !wrapEl || !wrapEl.contains(target)) {
+      this.closeAssignPopover();
+    }
+  }
+
+  getAssignFieldLabel(field: 'reporter' | 'accountant' | 'responsible' | null): string {
+    if (field === 'reporter') return 'Rapporteur';
+    if (field === 'accountant') return 'Comptable';
+    if (field === 'responsible') return 'Responsable';
+    return '';
+  }
+
+  private getAssignValue(field: 'reporter' | 'accountant' | 'responsible'): string {
+    if (field === 'reporter') return this.editedReporterId ?? '';
+    if (field === 'accountant') return this.editedAccountantId ?? '';
+    return this.editedResponsibleId ?? '';
+  }
+
+  private setAssignValue(field: 'reporter' | 'accountant' | 'responsible', value: string): void {
+    const v = (value ?? '').trim();
+    if (field === 'reporter') {
+      this.editedReporterId = v;
+      this.editedReporterIdChange.emit(v);
+      return;
+    }
+    if (field === 'accountant') {
+      this.editedAccountantId = v;
+      this.editedAccountantIdChange.emit(v);
+      return;
+    }
+    this.editedResponsibleId = v;
+    this.editedResponsibleIdChange.emit(v);
+  }
+
+  getUserLabel(userId: string): string {
+    const id = (userId ?? '').trim();
+    if (!id) return 'Non défini';
+    const u = this.users.find((x) => x.id === id);
+    return u?.label || id;
+  }
+
+  getAssignAvatarText(field: 'reporter' | 'accountant' | 'responsible', userId: string): string {
+    const label = this.getUserLabel(userId);
+    if (label === 'Non défini') {
+      if (field === 'reporter') return 'R';
+      if (field === 'accountant') return 'C';
+      return 'RS';
+    }
+    const parts = label.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? '';
+    const b = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (a + b).toUpperCase() || label.slice(0, 2).toUpperCase();
+  }
 }

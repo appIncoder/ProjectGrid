@@ -37,6 +37,7 @@ import {
   HoverHint,
   LinkTooltip,
   ViewMode,
+  UserRef,
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
@@ -64,6 +65,7 @@ type LinkDraft = {
 })
 export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck {
   @Input() project: ProjectDetail | null = null;
+  @Input() users: UserRef[] = [];
 
   @ViewChild('taskEditModal', { static: false }) taskEditModalTpl?: TemplateRef<any>;
   @ViewChild('ganttScroll', { static: false }) ganttScrollRef?: ElementRef<HTMLElement>;
@@ -293,6 +295,9 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
   editedPhase: PhaseId | null = null;
+  editedReporterId = '';
+  editedAccountantId = '';
+  editedResponsibleId = '';
 
   // ✅ Contraintes éditées (dans “plus d’infos”)
   editedConstraints: TaskConstraints = {};
@@ -2235,6 +2240,9 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     this.editedCategory = (ctx.task as any).category ?? 'projectManagement';
     this.editedPhase = (ctx.task as any).phase ?? ctx.phase;
+    this.editedReporterId = (ctx.task as any).reporterId ?? '';
+    this.editedAccountantId = (ctx.task as any).accountantId ?? '';
+    this.editedResponsibleId = (ctx.task as any).responsibleId ?? '';
 
     // ✅ charge contraintes
     this.editedConstraints = this.getConstraintsFromTask(ctx.task) ?? {};
@@ -2364,6 +2372,9 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       startDate: this.editedStartDate,
       endDate: this.editedEndDate,
       category: this.editedCategory,
+      reporterId: this.editedReporterId,
+      accountantId: this.editedAccountantId,
+      responsibleId: this.editedResponsibleId,
       phase: this.editedPhase,
     });
 

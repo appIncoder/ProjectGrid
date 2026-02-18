@@ -2,7 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail } from '../models';
+import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, UserRef } from '../models';
 import { environment } from '../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -29,6 +29,17 @@ export class ProjectDataService {
     return list;
   }
 
+  async listUsers(): Promise<UserRef[]> {
+    const url = `${this.baseUrl}/users`;
+    const rows = await firstValueFrom(this.http.get<Array<{ id?: unknown; label?: unknown; name?: unknown }>>(url));
+    return (Array.isArray(rows) ? rows : [])
+      .map((r) => ({
+        id: String(r?.id ?? '').trim(),
+        label: String((r?.label ?? r?.name ?? r?.id ?? '')).trim(),
+      }))
+      .filter((u) => !!u.id);
+  }
+
   async getProjectById(projectId: string | null): Promise<ProjectDetail | null> {
   const requestedProjectId = projectId;
 
@@ -45,12 +56,12 @@ export class ProjectDataService {
 
     console.log('[ProjectDataService] raw response', { url, res });
 
-    // ✅ Cas 1 : API renvoie déjà un ProjectDetail
+    // Cas standard: API renvoie un ProjectDetail reconstruit depuis les tables SQL
     if (res?.activities && res?.taskMatrix) {
       return this.normalizeProjectDetail(res, id);
     }
 
-    // ✅ Cas 2 : API renvoie { id, payload: "...." }
+    // Fallback rétro-compatibilité uniquement si backend legacy
     if (typeof res?.payload === 'string') {
       try {
         const parsed = JSON.parse(res.payload);
@@ -61,7 +72,7 @@ export class ProjectDataService {
       }
     }
 
-    // ✅ Cas 3 : API renvoie { id, payload: {...} }
+    // Fallback rétro-compatibilité uniquement si backend legacy
     if (res?.payload && typeof res.payload === 'object') {
       return this.normalizeProjectDetail(res.payload, id);
     }

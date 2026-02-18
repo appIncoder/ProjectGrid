@@ -68,7 +68,7 @@
 
       <div class="project-tab-panel">
         <!-- Onglet 1 : Scorecard -->
-        <app-project-score-card *ngIf="activeTab === 'scorecard'" [project]="p"></app-project-score-card>
+        <app-project-score-card *ngIf="activeTab === 'scorecard'" [project]="p" [users]="users"></app-project-score-card>
 
         <!-- Onglet 2 : Gestion des risques -->
         <app-project-risks *ngIf="activeTab === 'risks'"></app-project-risks>
@@ -77,10 +77,10 @@
         <app-project-budget *ngIf="activeTab === 'budget'"></app-project-budget>
 
         <!-- Onglet 4 : Roadmap / Gantt -->
-        <app-project-roadmap *ngIf="activeTab === 'roadmap'" [project]="p"></app-project-roadmap>
+        <app-project-roadmap *ngIf="activeTab === 'roadmap'" [project]="p" [users]="users"></app-project-roadmap>
 
         <!-- Onglet 5 : Board -->
-        <app-project-board *ngIf="activeTab === 'board'" [project]="p"></app-project-board>
+        <app-project-board *ngIf="activeTab === 'board'" [project]="p" [users]="users"></app-project-board>
 
         <!-- Onglet 6 : Ressources -->
         <app-project-ressources *ngIf="activeTab === 'ressources'" [project]="p"></app-project-ressources>

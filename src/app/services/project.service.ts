@@ -27,6 +27,9 @@ export interface UpdateTaskPayload {
   startDate?: string; // "YYYY-MM-DD"
   endDate?: string; // "YYYY-MM-DD"
   category?: TaskCategory;
+  reporterId?: string;
+  accountantId?: string;
+  responsibleId?: string;
 
   toPhase?: PhaseId; // déplacement éventuel
   phase?: PhaseId;   // cohérence (optionnel)
@@ -211,6 +214,9 @@ export class ProjectService {
     if (payload.endDate !== undefined) task.endDate = payload.endDate || undefined;
 
     if (payload.category !== undefined) (task as any).category = payload.category;
+    if (payload.reporterId !== undefined) (task as any).reporterId = payload.reporterId || undefined;
+    if (payload.accountantId !== undefined) (task as any).accountantId = payload.accountantId || undefined;
+    if (payload.responsibleId !== undefined) (task as any).responsibleId = payload.responsibleId || undefined;
 
     // Phase explicite (cohérence)
     if (payload.phase !== undefined) (task as any).phase = payload.phase;

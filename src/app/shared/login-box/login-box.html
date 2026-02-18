@@ -14,6 +14,7 @@
                autocapitalize="off"
                autocorrect="off"
                spellcheck="false"
+               [disabled]="loading"
                required>
       </div>
 
@@ -25,11 +26,16 @@
                [(ngModel)]="model.password"
                name="password"
                autocomplete="new-password"
+               [disabled]="loading"
                required>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100">
-        Se connecter
+      <div *ngIf="errorMessage" class="alert alert-danger py-2 mb-3" role="alert">
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" [disabled]="loading">
+        {{ loading ? 'Connexion...' : 'Se connecter' }}
       </button>
     </form>
   </div>

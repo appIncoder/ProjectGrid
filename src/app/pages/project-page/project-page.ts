@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 
-import type { ProjectDetail, ProjectTab } from '../../models';
+import type { ProjectDetail, ProjectTab, UserRef } from '../../models';
 import { ProjectDataService } from '../../services/project-data.service';
 
 // Composants d’onglet
@@ -33,6 +33,7 @@ import { ProjectRessources } from '../../shared/project-ressources/project-resso
 })
 export class ProjectPage implements OnInit, OnDestroy {
   project: ProjectDetail | null = null;
+  users: UserRef[] = [];
   activeTab: ProjectTab = 'scorecard';
 
   isLoading = false;
@@ -73,7 +74,10 @@ export class ProjectPage implements OnInit, OnDestroy {
     console.log('[ProjectPage] loadProject()', { projectId });
 
     try {
-      const p = await this.data.getProjectById(projectId);
+      const [p, users] = await Promise.all([
+        this.data.getProjectById(projectId),
+        this.data.listUsers().catch(() => [] as UserRef[]),
+      ]);
 
       console.log('[ProjectPage] getProjectById result', { found: !!p, projectId });
 
@@ -84,6 +88,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       }
 
       this.project = this.normalizeForView(p, projectId);
+      this.users = users;
       this.activeTab = this.activeTab || 'scorecard';
 
       console.log('[ProjectPage] project bound to template', {

@@ -14,6 +14,7 @@ import type {
   PhaseId,
   Task,
   TaskCategory,
+  UserRef,
 } from '../../models';
 import { ProjectService } from '../../services/project.service';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
@@ -37,6 +38,7 @@ const STATUSES: Array<{ id: KanbanStatus; label: string }> = [
 export class ProjectBoard implements OnChanges {
   /** Projet (pour déduire les lanes + éventuellement des cartes) */
   @Input() project: ProjectDetail | null = null;
+  @Input() users: UserRef[] = [];
 
   /**
    * Données Kanban (recommandé): tu passes explicitement les cartes.
@@ -87,6 +89,9 @@ export class ProjectBoard implements OnChanges {
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
   editedPhase: PhaseId | null = null;
+  editedReporterId = '';
+  editedAccountantId = '';
+  editedResponsibleId = '';
   editedDependencies: EditableDependencyRow[] = [];
   editError: string | null = null;
 
@@ -274,6 +279,9 @@ for (const lane of this.lanes) {
     this.editedEndDate = task.endDate ?? '';
     this.editedCategory = task.category ?? 'projectManagement';
     this.editedPhase = task.phase ?? parsed.phase;
+    this.editedReporterId = task.reporterId ?? '';
+    this.editedAccountantId = task.accountantId ?? '';
+    this.editedResponsibleId = task.responsibleId ?? '';
 
     this.ensureProjectDependenciesContainer();
     const deps = this.getProjectDependencies().filter((d) => d.fromId === task.id);
@@ -351,6 +359,9 @@ for (const lane of this.lanes) {
       startDate: this.editedStartDate,
       endDate: this.editedEndDate,
       category: this.editedCategory,
+      reporterId: this.editedReporterId,
+      accountantId: this.editedAccountantId,
+      responsibleId: this.editedResponsibleId,
       phase: this.editedPhase,
     });
 

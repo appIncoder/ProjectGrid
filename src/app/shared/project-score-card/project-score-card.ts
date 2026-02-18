@@ -12,6 +12,7 @@ import {
   ProjectDetail,
   Task,
   TaskCategory,
+  UserRef,
   DependencyType,
   GanttDependency,
   EditableDependencyRow,
@@ -30,6 +31,7 @@ import { ProjectService } from '../../services/project.service';
 })
 export class ProjectScorecard implements OnChanges {
   @Input() project: ProjectDetail | null = null;
+  @Input() users: UserRef[] = [];
 
   taskStatusOptions: { value: ActivityStatus; label: string }[] = [
     { value: 'todo',          label: 'À faire (blanc)' },
@@ -58,6 +60,9 @@ export class ProjectScorecard implements OnChanges {
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
   editedPhase: PhaseId | null = null;
+  editedReporterId = '';
+  editedAccountantId = '';
+  editedResponsibleId = '';
 
   // ✅ Dépendances éditées dans le popup
   editedDependencies: EditableDependencyRow[] = [];
@@ -193,6 +198,9 @@ export class ProjectScorecard implements OnChanges {
 
     this.editedCategory = task.category ?? 'projectManagement';
     this.editedPhase = task.phase ?? phase;
+    this.editedReporterId = task.reporterId ?? '';
+    this.editedAccountantId = task.accountantId ?? '';
+    this.editedResponsibleId = task.responsibleId ?? '';
 
     // ✅ charge les dépendances existantes pour cette tâche (fromId = task.id)
     this.ensureProjectDependenciesContainer();
@@ -293,6 +301,9 @@ export class ProjectScorecard implements OnChanges {
       startDate: this.editedStartDate,
       endDate: this.editedEndDate,
       category: this.editedCategory,
+      reporterId: this.editedReporterId,
+      accountantId: this.editedAccountantId,
+      responsibleId: this.editedResponsibleId,
       phase: this.editedPhase,
     });
 

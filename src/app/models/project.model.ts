@@ -143,6 +143,9 @@ export interface Task {
   startDate?: string; // format "YYYY-MM-DD"
   endDate?: string;   // format "YYYY-MM-DD"
   category?: TaskCategory;
+  reporterId?: string;
+  accountantId?: string;
+  responsibleId?: string;
 
   // IMPORTANT : une tâche "vit" dans une phase de la matrice
   phase?: PhaseId;
@@ -155,4 +158,9 @@ export interface PhaseDefinition {
   // format ISO "YYYY-MM-DD" (cohérent avec <input type="date">)
   startDate: string;
   endDate: string;
+}
+
+export interface UserRef {
+  id: string;
+  label: string;
 }

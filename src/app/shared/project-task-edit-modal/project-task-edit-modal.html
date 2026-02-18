@@ -1,6 +1,58 @@
 <div class="modal-header py-2">
-  <h5 class="modal-title fs-6">Modifier l’activité</h5>
-  <button type="button" class="btn-close" aria-label="Close" (click)="cancel.emit()"></button>
+  <div class="d-flex align-items-start justify-content-between w-100 gap-2">
+    <h5 class="modal-title fs-6 mb-0">Modifier l’activité</h5>
+
+    <div class="assignments-quick-wrap" #assignmentsQuickWrap>
+      <div class="assignments-quick" aria-label="Assignations">
+        <button
+          type="button"
+          class="assign-avatar assign-avatar--reporter"
+          [class.assign-avatar--filled]="!!editedReporterId"
+          [class.assign-avatar--active]="assignPopoverField === 'reporter'"
+          [attr.title]="'Rapporteur : ' + getUserLabel(editedReporterId)"
+          (click)="openAssignPopover('reporter')"
+        >
+          {{ getAssignAvatarText('reporter', editedReporterId) }}
+        </button>
+
+        <button
+          type="button"
+          class="assign-avatar assign-avatar--accountant"
+          [class.assign-avatar--filled]="!!editedAccountantId"
+          [class.assign-avatar--active]="assignPopoverField === 'accountant'"
+          [attr.title]="'Comptable : ' + getUserLabel(editedAccountantId)"
+          (click)="openAssignPopover('accountant')"
+        >
+          {{ getAssignAvatarText('accountant', editedAccountantId) }}
+        </button>
+
+        <button
+          type="button"
+          class="assign-avatar assign-avatar--responsible"
+          [class.assign-avatar--filled]="!!editedResponsibleId"
+          [class.assign-avatar--active]="assignPopoverField === 'responsible'"
+          [attr.title]="'Responsable : ' + getUserLabel(editedResponsibleId)"
+          (click)="openAssignPopover('responsible')"
+        >
+          {{ getAssignAvatarText('responsible', editedResponsibleId) }}
+        </button>
+      </div>
+
+      <div *ngIf="assignPopoverField as field" class="assign-popover">
+        <div class="assign-popover-title">{{ getAssignFieldLabel(field) }}</div>
+        <select class="form-select form-select-sm" [(ngModel)]="pendingAssignUserId">
+          <option value="">— Aucun —</option>
+          <option *ngFor="let u of users" [value]="u.id">{{ u.label }} ({{ u.id }})</option>
+        </select>
+        <div class="assign-popover-actions">
+          <button type="button" class="assign-icon-btn assign-icon-btn--close" title="Fermer" (click)="closeAssignPopover()">✕</button>
+          <button type="button" class="assign-icon-btn assign-icon-btn--confirm" title="Confirmer" (click)="applyAssignFromPopover()">✓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="btn-close ms-2" aria-label="Close" (click)="cancel.emit()"></button>
 </div>
 
 <div class="modal-body">
@@ -78,6 +130,10 @@
     <div class="form-text small">
       Changer la phase déplacera l’activité vers la cellule correspondante.
     </div>
+  </div>
+
+  <div class="form-text small mb-3">
+    Clique sur les avatars en haut à droite pour initialiser, changer ou supprimer les assignations.
   </div>
 
   <div class="mt-3 pt-3 border-top">
