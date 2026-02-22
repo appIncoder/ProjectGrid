@@ -40,7 +40,7 @@ function cors(): void {
 /**
  * Déduit le path demandé en tenant compte du basePath.
  * Ex: basePath="/projectgrid/api"
- * URI: "/projectgrid/api/projects/proj-a" => "/projects/proj-a"
+ * URI: "/projectgrid/api/projects/proj-a" => "./projects/proj-a"
  */
 function request_path(string $basePath): string {
   $uri = $_SERVER['REQUEST_URI'] ?? '/';
@@ -49,5 +49,9 @@ function request_path(string $basePath): string {
     $path = substr($path, strlen($basePath));
   }
   $path = $path === '' ? '/' : $path;
+  if ($path !== '/') {
+    $path = rtrim($path, '/');
+    if ($path === '') $path = '/';
+  }
   return $path;
 }

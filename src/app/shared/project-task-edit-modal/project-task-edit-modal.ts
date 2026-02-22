@@ -140,13 +140,40 @@ export class ProjectTaskEditModal {
   getAssignAvatarText(field: 'reporter' | 'accountant' | 'responsible', userId: string): string {
     const label = this.getUserLabel(userId);
     if (label === 'Non défini') {
-      if (field === 'reporter') return 'R';
-      if (field === 'accountant') return 'C';
-      return 'RS';
+      if (field === 'reporter') return 'REP';
+      if (field === 'accountant') return 'ACC';
+      return 'RES';
     }
     const parts = label.split(/\s+/).filter(Boolean);
     const a = parts[0]?.[0] ?? '';
     const b = parts.length > 1 ? parts[parts.length - 1][0] : '';
     return (a + b).toUpperCase() || label.slice(0, 2).toUpperCase();
+  }
+
+  getAssignTitle(field: 'reporter' | 'accountant' | 'responsible', userId: string): string {
+    const value = (userId ?? '').trim();
+    const role = this.getAssignFieldLabel(field);
+    if (!value) return `${role} non assigné. Cliquer pour assigner.`;
+    return `${role} : ${this.getUserLabel(value)}`;
+  }
+
+  getCategoryHint(value: TaskCategory): string {
+    if (value === 'projectManagement') return 'Pilotage, coordination et suivi global';
+    if (value === 'businessManagement') return 'Besoins, priorisation et validation métier';
+    if (value === 'changeManagement') return 'Communication, adoption et accompagnement';
+    return 'Architecture, build, tests et déploiement';
+  }
+
+  getDependencyTypeShort(type: DependencyType | undefined): string {
+    if (type === 'F2F') return 'FF';
+    if (type === 'S2S') return 'SS';
+    return 'FS';
+  }
+
+  getTaskLabel(taskId: string): string {
+    const id = (taskId ?? '').trim();
+    if (!id) return 'Activité non définie';
+    const found = this.linkableTasks.find((t) => t.id === id);
+    return found?.label || id;
   }
 }

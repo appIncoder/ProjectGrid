@@ -191,6 +191,47 @@ CREATE TABLE IF NOT EXISTS `phases` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Structure de la table `risks`
+--
+
+CREATE TABLE IF NOT EXISTS `risks` (
+  `uuid` uuid NOT NULL DEFAULT uuid(),
+  `name` varchar(180) NOT NULL,
+  `description` text DEFAULT NULL,
+  `probability` varchar(32) NOT NULL,
+  `criticity` varchar(32) NOT NULL,
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_risks`
+--
+
+CREATE TABLE IF NOT EXISTS `project_risks` (
+  `projectId` uuid NOT NULL,
+  `riskId` uuid NOT NULL,
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `status` varchar(16) NOT NULL DEFAULT 'active',
+  PRIMARY KEY (`projectId`, `riskId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_changes` (historique des modifications)
+--
+
+CREATE TABLE IF NOT EXISTS `project_changes` (
+  `id` uuid NOT NULL DEFAULT uuid(),
+  `project_id` uuid NOT NULL,
+  `change_type` varchar(64) NOT NULL,
+  `source` varchar(64) NOT NULL,
+  `payload` longtext NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_project_changes_project_created` (`project_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
 -- Index pour les tables déchargées
 --
 
@@ -229,6 +270,7 @@ ALTER TABLE `users`
 CREATE INDEX IF NOT EXISTS `idx_users_username` ON `users` (`username`);
 CREATE INDEX IF NOT EXISTS `idx_users_full_name` ON `users` (`full_name`);
 CREATE INDEX IF NOT EXISTS `idx_users_email` ON `users` (`email`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_users_username` ON `users` (`username`);
 
 --
 -- Index pour la table `users_roles_projects`
@@ -243,6 +285,36 @@ ALTER TABLE `users_roles_projects`
 CREATE INDEX IF NOT EXISTS `idx_urp_user` ON `users_roles_projects` (`user_id`);
 CREATE INDEX IF NOT EXISTS `idx_urp_role` ON `users_roles_projects` (`role_id`);
 CREATE INDEX IF NOT EXISTS `idx_urp_project` ON `users_roles_projects` (`project_id`);
+
+-- Nettoyage des doublons avant contrainte d'unicité (même user/role/project)
+SET @has_dedup_col := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users_roles_projects' AND COLUMN_NAME = '__dedup_row'
+);
+SET @sql := IF(@has_dedup_col = 0,
+  'ALTER TABLE `users_roles_projects` ADD COLUMN `__dedup_row` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+DELETE t1 FROM `users_roles_projects` t1
+JOIN `users_roles_projects` t2
+  ON t1.`user_id` <=> t2.`user_id`
+ AND t1.`role_id` <=> t2.`role_id`
+ AND t1.`project_id` <=> t2.`project_id`
+ AND t1.`__dedup_row` > t2.`__dedup_row`;
+
+SET @has_dedup_col := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users_roles_projects' AND COLUMN_NAME = '__dedup_row'
+);
+SET @sql := IF(@has_dedup_col > 0,
+  'ALTER TABLE `users_roles_projects` DROP COLUMN `__dedup_row`',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_urp_user_role_project` ON `users_roles_projects` (`user_id`, `role_id`, `project_id`);
 
 --
 -- Index pour la table `project_task_assignments`
@@ -261,10 +333,82 @@ CREATE INDEX IF NOT EXISTS `idx_project_tasks_status` ON `project_tasks` (`statu
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_name` ON `project_type` (`name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_activities_type_short` ON `activities` (`id_project_type`, `short_name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_phases_type_short` ON `phases` (`id_project_type`, `short_name`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_risks_name` ON `risks` (`name`);
+CREATE INDEX IF NOT EXISTS `idx_risks_name` ON `risks` (`name`);
+CREATE INDEX IF NOT EXISTS `idx_risks_probability` ON `risks` (`probability`);
+CREATE INDEX IF NOT EXISTS `idx_project_risks_status` ON `project_risks` (`status`);
+CREATE INDEX IF NOT EXISTS `idx_project_risks_risk` ON `project_risks` (`riskId`);
+CREATE INDEX IF NOT EXISTS `idx_project_changes_project_created` ON `project_changes` (`project_id`, `created_at`);
+
+-- Correction précoce de FK legacy: fk_pta_project peut pointer vers `projects_`
+-- et faire échouer les INSERT de project_task_assignments.
+SET @fk_pta_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_task_assignments'
+    AND CONSTRAINT_NAME = 'fk_pta_project'
+);
+SET @fk_pta_ref_table := (
+  SELECT kcu.REFERENCED_TABLE_NAME
+  FROM information_schema.KEY_COLUMN_USAGE kcu
+  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+    AND kcu.TABLE_NAME = 'project_task_assignments'
+    AND kcu.CONSTRAINT_NAME = 'fk_pta_project'
+  LIMIT 1
+);
+SET @sql := IF(@fk_pta_exists > 0 AND @fk_pta_ref_table <> 'projects',
+  'ALTER TABLE `project_task_assignments` DROP FOREIGN KEY `fk_pta_project`',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @fk_pta_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_task_assignments'
+    AND CONSTRAINT_NAME = 'fk_pta_project'
+);
+SET @sql := IF(@fk_pta_exists = 0,
+  'ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 --
 -- Données d'exemple supplémentaires (tolérant aux schémas legacy)
 --
+
+-- Purge complète des enregistrements avant réinjection des données de référence
+-- (évite toute redondance lors des ré-exécutions du script)
+SET FOREIGN_KEY_CHECKS = 0;
+DELETE FROM `project_task_assignments`;
+DELETE FROM `project_tasks`;
+DELETE FROM `project_activities`;
+DELETE FROM `project_phases`;
+DELETE FROM `users_roles_projects`;
+DELETE FROM `project_risks`;
+DELETE FROM `project_changes`;
+DELETE FROM `risks`;
+DELETE FROM `phases`;
+DELETE FROM `activities`;
+DELETE FROM `project_type`;
+DELETE FROM `users`;
+DELETE FROM `roles`;
+DELETE FROM `projects`;
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- Réinjection explicite du projet de référence (requis avant tasks/assignments/risks)
+INSERT INTO `projects` (`id`, `name`, `description`, `payload`, `status`)
+VALUES (
+  '6c4a8c7c-95ca-4b5d-8667-7e8242f73596',
+  'Projet A – Plateforme opérationnelle',
+  'Mise en place d’une nouvelle plateforme de suivi opérationnel pour les équipes métiers et IT.',
+  '{}',
+  'active'
+)
+ON DUPLICATE KEY UPDATE
+  `name` = VALUES(`name`),
+  `description` = VALUES(`description`),
+  `status` = VALUES(`status`);
 
 INSERT IGNORE INTO `project_type` (`name`, `description`, `date_created`)
 VALUES ('PMBOK', '6 phases', NOW());
@@ -290,6 +434,31 @@ INSERT IGNORE INTO `phases` (`sequence`, `short_name`, `long_name`, `id_project_
 (4, 'Phase4', 'Phase 4', @id_project_type_pmbok, NOW()),
 (5, 'Phase5', 'Phase 5', @id_project_type_pmbok, NOW()),
 (6, 'Phase6', 'Phase 6', @id_project_type_pmbok, NOW());
+
+INSERT IGNORE INTO `risks` (`uuid`, `name`, `description`, `probability`, `criticity`, `date_created`) VALUES
+('10000000-0000-0000-0000-000000000001', 'Indisponibilité d''un sponsor métier', 'Disponibilité clé métier', 'Moyenne', 'high', NOW()),
+('10000000-0000-0000-0000-000000000002', 'Retard de livraison IT critique', 'Retard de livraison IT', 'Élevée', 'critical', NOW()),
+('10000000-0000-0000-0000-000000000003', 'Sous-estimation des charges projet', 'Sous-estimation charge', 'Élevée', 'high', NOW()),
+('10000000-0000-0000-0000-000000000004', 'Turn-over dans l''équipe projet', 'Turn-over équipe', 'Moyenne', 'medium', NOW()),
+('10000000-0000-0000-0000-000000000005', 'Risque de faille de sécurité', 'Faille de sécurité majeure', 'Faible', 'critical', NOW());
+
+INSERT IGNORE INTO `project_risks` (`projectId`, `riskId`, `date_created`, `status`) VALUES
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000001', NOW(), 'active'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000002', NOW(), 'active'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000003', NOW(), 'active'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000004', NOW(), 'active'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000005', NOW(), 'active');
+
+-- Lien automatique du projet existant avec tous les risks existants
+INSERT IGNORE INTO `project_risks` (`projectId`, `riskId`, `date_created`, `status`)
+SELECT
+  p.`id` AS `projectId`,
+  r.`uuid` AS `riskId`,
+  NOW() AS `date_created`,
+  'active' AS `status`
+FROM `projects` p
+JOIN `risks` r
+WHERE p.`id` = '6c4a8c7c-95ca-4b5d-8667-7e8242f73596';
 
 SET @roles_pk_seed_col := IF(
   (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'roles' AND COLUMN_NAME = 'id') > 0,
@@ -353,13 +522,6 @@ SET @sql := IF(@urp_pk_seed_col IS NULL,
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-INSERT IGNORE INTO `project_task_assignments`
-(`project_id`, `activity_id`, `phase_id`, `task_id`, `reporter_id`, `accountant_id`, `responsible_id`) VALUES
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-1', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Phase3', 'c3-1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase2', 't2-1', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'dddddddd-dddd-dddd-dddd-dddddddddddd');
-
 INSERT IGNORE INTO `project_phases` (`project_id`, `phase_id`, `phase_order`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase1', 1),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase2', 2),
@@ -374,7 +536,7 @@ INSERT IGNORE INTO `project_activities` (`project_id`, `activity_id`, `label`, `
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Gestion du changement', 'Bruno Martin'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Gestion de la technologie', 'David Lambert');
 
-INSERT IGNORE INTO `project_tasks` (`project_id`, `activity_id`, `phase_id`, `task_id`, `label`, `status`) VALUES
+INSERT INTO `project_tasks` (`project_id`, `activity_id`, `phase_id`, `task_id`, `label`, `status`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'Charte projet', 'done'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-2', 'Nomination gouvernance', 'done'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase2', 'p2-1', 'Plan de projet détaillé', 'inprogress'),
@@ -386,8 +548,6 @@ INSERT IGNORE INTO `project_tasks` (`project_id`, `activity_id`, `phase_id`, `ta
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase1', 'm1-1', 'Clarification besoins', 'done'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-1', 'Priorisation fonctionnalités', 'inprogress'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-2', 'Scénarios métier', 'todo'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-3', 'Priorisation fonctionnalités', 'inprogress'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-4', 'Scénarios métier', 'todo'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase3', 'm3-1', 'Validation maquettes', 'inprogress'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase4', 'm4-1', 'Recette métier', 'todo'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase5', 'm5-1', 'Validation Go / No-Go', 'todo'),
@@ -406,7 +566,21 @@ INSERT IGNORE INTO `project_tasks` (`project_id`, `activity_id`, `phase_id`, `ta
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase3', 't3-2', 'Tests techniques', 'todo'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase4', 't4-1', 'Tests de performance', 'todo'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase5', 't5-1', 'Déploiement', 'todo'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase6', 't6-1', 'Support post-déploiement', 'todo');
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase6', 't6-1', 'Support post-déploiement', 'todo')
+ON DUPLICATE KEY UPDATE
+  `label` = VALUES(`label`),
+  `status` = VALUES(`status`);
+
+INSERT INTO `project_task_assignments`
+(`project_id`, `activity_id`, `phase_id`, `task_id`, `reporter_id`, `accountant_id`, `responsible_id`) VALUES
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-1', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Phase3', 'c3-1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase2', 't2-1', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'dddddddd-dddd-dddd-dddd-dddddddddddd')
+ON DUPLICATE KEY UPDATE
+  `reporter_id` = VALUES(`reporter_id`),
+  `accountant_id` = VALUES(`accountant_id`),
+  `responsible_id` = VALUES(`responsible_id`);
 
 --
 -- Enrichissement non destructif des données existantes
@@ -465,6 +639,77 @@ SET @sql := IF(@has_urp_project_legacy > 0,
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- Nettoyage des redondances non exploitées par le backend
+-- (on conserve les colonnes canoniques: created_at/updated_at/full_name/user_id/role_id/project_id)
+
+-- users: supprimer firstname/lastname après migration vers full_name
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'firstname'
+);
+SET @sql := IF(@col_exists > 0, 'ALTER TABLE `users` DROP COLUMN `firstname`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'lastname'
+);
+SET @sql := IF(@col_exists > 0, 'ALTER TABLE `users` DROP COLUMN `lastname`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- users: uniformiser date_created/date_updated vers created_at/updated_at puis supprimer legacy
+SET @has_users_date_created := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'date_created'
+);
+SET @has_users_created_at := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'created_at'
+);
+SET @sql := IF(@has_users_date_created > 0 AND @has_users_created_at > 0,
+  'UPDATE `users` SET `created_at` = COALESCE(`created_at`, `date_created`) WHERE `date_created` IS NOT NULL',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@has_users_date_created > 0, 'ALTER TABLE `users` DROP COLUMN `date_created`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_users_date_updated := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'date_updated'
+);
+SET @has_users_updated_at := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'updated_at'
+);
+SET @sql := IF(@has_users_date_updated > 0 AND @has_users_updated_at > 0,
+  'UPDATE `users` SET `updated_at` = COALESCE(`updated_at`, `date_updated`) WHERE `date_updated` IS NOT NULL',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql := IF(@has_users_date_updated > 0, 'ALTER TABLE `users` DROP COLUMN `date_updated`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- users_roles_projects: supprimer alias legacy après copie vers colonnes canoniques
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users_roles_projects' AND COLUMN_NAME = 'user'
+);
+SET @sql := IF(@col_exists > 0, 'ALTER TABLE `users_roles_projects` DROP COLUMN `user`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users_roles_projects' AND COLUMN_NAME = 'role'
+);
+SET @sql := IF(@col_exists > 0, 'ALTER TABLE `users_roles_projects` DROP COLUMN `role`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users_roles_projects' AND COLUMN_NAME = 'project'
+);
+SET @sql := IF(@col_exists > 0, 'ALTER TABLE `users_roles_projects` DROP COLUMN `project`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Valeurs par défaut minimales pour éviter des NULL bloquants côté applicatif
 UPDATE `projects` SET `status` = COALESCE(NULLIF(`status`, ''), 'active');
 UPDATE `roles` SET `status` = COALESCE(NULLIF(`status`, ''), 'active');
@@ -478,11 +723,39 @@ SET @has_users_user_id := (
   SELECT COUNT(*) FROM information_schema.COLUMNS
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'user_id'
 );
+
+-- username: conversion des UUID vers des nicknames lisibles
+UPDATE `users`
+SET `username` = NULL
+WHERE `username` REGEXP '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+
+UPDATE `users`
+SET `username` = LOWER(SUBSTRING_INDEX(`email`, '@', 1))
+WHERE (`username` IS NULL OR `username` = '')
+  AND `email` IS NOT NULL
+  AND `email` <> '';
+
+UPDATE `users`
+SET `username` = LOWER(
+  REPLACE(
+    REPLACE(
+      REPLACE(TRIM(`full_name`), ' ', '_'),
+      '''',
+      ''
+    ),
+    '.',
+    '_'
+  )
+)
+WHERE (`username` IS NULL OR `username` = '')
+  AND `full_name` IS NOT NULL
+  AND `full_name` <> '';
+
 SET @sql := IF(@has_users_id > 0,
-  'UPDATE `users` SET `username` = COALESCE(NULLIF(`username`, ''''), CAST(`id` AS CHAR(36)))',
+  'UPDATE `users` SET `username` = COALESCE(NULLIF(`username`, ''''), CONCAT(''user_'', LOWER(REPLACE(CAST(`id` AS CHAR(36)), ''-'', ''''))))',
   IF(@has_users_user_id > 0,
-    'UPDATE `users` SET `username` = COALESCE(NULLIF(`username`, ''''), CAST(`user_id` AS CHAR(36)))',
-    'UPDATE `users` SET `username` = COALESCE(NULLIF(`username`, ''''), UUID())'
+    'UPDATE `users` SET `username` = COALESCE(NULLIF(`username`, ''''), CONCAT(''user_'', LOWER(REPLACE(CAST(`user_id` AS CHAR(36)), ''-'', ''''))))',
+    'UPDATE `users` SET `username` = COALESCE(NULLIF(`username`, ''''), CONCAT(''user_'', LOWER(REPLACE(UUID(), ''-'', ''''))))'
   )
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -515,6 +788,38 @@ SET @projects_pk_col := IF(
     NULL
   )
 );
+
+-- username uniques: en cas de collision, suffixe avec la PK utilisateur
+SET @sql := IF(@users_pk_col IS NOT NULL,
+  CONCAT(
+    'UPDATE `users` u ',
+    'JOIN `users` u2 ON u.`username` = u2.`username` AND u.`', @users_pk_col, '` > u2.`', @users_pk_col, '` ',
+    'SET u.`username` = CONCAT(u.`username`, ''_'', LOWER(REPLACE(CAST(u.`', @users_pk_col, '` AS CHAR(36)), ''-'', '''')))'
+  ),
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Compte administrateur imposé: admin / admin (stocké en MD5 pour compatibilité applicative)
+UPDATE `users`
+SET
+  `password_hash` = MD5('admin'),
+  `full_name` = COALESCE(NULLIF(`full_name`, ''), 'Administrateur'),
+  `is_active` = 1
+WHERE LOWER(`username`) = 'admin';
+
+SET @admin_exists := (SELECT COUNT(*) FROM `users` WHERE LOWER(`username`) = 'admin');
+SET @sql := IF(@admin_exists = 0,
+  IF(@users_pk_col IS NOT NULL,
+    CONCAT(
+      'INSERT INTO `users` (`', @users_pk_col, '`, `username`, `password_hash`, `full_name`, `email`, `is_active`) ',
+      'VALUES (''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'', ''admin'', MD5(''admin''), ''Administrateur'', ''admin@local'', 1)'
+    ),
+    'INSERT INTO `users` (`username`, `password_hash`, `full_name`, `email`, `is_active`) VALUES (''admin'', MD5(''admin''), ''Administrateur'', ''admin@local'', 1)'
+  ),
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
@@ -570,6 +875,22 @@ SET @sql := IF(@fk_exists = 0 AND @projects_pk_col IS NOT NULL AND @col_match > 
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_project'
+);
+SET @fk_ref_table := (
+  SELECT kcu.REFERENCED_TABLE_NAME
+  FROM information_schema.KEY_COLUMN_USAGE kcu
+  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+    AND kcu.TABLE_NAME = 'project_task_assignments'
+    AND kcu.CONSTRAINT_NAME = 'fk_pta_project'
+  LIMIT 1
+);
+SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'projects',
+  'ALTER TABLE `project_task_assignments` DROP FOREIGN KEY `fk_pta_project`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_project'
@@ -639,6 +960,42 @@ SET @col_match := (
 );
 SET @sql := IF(@fk_exists = 0 AND @users_pk_col IS NOT NULL AND @col_match > 0,
   CONCAT('ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_responsible` FOREIGN KEY (`responsible_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_risks' AND CONSTRAINT_NAME = 'fk_project_risks_project'
+);
+SET @col_match := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS c1
+  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  WHERE c1.TABLE_SCHEMA = DATABASE()
+    AND c1.TABLE_NAME = 'project_risks' AND c1.COLUMN_NAME = 'projectId'
+    AND c2.TABLE_NAME = 'projects' AND c2.COLUMN_NAME = @projects_pk_col
+    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+);
+SET @sql := IF(@fk_exists = 0 AND @projects_pk_col IS NOT NULL AND @col_match > 0,
+  CONCAT('ALTER TABLE `project_risks` ADD CONSTRAINT `fk_project_risks_project` FOREIGN KEY (`projectId`) REFERENCES `projects` (`', @projects_pk_col, '`)'),
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_risks' AND CONSTRAINT_NAME = 'fk_project_risks_risk'
+);
+SET @col_match := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS c1
+  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  WHERE c1.TABLE_SCHEMA = DATABASE()
+    AND c1.TABLE_NAME = 'project_risks' AND c1.COLUMN_NAME = 'riskId'
+    AND c2.TABLE_NAME = 'risks' AND c2.COLUMN_NAME = 'uuid'
+    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+);
+SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
+  'ALTER TABLE `project_risks` ADD CONSTRAINT `fk_project_risks_risk` FOREIGN KEY (`riskId`) REFERENCES `risks` (`uuid`)',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 COMMIT;

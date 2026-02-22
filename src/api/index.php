@@ -16,9 +16,10 @@ $routesHint = [
   'GET /db-check',
   'GET /users',
   'POST /auth/login',
+  'POST /projects/{id}/procedure',
+  'POST /projects/{id}/rebuild-payload',
   'GET /projects',
   'GET /projects/{id}',
-  'GET /projects/{id}/payload',
   'POST /projects',
 ];
 
@@ -50,7 +51,7 @@ function normalize_project_payload(array $payload): array {
   return $payload;
 }
 
-function project_default_phases(): array {
+function project_default_phases(): array { 
   return ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
 }
 
@@ -61,13 +62,44 @@ function project_default_activities(): array {
     'changement' => ['id' => 'changement', 'label' => 'Gestion du changement', 'owner' => '—'],
     'technologie' => ['id' => 'technologie', 'label' => 'Gestion de la technologie', 'owner' => '—'],
   ];
+} 
+
+function build_payload_task_lookup(array $payload): array {
+  $lookup = [];
+  $tm = $payload['taskMatrix'] ?? null;
+  if (!is_array($tm)) return $lookup;
+
+  foreach ($tm as $activityId => $phaseMap) {
+    $aid = trim((string)$activityId);
+    if ($aid === '' || !is_array($phaseMap)) continue;
+    foreach ($phaseMap as $phaseId => $tasks) {
+      $pid = trim((string)$phaseId);
+      if ($pid === '' || !is_array($tasks)) continue;
+      foreach ($tasks as $task) {
+        if (!is_array($task)) continue;
+        $taskId = trim((string)($task['id'] ?? ''));
+        if ($taskId === '') continue;
+        $lookup[$aid][$pid][$taskId] = $task;
+      }
+    }
+  }
+
+  return $lookup;
 }
 
 function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
-  $stmt = $pdo->prepare('SELECT id, name, description FROM projects WHERE id = :id LIMIT 1');
+  $stmt = $pdo->prepare('SELECT id, name, description, payload FROM projects WHERE id = :id LIMIT 1');
   $stmt->execute([':id' => $projectId]);
   $row = $stmt->fetch();
   if (!$row) return null;
+
+  $payloadData = [];
+  $payloadRaw = (string)($row['payload'] ?? '');
+  if ($payloadRaw !== '') {
+    $decoded = json_decode($payloadRaw, true);
+    if (is_array($decoded)) $payloadData = $decoded;
+  }
+  $payloadTaskLookup = build_payload_task_lookup($payloadData);
 
   $detail = [
     'id' => (string)$row['id'],
@@ -156,6 +188,18 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     if ($accountant !== '') $task['accountantId'] = $accountant;
     if ($responsible !== '') $task['responsibleId'] = $responsible;
 
+    $overlay = $payloadTaskLookup[$activityId][$phaseId][$taskId] ?? null;
+    if (is_array($overlay)) {
+      foreach (['startDate', 'endDate', 'category', 'phase'] as $k) {
+        if (!array_key_exists($k, $overlay)) continue;
+        $v = trim((string)($overlay[$k] ?? ''));
+        if ($v !== '') $task[$k] = $v;
+      }
+      if (isset($overlay['constraints']) && is_array($overlay['constraints'])) {
+        $task['constraints'] = $overlay['constraints'];
+      }
+    }
+
     $detail['taskMatrix'][$activityId][$phaseId][] = $task;
   }
 
@@ -166,6 +210,10 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
         $detail['taskMatrix'][$activityId][$phaseId] = [];
       }
     }
+  }
+
+  if (isset($payloadData['ganttDependencies']) && is_array($payloadData['ganttDependencies'])) {
+    $detail['ganttDependencies'] = $payloadData['ganttDependencies'];
   }
 
   return $detail;
@@ -271,12 +319,144 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
   }
 }
 
+function ensure_project_changes_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `project_changes` (
+      `id` uuid NOT NULL DEFAULT uuid(),
+      `project_id` uuid NOT NULL,
+      `change_type` varchar(64) NOT NULL,
+      `source` varchar(64) NOT NULL,
+      `payload` longtext NOT NULL,
+      `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+      PRIMARY KEY (`id`),
+      KEY `idx_project_changes_project_created` (`project_id`, `created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  $ready = true;
+}
+
+function insert_project_change(PDO $pdo, string $projectId, string $changeType, string $source, string $payloadStr): void {
+  $stmt = $pdo->prepare("
+    INSERT INTO project_changes (project_id, change_type, source, payload)
+    VALUES (:project_id, :change_type, :source, :payload)
+  ");
+  $stmt->execute([
+    ':project_id' => $projectId,
+    ':change_type' => $changeType,
+    ':source' => $source,
+    ':payload' => $payloadStr,
+  ]);
+}
+
+function save_project_detail(PDO $pdo, string $projectId, array $project, string $source = 'api'): void {
+  // IMPORTANT: ne pas exécuter de DDL pendant une transaction MariaDB,
+  // sinon commit implicite et "There is no active transaction".
+  ensure_project_changes_table($pdo);
+
+  $project['id'] = $projectId;
+  $project = normalize_project_payload($project);
+
+  $name = trim((string)($project['name'] ?? ''));
+  if ($name === '') {
+    throw new InvalidArgumentException('Missing required field: project.name');
+  }
+
+  $payloadStr = json_encode($project, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  if ($payloadStr === false) {
+    throw new InvalidArgumentException('Could not encode project payload as JSON');
+  }
+
+  $pdo->beginTransaction();
+  try {
+    $sql = "
+      INSERT INTO projects (id, name, description, payload)
+      VALUES (:id, :name, :description, :payload)
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name),
+        description = VALUES(description),
+        payload = VALUES(payload),
+        updated_at = CURRENT_TIMESTAMP
+    ";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+      ':id' => $projectId,
+      ':name' => $name,
+      ':description' => trim((string)($project['description'] ?? '')),
+      ':payload' => $payloadStr,
+    ]);
+
+    persist_project_tables($pdo, $project, $projectId);
+    insert_project_change($pdo, $projectId, 'save_project', $source, $payloadStr);
+    $pdo->commit();
+  } catch (Throwable $inner) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    throw $inner;
+  }
+}
+
+function run_project_procedure(PDO $pdo, string $projectId, string $procedure, array $payload): array {
+  if ($procedure === 'save_project') {
+    $project = (isset($payload['project']) && is_array($payload['project'])) ? $payload['project'] : [];
+    if (!$project) {
+      throw new InvalidArgumentException('Missing payload.project for save_project');
+    }
+    save_project_detail($pdo, $projectId, $project, 'procedure.save_project');
+
+    return ['ok' => true, 'procedure' => 'save_project', 'id' => $projectId];
+  }
+
+  throw new InvalidArgumentException('Unknown procedure: ' . $procedure);
+}
+
+function rebuild_project_payload(PDO $pdo, string $projectId): array {
+  $detail = fetch_project_from_tables($pdo, $projectId);
+  if ($detail === null) {
+    throw new InvalidArgumentException('Project not found');
+  }
+
+  $detail = normalize_project_payload($detail);
+  $payloadStr = json_encode($detail, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  if ($payloadStr === false) {
+    throw new InvalidArgumentException('Could not encode rebuilt payload as JSON');
+  }
+
+  $stmt = $pdo->prepare('UPDATE projects SET payload = :payload, updated_at = CURRENT_TIMESTAMP WHERE id = :id');
+  $stmt->execute([
+    ':id' => $projectId,
+    ':payload' => $payloadStr,
+  ]);
+
+  return $detail;
+}
+
 function fetch_users(PDO $pdo): array {
   $columnsStmt = $pdo->query('SHOW COLUMNS FROM users');
   $columns = array_map(
     static fn(array $row): string => (string)($row['Field'] ?? ''),
     $columnsStmt->fetchAll()
   );
+
+  $idCandidates = ['id', 'user_id', 'uuid', 'user_uuid'];
+  $idColumn = null;
+  foreach ($idCandidates as $c) {
+    if (in_array($c, $columns, true)) {
+      $idColumn = $c;
+      break;
+    }
+  }
+
+  $fallbackIdCandidates = ['username', 'user', 'login', 'email'];
+  $fallbackIdColumn = null;
+  foreach ($fallbackIdCandidates as $c) {
+    if (in_array($c, $columns, true)) {
+      $fallbackIdColumn = $c;
+      break;
+    }
+  }
 
   $labelCandidates = ['display_name', 'full_name', 'name', 'username', 'email'];
   $labelColumn = null;
@@ -287,10 +467,11 @@ function fetch_users(PDO $pdo): array {
     }
   }
   if ($labelColumn === null) {
-    $labelColumn = 'id';
+    $labelColumn = $idColumn ?? $fallbackIdColumn ?? 'NULL';
   }
 
-  $sql = "SELECT id, {$labelColumn} AS label FROM users ORDER BY {$labelColumn} ASC";
+  $idExpr = $idColumn ?? $fallbackIdColumn ?? "''";
+  $sql = "SELECT {$idExpr} AS id, {$labelColumn} AS label FROM users ORDER BY {$labelColumn} ASC";
   $rows = $pdo->query($sql)->fetchAll();
 
   return array_map(static function (array $r): array {
@@ -308,30 +489,61 @@ function find_first_existing_column(array $columns, array $candidates): ?string 
   return null;
 }
 
-function verify_login(PDO $pdo, string $username, string $password): ?array {
+function verify_login(PDO $pdo, string $username, string $password, ?string &$authError = null): ?array {
   $columnsStmt = $pdo->query('SHOW COLUMNS FROM users');
   $columns = array_map(
     static fn(array $row): string => (string)($row['Field'] ?? ''),
     $columnsStmt->fetchAll()
   );
 
-  $idCol = find_first_existing_column($columns, ['id', 'user_id']);
-  $userCol = find_first_existing_column($columns, ['username', 'user', 'login', 'email']);
+  $idCol = find_first_existing_column($columns, ['id', 'user_id', 'uuid', 'user_uuid']);
+  $loginCols = array_values(array_filter(
+    ['username', 'user', 'login', 'email'],
+    static fn(string $c): bool => in_array($c, $columns, true)
+  ));
+  if (in_array('full_name', $columns, true)) {
+    $loginCols[] = 'full_name';
+  }
+  if (in_array('display_name', $columns, true)) {
+    $loginCols[] = 'display_name';
+  }
+  if (in_array('name', $columns, true)) {
+    $loginCols[] = 'name';
+  }
+  $loginCols = array_values(array_unique($loginCols));
+  $userCol = $loginCols[0] ?? null;
   $passCol = find_first_existing_column($columns, ['password_hash', 'password', 'passwd', 'pass', 'pwd']);
   $labelCol = find_first_existing_column($columns, ['display_name', 'full_name', 'name', 'username', 'email']);
   $isActiveCol = find_first_existing_column($columns, ['is_active', 'active', 'enabled']);
 
-  if ($idCol === null || $userCol === null || $passCol === null) {
-    throw new RuntimeException('Users table is missing required auth columns.');
+  if ($userCol === null || $passCol === null) {
+    $missing = [];
+    if ($userCol === null) $missing[] = 'username|user|login|email';
+    if ($passCol === null) $missing[] = 'password_hash|password|passwd|pass|pwd';
+    $authError = 'Users table auth columns are missing: ' . implode(', ', $missing);
+    return null;
   }
   if ($labelCol === null) $labelCol = $userCol;
 
-  $sql = "SELECT {$idCol} AS id, {$userCol} AS username, {$labelCol} AS label, {$passCol} AS pass";
+  $idExpr = $idCol ?? $userCol;
+  $sql = "SELECT {$idExpr} AS id, {$userCol} AS username, {$labelCol} AS label, {$passCol} AS pass";
   if ($isActiveCol !== null) $sql .= ", {$isActiveCol} AS is_active";
-  $sql .= " FROM users WHERE {$userCol} = :username LIMIT 1";
+  $whereParts = [];
+  $params = [];
+  foreach ($loginCols as $c) {
+    // Tolérance aux espaces/casse pour limiter les 401 "faux négatifs".
+    $whereParts[] = "{$c} = ?";
+    $params[] = $username;
+    $whereParts[] = "TRIM({$c}) = TRIM(?)";
+    $params[] = $username;
+    $whereParts[] = "LOWER(TRIM({$c})) = LOWER(TRIM(?))";
+    $params[] = $username;
+  }
+  $where = implode(' OR ', $whereParts);
+  $sql .= " FROM users WHERE ({$where}) LIMIT 1";
 
   $stmt = $pdo->prepare($sql);
-  $stmt->execute([':username' => $username]);
+  $stmt->execute($params);
   $row = $stmt->fetch();
   if (!$row) return null;
 
@@ -339,7 +551,7 @@ function verify_login(PDO $pdo, string $username, string $password): ?array {
     return null;
   }
 
-  $stored = (string)($row['pass'] ?? '');
+  $stored = trim((string)($row['pass'] ?? ''));
   if ($stored === '') return null;
 
   $valid = false;
@@ -392,6 +604,15 @@ try {
   // -----------------------------
   // POST /auth/login
   // -----------------------------
+  if ($path === '/auth/login' && $method !== 'POST') {
+    send_json([
+      'error' => 'Method not allowed',
+      'uri' => $path,
+      'method' => $method,
+      'allowed' => ['POST'],
+    ], 405);
+  }
+
   if ($method === 'POST' && $path === '/auth/login') {
     $body = read_json_body();
     $username = trim((string)($body['username'] ?? ''));
@@ -402,12 +623,81 @@ try {
     }
 
     $pdo = db();
-    $user = verify_login($pdo, $username, $password);
+    $authError = null;
+    $user = verify_login($pdo, $username, $password, $authError);
+    if ($authError !== null) {
+      send_json(['error' => 'Authentication is not configured on this database', 'detail' => $authError], 500);
+    }
     if ($user === null) {
       send_json(['error' => 'Invalid credentials'], 401);
     }
 
     send_json(['ok' => true, 'user' => $user]);
+  }
+
+  // -----------------------------
+  // POST /projects/{id}/procedure
+  // Body: { procedure: "save_project", payload: { project: ProjectDetail } }
+  // -----------------------------
+  if ($method !== 'POST' && preg_match('#^/projects/([^/]+)/procedure$#', $path)) {
+    send_json([
+      'error' => 'Method not allowed',
+      'uri' => $path,
+      'method' => $method,
+      'allowed' => ['POST'],
+    ], 405);
+  }
+
+  if ($method === 'POST' && preg_match('#^/projects/([^/]+)/procedure$#', $path, $m)) {
+    $projectId = normalize_id(urldecode($m[1]));
+    if ($projectId === '') send_json(['error' => 'Missing project id in route'], 400);
+
+    $body = read_json_body();
+    $procedure = trim((string)($body['procedure'] ?? $body['name'] ?? ''));
+    if ($procedure === '') {
+      send_json(['error' => 'Missing procedure name'], 400);
+    }
+
+    $payload = (isset($body['payload']) && is_array($body['payload'])) ? $body['payload'] : [];
+
+    $pdo = db();
+    try {
+      $result = run_project_procedure($pdo, $projectId, $procedure, $payload);
+      send_json($result);
+    } catch (InvalidArgumentException $e) {
+      send_json(['error' => 'Invalid procedure payload', 'detail' => $e->getMessage()], 400);
+    }
+  }
+
+  // -----------------------------
+  // POST /projects/{id}/rebuild-payload
+  // Reconstitue le payload depuis les tables et le stocke dans projects.payload
+  // -----------------------------
+  if ($method !== 'POST' && preg_match('#^/projects/([^/]+)/rebuild-payload$#', $path)) {
+    send_json([
+      'error' => 'Method not allowed',
+      'uri' => $path,
+      'method' => $method,
+      'allowed' => ['POST'],
+    ], 405);
+  }
+
+  if ($method === 'POST' && preg_match('#^/projects/([^/]+)/rebuild-payload$#', $path, $m)) {
+    $projectId = normalize_id(urldecode($m[1]));
+    if ($projectId === '') send_json(['error' => 'Missing project id in route'], 400);
+
+    $pdo = db();
+    try {
+      $rebuilt = rebuild_project_payload($pdo, $projectId);
+      send_json([
+        'ok' => true,
+        'id' => $projectId,
+        'payload' => $rebuilt,
+      ]);
+    } catch (InvalidArgumentException $e) {
+      $status = $e->getMessage() === 'Project not found' ? 404 : 400;
+      send_json(['error' => $e->getMessage()], $status);
+    }
   }
 
   // -----------------------------
@@ -436,35 +726,6 @@ try {
   }
 
   // -----------------------------
-  // GET /projects/{id}/payload (retourne le JSON payload)
-  // -----------------------------
-  if ($method === 'GET' && preg_match('#^/projects/([^/]+)/payload$#', $path, $m)) {
-    $id = normalize_id(urldecode($m[1]));
-    if ($id === '') send_json(['error' => 'Missing id'], 400);
-
-    $pdo = db();
-    $stmt = $pdo->prepare('SELECT id, name, payload FROM projects WHERE id = :id LIMIT 1');
-    $stmt->execute([':id' => $id]);
-    $row = $stmt->fetch();
-
-    if (!$row) {
-      send_json(['error' => 'Project not found', 'requestedId' => $id], 404);
-    }
-
-    $payloadStr = $row['payload'] ?? '';
-    $payload = json_decode($payloadStr, true);
-
-    if (!is_array($payload)) {
-      send_json(['error' => 'Invalid payload JSON in DB', 'projectId' => $id], 500);
-    }
-
-    $payload['id'] = $row['id'];
-    $payload['name'] = $payload['name'] ?? $row['name'];
-
-    send_json($payload);
-  }
-
-  // -----------------------------
   // POST /projects (upsert)
   // Body: ProjectDetail JSON
   // -----------------------------
@@ -472,44 +733,15 @@ try {
     $body = read_json_body();
 
     $id = normalize_id($body['id'] ?? null);
-    $name = trim((string)($body['name'] ?? ''));
-
-    if ($id === '' || $name === '') {
+    if ($id === '') {
       send_json(['error' => 'Missing required fields: id, name'], 400);
     }
 
-    // On stocke le payload COMPLET (y compris taskMatrix, etc.)
-    $normalizedBody = normalize_project_payload($body);
-    $payloadStr = json_encode($normalizedBody, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($payloadStr === false) {
-      send_json(['error' => 'Could not encode payload as JSON'], 400);
-    }
-
     $pdo = db();
-    $pdo->beginTransaction();
     try {
-      $sql = "
-        INSERT INTO projects (id, name, description, payload)
-        VALUES (:id, :name, :description, :payload)
-        ON DUPLICATE KEY UPDATE
-          name = VALUES(name),
-          description = VALUES(description),
-          payload = VALUES(payload),
-          updated_at = CURRENT_TIMESTAMP
-      ";
-      $stmt = $pdo->prepare($sql);
-      $stmt->execute([
-        ':id' => $id,
-        ':name' => $name,
-        ':description' => trim((string)($body['description'] ?? '')),
-        ':payload' => $payloadStr,
-      ]);
-
-      persist_project_tables($pdo, $normalizedBody, $id);
-      $pdo->commit();
-    } catch (Throwable $inner) {
-      if ($pdo->inTransaction()) $pdo->rollBack();
-      throw $inner;
+      save_project_detail($pdo, $id, $body, 'route.projects');
+    } catch (InvalidArgumentException $e) {
+      send_json(['error' => $e->getMessage()], 400);
     }
 
     send_json(['ok' => true, 'id' => $id]);
@@ -521,6 +753,7 @@ try {
   send_json([
     'error' => 'Route not found',
     'uri' => $path,
+    'method' => $method,
     'basePath' => $basePath,
     'routesHint' => $routesHint,
   ], 404);

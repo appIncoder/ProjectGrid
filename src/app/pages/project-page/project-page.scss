@@ -152,13 +152,37 @@
 }
 
 .task-pill {
-  display: inline-block;
-  padding: 0.1rem 0.35rem;
+  display: block;
+  position: relative;
+  width: 210px;
+  min-width: 210px;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.1rem 1.2rem 0.1rem 0.35rem;
   border-radius: 999px;
   font-size: 0.75rem;
   border: 1px solid #000;
   background-color: #fff;
   text-align: left;
+  cursor: pointer;
+}
+
+.task-pill::after {
+  content: '\270E';
+  position: absolute;
+  right: 0.42rem;
+  top: 50%;
+  transform: translateY(-50%) scale(0.92);
+  font-size: 0.74rem;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.task-pill:hover::after {
+  opacity: 0.92;
+  transform: translateY(-50%) scale(1);
 }
 
 /* Couleurs des tâches selon le statut */

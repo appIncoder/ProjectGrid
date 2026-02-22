@@ -1,9 +1,9 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
-import { RiskCellItem, RiskLevel, TopRisk, RiskStatus, TopRiskExtended } from '../../models';
+import { RiskCellItem, RiskLevel, RiskStatus, TopRiskExtended } from '../../models';
 
 export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   OPEN: 'Ouvert',
@@ -13,86 +13,97 @@ export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   CLOSED: 'Fermé',
 };
 
+type RiskStatePayload = {
+  riskMatrix: Record<string, RiskCellItem[]>;
+  topRisks: TopRiskExtended[];
+};
+
+const DEFAULT_RISK_MATRIX: Record<string, RiskCellItem[]> = {
+  'Significatif|Moyenne': [{ id: 'R1', label: 'Disponibilité clé métier', level: 'high' }],
+  'Majeur|Élevée': [
+    { id: 'R2', label: 'Retard de livraison IT', level: 'critical' },
+    { id: 'R3', label: 'Sous-estimation charge', level: 'high' },
+  ],
+  'Modéré|Moyenne': [{ id: 'R4', label: 'Turn-over équipe', level: 'medium' }],
+  'Critique|Faible': [{ id: 'R5', label: 'Faille de sécurité majeure', level: 'critical' }],
+};
+
+const DEFAULT_TOP_RISKS: TopRiskExtended[] = [
+  {
+    id: 'R2',
+    title: 'Retard de livraison IT critique',
+    impact: 'Majeur',
+    probability: 'Élevée',
+    level: 'critical',
+    owner: 'David Lambert',
+    dueDate: '30/09/2025',
+    status: 'IN_PROGRESS',
+    residualRiskId: 'R2-RES',
+  },
+  {
+    id: 'R3',
+    title: 'Sous-estimation des charges projet',
+    impact: 'Majeur',
+    probability: 'Élevée',
+    level: 'high',
+    owner: 'Alice Dupont',
+    dueDate: '15/09/2025',
+    status: 'OPEN',
+    residualRiskId: null,
+  },
+  {
+    id: 'R1',
+    title: 'Indisponibilité d’un sponsor métier',
+    impact: 'Significatif',
+    probability: 'Moyenne',
+    level: 'high',
+    owner: 'Claire Leroy',
+    dueDate: '01/09/2025',
+    status: 'ON_HOLD',
+    residualRiskId: null,
+  },
+  {
+    id: 'R4',
+    title: 'Turn-over dans l’équipe projet',
+    impact: 'Modéré',
+    probability: 'Moyenne',
+    level: 'medium',
+    owner: 'Bruno Martin',
+    dueDate: '15/10/2025',
+    status: 'RESOLVED',
+    residualRiskId: 'R4-RES',
+  },
+  {
+    id: 'R5',
+    title: 'Risque de faille de sécurité',
+    impact: 'Critique',
+    probability: 'Faible',
+    level: 'critical',
+    owner: 'Security Officer',
+    dueDate: '31/12/2025',
+    status: 'OPEN',
+    residualRiskId: null,
+  },
+];
+
 @Component({
   selector: 'app-project-risks',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './project-risks.html',
 })
-export class ProjectRisks {
+export class ProjectRisks implements OnInit {
+  @Input() projectId: string | null = null;
+
   riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
   riskProbabilityLevels: string[] = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
 
   RISK_STATUS_LABEL = RISK_STATUS_LABEL;
 
   // clé = `${impact}|${prob}`
-  riskMatrix: Record<string, RiskCellItem[]> = {
-    'Significatif|Moyenne': [{ id: 'R1', label: 'Disponibilité clé métier', level: 'high' }],
-    'Majeur|Élevée': [
-      { id: 'R2', label: 'Retard de livraison IT', level: 'critical' },
-      { id: 'R3', label: 'Sous-estimation charge', level: 'high' },
-    ],
-    'Modéré|Moyenne': [{ id: 'R4', label: 'Turn-over équipe', level: 'medium' }],
-    'Critique|Faible': [{ id: 'R5', label: 'Faille de sécurité majeure', level: 'critical' }],
-  };
+  riskMatrix: Record<string, RiskCellItem[]> = this.clone(DEFAULT_RISK_MATRIX);
 
-  topRisks: TopRiskExtended[] = [
-    {
-      id: 'R2',
-      title: 'Retard de livraison IT critique',
-      impact: 'Majeur',
-      probability: 'Élevée',
-      level: 'critical',
-      owner: 'David Lambert',
-      dueDate: '30/09/2025',
-      status: 'IN_PROGRESS',
-      residualRiskId: 'R2-RES',
-    },
-    {
-      id: 'R3',
-      title: 'Sous-estimation des charges projet',
-      impact: 'Majeur',
-      probability: 'Élevée',
-      level: 'high',
-      owner: 'Alice Dupont',
-      dueDate: '15/09/2025',
-      status: 'OPEN',
-      residualRiskId: null,
-    },
-    {
-      id: 'R1',
-      title: 'Indisponibilité d’un sponsor métier',
-      impact: 'Significatif',
-      probability: 'Moyenne',
-      level: 'high',
-      owner: 'Claire Leroy',
-      dueDate: '01/09/2025',
-      status: 'ON_HOLD',
-      residualRiskId: null,
-    },
-    {
-      id: 'R4',
-      title: 'Turn-over dans l’équipe projet',
-      impact: 'Modéré',
-      probability: 'Moyenne',
-      level: 'medium',
-      owner: 'Bruno Martin',
-      dueDate: '15/10/2025',
-      status: 'RESOLVED',
-      residualRiskId: 'R4-RES',
-    },
-    {
-      id: 'R5',
-      title: 'Risque de faille de sécurité',
-      impact: 'Critique',
-      probability: 'Faible',
-      level: 'critical',
-      owner: 'Security Officer',
-      dueDate: '31/12/2025',
-      status: 'OPEN',
-      residualRiskId: null,
-    },
-  ];
+  topRisks: TopRiskExtended[] = this.clone(DEFAULT_TOP_RISKS);
 
   draggedRisk: { item: RiskCellItem; fromImpact: string; fromProbability: string } | null = null;
 
@@ -103,6 +114,49 @@ export class ProjectRisks {
     y: 0,
     riskId: '' as string,
   };
+
+  ngOnInit(): void {
+    this.restoreState();
+  }
+
+  private storageKey(): string {
+    const key = (this.projectId ?? '').trim() || 'global';
+    return `project-risks:${key}`;
+  }
+
+  private clone<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+
+  private persistState(): void {
+    const payload: RiskStatePayload = {
+      riskMatrix: this.riskMatrix,
+      topRisks: this.topRisks,
+    };
+    try {
+      localStorage.setItem(this.storageKey(), JSON.stringify(payload));
+    } catch {
+      // Storage inaccessible (private mode/quota): ignore without blocking UX.
+    }
+  }
+
+  private restoreState(): void {
+    try {
+      const raw = localStorage.getItem(this.storageKey());
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<RiskStatePayload>;
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.riskMatrix && typeof parsed.riskMatrix === 'object') {
+          this.riskMatrix = parsed.riskMatrix;
+        }
+        if (Array.isArray(parsed.topRisks)) {
+          this.topRisks = parsed.topRisks;
+        }
+      }
+    } catch {
+      // Corrupt JSON / storage inaccessible: keep defaults.
+    }
+  }
 
   get probabilityOptions(): string[] {
     return this.riskProbabilityLevels;
@@ -221,6 +275,7 @@ export class ProjectRisks {
 
     this.upsertItemInCell(updatedItem, targetImpact, targetProbability);
     this.draggedRisk = null;
+    this.persistState();
   }
 
   // ====== Synchronisation depuis le tableau TopRisks ======
@@ -241,15 +296,18 @@ export class ProjectRisks {
 
     this.removeItemEverywhere(risk.id);
     this.upsertItemInCell(item, risk.impact, risk.probability);
+    this.persistState();
   }
 
   onTopRiskLevelChange(risk: TopRiskExtended): void {
     // Quand criticité changée dans le tableau => juste changer le style de la pastille (pas son emplacement)
     this.updateCellItemLevel(risk.id, risk.level);
+    this.persistState();
   }
 
   onTopRiskStatusChange(_risk: TopRiskExtended): void {
     // Rien à faire côté matrice (statut affiché dans tableau / menu)
+    this.persistState();
   }
 
   private getCellItemById(id: string): RiskCellItem | undefined {

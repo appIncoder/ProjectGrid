@@ -15,6 +15,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
+import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 
 import {
   ActivityId,
@@ -56,16 +57,27 @@ type LinkDraft = {
   targetSide: LinkAnchorSide | null;
 };
 
+type TaskHoverCard = {
+  x: number;
+  y: number;
+  label: string;
+  start: string;
+  end: string;
+  status: string;
+};
+
 @Component({
   selector: 'app-project-roadmap',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal],
+  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip],
   templateUrl: './project-roadmap.html',
   styleUrls: ['./project-roadmap.scss'],
 })
 export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck {
   @Input() project: ProjectDetail | null = null;
   @Input() users: UserRef[] = [];
+  @Input() isSaving = false;
+  @Input() saveError: string | null = null;
 
   @ViewChild('taskEditModal', { static: false }) taskEditModalTpl?: TemplateRef<any>;
   @ViewChild('ganttScroll', { static: false }) ganttScrollRef?: ElementRef<HTMLElement>;
@@ -247,6 +259,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   private resizeFixedStartDayIndex: number | null = null;
 
   hoverHints: { start?: HoverHint; end?: HoverHint } = {};
+  taskHoverCard: TaskHoverCard | null = null;
   private previewStartDayIndex: number | null = null;
   private previewEndDayIndex: number | null = null;
 
@@ -310,6 +323,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   hoveredLinkKey: string | null = null;
   hoveredFromId: string | null = null;
   hoveredToId: string | null = null;
+  hoveredTaskId: string | null = null;
 
   filterLinksInGantt = false;
   private filterTaskId: string | null = null;
@@ -658,6 +672,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     this.depsSignature = this.computeDepsSignature();
     this.updateGanttLinks();
+    this.projectService.markProjectMutated(this.project.id, 'dependencies_updated');
   }
 
   private removePrimaryDependency(fromId: string): void {
@@ -675,6 +690,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     this.depsSignature = this.computeDepsSignature();
     this.updateGanttLinks();
+    this.projectService.markProjectMutated(this.project.id, 'dependencies_updated');
   }
 
   private computeDepsSignature(): string {
@@ -1213,6 +1229,120 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     return `${head} ${tail}`.trim();
   }
 
+  private pointsToPathWithLoops(
+    points: Array<{ x: number; y: number }>,
+    loopsBySegment: Map<number, number[]>
+  ): string {
+    if (!points.length) return '';
+    const cmd: string[] = [`M ${points[0].x} ${points[0].y}`];
+
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const isHorizontal = Math.abs(a.y - b.y) < 0.001;
+      const isVertical = Math.abs(a.x - b.x) < 0.001;
+      const loopRefs = loopsBySegment.get(i) ?? [];
+
+      if (!loopRefs.length || (!isHorizontal && !isVertical)) {
+        cmd.push(`L ${b.x} ${b.y}`);
+        continue;
+      }
+
+      if (isHorizontal) {
+        const dir = b.x >= a.x ? 1 : -1;
+        const sortedRefs = [...loopRefs].sort((u, v) => (dir > 0 ? u - v : v - u));
+        const maxHalf = Math.max(3, Math.min(7, Math.abs(b.x - a.x) / 6));
+        const halfW = maxHalf;
+        const loopH = 5;
+        let cursorX = a.x;
+
+        for (const loopX of sortedRefs) {
+          const preX = loopX - dir * halfW;
+          const postX = loopX + dir * halfW;
+          cmd.push(`L ${preX} ${a.y}`);
+          cmd.push(`Q ${loopX} ${a.y - loopH} ${postX} ${a.y}`);
+          cursorX = postX;
+        }
+
+        if (Math.abs(cursorX - b.x) > 0.001) {
+          cmd.push(`L ${b.x} ${b.y}`);
+        }
+        continue;
+      }
+
+      // Vertical segment: side bump (small left arc) at each crossing Y.
+      const dir = b.y >= a.y ? 1 : -1;
+      const sortedRefs = [...loopRefs].sort((u, v) => (dir > 0 ? u - v : v - u));
+      const maxHalf = Math.max(3, Math.min(7, Math.abs(b.y - a.y) / 6));
+      const halfH = maxHalf;
+      const loopW = 5;
+      let cursorY = a.y;
+
+      for (const loopY of sortedRefs) {
+        const preY = loopY - dir * halfH;
+        const postY = loopY + dir * halfH;
+        cmd.push(`L ${a.x} ${preY}`);
+        cmd.push(`Q ${a.x - loopW} ${loopY} ${a.x} ${postY}`);
+        cursorY = postY;
+      }
+
+      if (Math.abs(cursorY - b.y) > 0.001) {
+        cmd.push(`L ${b.x} ${b.y}`);
+      }
+    }
+
+    return cmd.join(' ');
+  }
+
+  private getOrthogonalSegments(points: Array<{ x: number; y: number }>): Array<{
+    segIndex: number;
+    orientation: 'h' | 'v';
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  }> {
+    const out: Array<{
+      segIndex: number;
+      orientation: 'h' | 'v';
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    }> = [];
+
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const isHorizontal = Math.abs(a.y - b.y) < 0.001;
+      const isVertical = Math.abs(a.x - b.x) < 0.001;
+      if (!isHorizontal && !isVertical) continue;
+
+      out.push({
+        segIndex: i,
+        orientation: isHorizontal ? 'h' : 'v',
+        x1: a.x,
+        y1: a.y,
+        x2: b.x,
+        y2: b.y,
+      });
+    }
+    return out;
+  }
+
+  private strictlyBetween(v: number, a: number, b: number): boolean {
+    const min = Math.min(a, b);
+    const max = Math.max(a, b);
+    return v > min + 0.001 && v < max - 0.001;
+  }
+
+  private addLoopRef(map: Map<number, number[]>, segIndex: number, at: number): void {
+    const refs = map.get(segIndex) ?? [];
+    if (refs.some((x) => Math.abs(x - at) < 1.2)) return;
+    refs.push(at);
+    map.set(segIndex, refs);
+  }
+
   private updateGanttLinks(): void {
     const depsAll = this.getProjectDependencies();
 
@@ -1221,6 +1351,14 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       : depsAll;
 
     const links: RoadmapLinkView[] = [];
+    const built: Array<{
+      fromId: string;
+      toId: string;
+      type: DependencyType;
+      key: string;
+      startY: number;
+      points: Array<{ x: number; y: number }>;
+    }> = [];
     const hMargin = 10;
     const laneGap = Math.max(8, Math.round(this.bodyRowHeight * 0.25));
     const barClearance = 24;
@@ -1327,14 +1465,72 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
         ];
       }
 
-      const path = this.pointsToPath(chosen);
-
-      links.push({
+      built.push({
         fromId: dep.fromId,
         toId: dep.toId,
-        path,
         type,
         key: this.makeLinkKey(String(dep.fromId), String(dep.toId), type),
+        startY,
+        points: chosen,
+      });
+    }
+
+    // Croisements: la ligne qui démarre le plus haut reçoit une petite boucle.
+    const loopsByLink = new Map<string, Map<number, number[]>>();
+    const getLinkLoops = (key: string): Map<number, number[]> => {
+      let m = loopsByLink.get(key);
+      if (!m) {
+        m = new Map<number, number[]>();
+        loopsByLink.set(key, m);
+      }
+      return m;
+    };
+
+    for (let i = 0; i < built.length; i++) {
+      for (let j = i + 1; j < built.length; j++) {
+        const a = built[i];
+        const b = built[j];
+        if (Math.abs(a.startY - b.startY) < 0.001) continue;
+
+        const upper = a.startY < b.startY ? a : b;
+        const lower = a.startY < b.startY ? b : a;
+
+        const upperSegs = this.getOrthogonalSegments(upper.points);
+        const lowerSegs = this.getOrthogonalSegments(lower.points);
+
+        for (const us of upperSegs) {
+          for (const ls of lowerSegs) {
+            if (us.orientation === ls.orientation) continue;
+
+            const h = us.orientation === 'h' ? us : ls;
+            const v = us.orientation === 'v' ? us : ls;
+            const xCross = v.x1;
+            const yCross = h.y1;
+            const intersects =
+              this.strictlyBetween(xCross, h.x1, h.x2) &&
+              this.strictlyBetween(yCross, v.y1, v.y2);
+
+            if (!intersects) continue;
+
+            const loops = getLinkLoops(upper.key);
+            if (us.orientation === 'h') {
+              this.addLoopRef(loops, us.segIndex, xCross);
+            } else {
+              this.addLoopRef(loops, us.segIndex, yCross);
+            }
+          }
+        }
+      }
+    }
+
+    for (const lk of built) {
+      const path = this.pointsToPathWithLoops(lk.points, loopsByLink.get(lk.key) ?? new Map<number, number[]>());
+      links.push({
+        fromId: lk.fromId,
+        toId: lk.toId,
+        path,
+        type: lk.type,
+        key: lk.key,
       });
     }
 
@@ -1762,13 +1958,35 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     if (!this.project || !this.ganttStartDate) return;
     if (String(taskView.id).startsWith('summary-')) return;
 
+    const startDay = taskView.startDayIndex ?? 0;
+    const endDay = taskView.endDayIndex ?? startDay;
+    const startIso = this.projectService.toIsoDate(this.projectService.addDays(this.ganttStartDate, startDay));
+    const endIso = this.projectService.toIsoDate(this.projectService.addDays(this.ganttStartDate, endDay));
+
+    const ctx = this.findContextForTaskId(taskView.id);
+    if (ctx) {
+      // Chemin principal: met à jour la tâche + émet une mutation pour déclencher l'autosave backend.
+      this.projectService.updateTask({
+        projectId: this.project.id,
+        activityId: ctx.activityId,
+        fromPhase: ctx.phase,
+        taskId: taskView.id,
+        startDate: startIso,
+        endDate: endIso,
+        phase: taskView.phase,
+      });
+      return;
+    }
+
+    // Fallback défensif si le contexte n'est pas retrouvé.
     this.projectService.syncGanttDayIndexesToTask({
       projectId: this.project.id,
       taskId: taskView.id,
       ganttStartDate: this.ganttStartDate,
-      startDayIndex: taskView.startDayIndex,
-      endDayIndex: taskView.endDayIndex,
+      startDayIndex: startDay,
+      endDayIndex: endDay,
     });
+    this.projectService.markProjectMutated(this.project.id, 'schedule_updated');
   }
 
   // =======================
@@ -1807,8 +2025,44 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   hideHints(): void {
     this.hoverHints = {};
+    this.taskHoverCard = null;
     this.previewStartDayIndex = null;
     this.previewEndDayIndex = null;
+  }
+
+  showTaskHoverCard(task: GanttTaskView): void {
+    if (this.draggingTask || String(task.id).startsWith('summary-')) return;
+    this.hoveredTaskId = task.id;
+
+    const boxW = 280;
+    const boxH = 84;
+    const margin = 8;
+    const preferredX = task.x + task.width + 12;
+    const fallbackX = task.x - boxW - 12;
+    const maxX = this.ganttViewportWidth - boxW - margin;
+    const minX = margin;
+    const x =
+      preferredX <= maxX
+        ? preferredX
+        : Math.max(minX, Math.min(maxX, fallbackX));
+
+    const yCenter = task.y + task.height / 2;
+    const maxY = Math.max(0, this.ganttBodyHeight - boxH - margin);
+    const y = Math.max(margin, Math.min(maxY, yCenter - boxH / 2));
+
+    this.taskHoverCard = {
+      x,
+      y,
+      label: task.label ?? '',
+      start: this.getTaskStartLabel(task),
+      end: this.getTaskEndLabel(task),
+      status: this.getTaskStatusText(task),
+    };
+  }
+
+  hideTaskHoverCard(): void {
+    this.taskHoverCard = null;
+    this.hoveredTaskId = null;
   }
 
   getTaskStartLabel(task: GanttTaskView, preview = false): string {
@@ -1933,6 +2187,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     anyProj.ganttDependencies = [...allDeps, { fromId, toId, type }];
     this.depsSignature = this.computeDepsSignature();
     this.updateGanttLinks();
+    this.projectService.markProjectMutated(this.project.id, 'dependencies_updated');
   }
 
   private computePreviewDaysFromX(task: GanttTaskView): void {
@@ -2044,6 +2299,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
       this.computePreviewDaysFromX(this.draggingTask);
       this.showHintsForDraggingTask(this.draggingTask);
+      this.updateGanttLinks();
       return;
     }
 

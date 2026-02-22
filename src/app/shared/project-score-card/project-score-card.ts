@@ -1,8 +1,9 @@
-import { Component, Input, OnChanges, SimpleChanges, TemplateRef } from '@angular/core';
+import { Component, ElementRef, Input, OnChanges, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
+import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 
 import {
   ActivityDefinition,
@@ -25,13 +26,23 @@ import { ProjectService } from '../../services/project.service';
 @Component({
   selector: 'app-project-score-card',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal],
+  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip],
   templateUrl: './project-score-card.html',
   styleUrls: ['./project-score-card.scss'],
 })
 export class ProjectScorecard implements OnChanges {
   @Input() project: ProjectDetail | null = null;
   @Input() users: UserRef[] = [];
+  @ViewChild('scorecardWrap', { static: false }) scorecardWrapRef?: ElementRef<HTMLElement>;
+
+  taskHoverCard: {
+    x: number;
+    y: number;
+    label: string;
+    start: string;
+    end: string;
+    status: string;
+  } | null = null;
 
   taskStatusOptions: { value: ActivityStatus; label: string }[] = [
     { value: 'todo',          label: 'À faire (blanc)' },
@@ -66,6 +77,13 @@ export class ProjectScorecard implements OnChanges {
 
   // ✅ Dépendances éditées dans le popup
   editedDependencies: EditableDependencyRow[] = [];
+
+  private draggedTask: {
+    taskId: string;
+    fromActivityId: ActivityId;
+    fromPhase: PhaseId;
+  } | null = null;
+  private dropTarget: { activityId: ActivityId; phase: PhaseId } | null = null;
 
   // ✅ Options de type
   dependencyTypeOptions: { value: DependencyType; label: string }[] = [
@@ -118,8 +136,139 @@ export class ProjectScorecard implements OnChanges {
     }
   }
 
+  getTaskStatusText(status: ActivityStatus): string {
+    switch (status) {
+      case 'done':
+        return 'Done';
+      case 'inprogress':
+        return 'In progress';
+      case 'onhold':
+        return 'On hold';
+      case 'notdone':
+        return 'Not done';
+      case 'notapplicable':
+        return 'N/A';
+      case 'todo':
+      default:
+        return 'Todo';
+    }
+  }
+
+  private formatIsoDate(iso?: string): string {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '—';
+    const [year, month, day] = iso.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  showTaskHoverCard(event: MouseEvent, task: Task): void {
+    const wrap = this.scorecardWrapRef?.nativeElement;
+    const target = event.currentTarget as HTMLElement | null;
+    if (!wrap || !target) return;
+
+    const boxW = 280;
+    const boxH = 84;
+    const margin = 8;
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+
+    const scrollLeft = wrap.scrollLeft;
+    const scrollTop = wrap.scrollTop;
+
+    const preferredX = targetRect.right - wrapRect.left + scrollLeft + 12;
+    const fallbackX = targetRect.left - wrapRect.left + scrollLeft - boxW - 12;
+    const minX = scrollLeft + margin;
+    const maxX = scrollLeft + wrap.clientWidth - boxW - margin;
+    const x = preferredX <= maxX ? preferredX : Math.max(minX, Math.min(maxX, fallbackX));
+
+    const centerY = targetRect.top - wrapRect.top + scrollTop + targetRect.height / 2;
+    const minY = scrollTop + margin;
+    const maxY = scrollTop + wrap.clientHeight - boxH - margin;
+    const y = Math.max(minY, Math.min(maxY, centerY - boxH / 2));
+
+    this.taskHoverCard = {
+      x,
+      y,
+      label: task.label ?? '',
+      start: this.formatIsoDate(task.startDate),
+      end: this.formatIsoDate(task.endDate),
+      status: this.getTaskStatusText(task.status),
+    };
+  }
+
+  hideTaskHoverCard(): void {
+    this.taskHoverCard = null;
+  }
+
   getPhaseLabel(phase: PhaseId): string {
     return phase;
+  }
+
+  onTaskDragStart(event: DragEvent, activityId: ActivityId, phase: PhaseId, task: Task): void {
+    this.draggedTask = {
+      taskId: task.id,
+      fromActivityId: activityId,
+      fromPhase: phase,
+    };
+    event.dataTransfer?.setData('text/plain', task.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onTaskDragEnd(): void {
+    this.draggedTask = null;
+    this.dropTarget = null;
+  }
+
+  onTaskDragOver(event: DragEvent, activityId: ActivityId, phase: PhaseId): void {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    this.dropTarget = { activityId, phase };
+  }
+
+  onTaskDragLeave(activityId: ActivityId, phase: PhaseId): void {
+    if (this.dropTarget?.activityId === activityId && this.dropTarget?.phase === phase) {
+      this.dropTarget = null;
+    }
+  }
+
+  onTaskDrop(event: DragEvent, toActivityId: ActivityId, toPhase: PhaseId): void {
+    event.preventDefault();
+    this.dropTarget = null;
+    if (!this.project || !this.draggedTask) return;
+
+    const { taskId, fromActivityId, fromPhase } = this.draggedTask;
+    this.draggedTask = null;
+
+    if (fromActivityId === toActivityId && fromPhase === toPhase) return;
+
+    this.projectService.updateTask({
+      projectId: this.project.id,
+      activityId: fromActivityId,
+      toActivityId,
+      fromPhase,
+      toPhase,
+      taskId,
+      phase: toPhase,
+      category: this.mapActivityToCategory(toActivityId),
+    });
+  }
+
+  isDropTarget(activityId: ActivityId, phase: PhaseId): boolean {
+    return this.dropTarget?.activityId === activityId && this.dropTarget?.phase === phase;
+  }
+
+  private mapActivityToCategory(activityId: ActivityId): TaskCategory {
+    switch (activityId) {
+      case 'projet':
+        return 'projectManagement';
+      case 'metier':
+        return 'businessManagement';
+      case 'changement':
+        return 'changeManagement';
+      case 'technologie':
+      default:
+        return 'technologyManagement';
+    }
   }
 
   // =======================

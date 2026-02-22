@@ -1,5 +1,6 @@
 // src/app/services/project.service.ts
 import { Injectable } from '@angular/core';
+import { Observable, Subject } from 'rxjs';
 import type {
   ActivityId,
   PhaseId,
@@ -21,6 +22,7 @@ export interface UpdateTaskPayload {
   activityId: ActivityId;
   fromPhase: PhaseId;
   taskId: string;
+  toActivityId?: ActivityId;
 
   label?: string;
   status?: ActivityStatus;
@@ -35,8 +37,15 @@ export interface UpdateTaskPayload {
   phase?: PhaseId;   // cohérence (optionnel)
 }
 
+export interface ProjectMutationEvent {
+  type: 'task_updated' | 'schedule_updated' | 'dependencies_updated';
+  projectId: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
+  private readonly mutationsSubject = new Subject<ProjectMutationEvent>();
+
   // Mini store (en attendant un store global / backend temps réel)
   private projects = new Map<string, ProjectDetail>();
 
@@ -50,6 +59,15 @@ export class ProjectService {
     Phase5: 4,
     Phase6: 5,
   };
+
+  get mutations$(): Observable<ProjectMutationEvent> {
+    return this.mutationsSubject.asObservable();
+  }
+
+  markProjectMutated(projectId: string, type: ProjectMutationEvent['type'] = 'task_updated'): void {
+    if (!projectId) return;
+    this.mutationsSubject.next({ type, projectId });
+  }
 
   // -----------------------------
   // Store / registration
@@ -199,10 +217,13 @@ export class ProjectService {
     const project = this.projects.get(payload.projectId);
     if (!project) return;
 
-    const row = project.taskMatrix?.[payload.activityId];
-    if (!row) return;
+    const fromActivityId = payload.activityId;
+    const toActivityId = payload.toActivityId ?? payload.activityId;
+    const fromRow = project.taskMatrix?.[fromActivityId];
+    const toRow = project.taskMatrix?.[toActivityId];
+    if (!fromRow || !toRow) return;
 
-    const fromList = row[payload.fromPhase] ?? [];
+    const fromList = fromRow[payload.fromPhase] ?? [];
     const task = fromList.find((t) => t.id === payload.taskId);
     if (!task) return;
 
@@ -222,20 +243,25 @@ export class ProjectService {
     if (payload.phase !== undefined) (task as any).phase = payload.phase;
 
     // Déplacement phase
-    if (payload.toPhase && payload.toPhase !== payload.fromPhase) {
-      const toList = row[payload.toPhase] ?? [];
+    const targetPhase = payload.toPhase ?? payload.fromPhase;
+    const shouldMove = toActivityId !== fromActivityId || targetPhase !== payload.fromPhase;
 
-      row[payload.fromPhase] = fromList.filter((t) => t.id !== payload.taskId);
+    if (shouldMove) {
+      const toList = toRow[targetPhase] ?? [];
+
+      fromRow[payload.fromPhase] = fromList.filter((t) => t.id !== payload.taskId);
 
       if (!toList.some((t) => t.id === payload.taskId)) {
         toList.push(task);
       }
-      row[payload.toPhase] = toList;
+      toRow[targetPhase] = toList;
 
-      (task as any).phase = payload.toPhase;
+      (task as any).phase = targetPhase;
     } else {
       (task as any).phase = (task as any).phase ?? payload.fromPhase;
     }
+
+    this.mutationsSubject.next({ type: 'task_updated', projectId: payload.projectId });
   }
 
   // -----------------------------
@@ -264,6 +290,7 @@ export class ProjectService {
     located.task.endDate = endIso;
 
     (located.task as any).phase = (located.task as any).phase ?? located.phase;
+    this.mutationsSubject.next({ type: 'schedule_updated', projectId: params.projectId });
   }
 
   private findTaskById(

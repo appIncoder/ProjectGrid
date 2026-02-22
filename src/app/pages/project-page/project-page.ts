@@ -5,6 +5,7 @@ import { Subscription } from 'rxjs';
 
 import type { ProjectDetail, ProjectTab, UserRef } from '../../models';
 import { ProjectDataService } from '../../services/project-data.service';
+import { ProjectService } from '../../services/project.service';
 
 // Composants d’onglet
 import { ProjectScorecard } from '../../shared/project-score-card/project-score-card';
@@ -38,27 +39,38 @@ export class ProjectPage implements OnInit, OnDestroy {
 
   isLoading = false;
   loadError: string | null = null;
+  saveError: string | null = null;
+  isSaving = false;
 
-  private sub?: Subscription;
+  private readonly subs = new Subscription();
   private destroyed = false;
+  private pendingSaveReason: string | null = null;
+  private saveInFlight = false;
+  private saveRequestedWhileInFlight = false;
 
   constructor(
     private route: ActivatedRoute,
     private data: ProjectDataService,
+    private projectService: ProjectService,
     private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
     // ✅ recharge si l'ID change (important quand on navigue entre projets)
-    this.sub = this.route.paramMap.subscribe((pm) => {
+    this.subs.add(this.route.paramMap.subscribe((pm) => {
       const projectId = pm.get('id');
       void this.loadProject(projectId);
-    });
+    }));
+
+    this.subs.add(this.projectService.mutations$.subscribe((evt) => {
+      if (!this.project || evt.projectId !== this.project.id) return;
+      this.schedulePersist(evt.type);
+    }));
   }
 
   ngOnDestroy(): void {
     this.destroyed = true;
-    this.sub?.unsubscribe();
+    this.subs.unsubscribe();
   }
 
   async reload(): Promise<void> {
@@ -69,6 +81,7 @@ export class ProjectPage implements OnInit, OnDestroy {
   private async loadProject(projectId: string | null): Promise<void> {
     this.isLoading = true;
     this.loadError = null;
+    this.saveError = null;
     this.project = null;
 
     console.log('[ProjectPage] loadProject()', { projectId });
@@ -107,6 +120,54 @@ export class ProjectPage implements OnInit, OnDestroy {
       if (!this.destroyed) {
         this.cdr.detectChanges();
       }
+    }
+  }
+
+  private schedulePersist(reason: string): void {
+    this.pendingSaveReason = reason;
+    void this.persistProjectProcedure();
+  }
+
+  private async persistProjectProcedure(): Promise<void> {
+    if (!this.project) return;
+    if (this.saveInFlight) {
+      this.saveRequestedWhileInFlight = true;
+      return;
+    }
+
+    this.saveInFlight = true;
+    this.isSaving = true;
+    this.saveError = null;
+    try {
+      do {
+        this.saveRequestedWhileInFlight = false;
+
+        if (!this.project) break;
+        const projectSnapshot =
+          typeof structuredClone === 'function'
+            ? structuredClone(this.project)
+            : JSON.parse(JSON.stringify(this.project));
+
+        try {
+          await this.data.runProjectProcedure(projectSnapshot.id, 'save_project', { project: projectSnapshot });
+          this.pendingSaveReason = null;
+        } catch (e) {
+          console.error('[ProjectPage] persistProjectProcedure error', {
+            reason: this.pendingSaveReason,
+            projectId: projectSnapshot.id,
+            e,
+          });
+          const detail = (e as any)?.error?.detail ?? (e as any)?.message ?? '';
+          this.saveError = detail
+            ? `Les modifications n'ont pas pu être enregistrées: ${detail}`
+            : "Les modifications n'ont pas pu être enregistrées.";
+          break;
+        }
+      } while (this.saveRequestedWhileInFlight);
+    } finally {
+      this.saveInFlight = false;
+      this.isSaving = false;
+      if (!this.destroyed) this.cdr.detectChanges();
     }
   }
 

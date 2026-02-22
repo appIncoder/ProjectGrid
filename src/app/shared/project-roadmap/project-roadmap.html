@@ -73,6 +73,16 @@
         <button class="btn btn-sm btn-outline-success" (click)="recalculateSchedule()">
           Recalculer
         </button>
+
+        <span *ngIf="isSaving" class="badge text-bg-light border">
+          Enregistrement...
+        </span>
+        <span *ngIf="!isSaving && !saveError" class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">
+          Synchro OK
+        </span>
+        <span *ngIf="saveError" class="badge text-bg-danger">
+          Erreur de sauvegarde
+        </span>
       </div>
     </div>
 
@@ -298,7 +308,7 @@
              PANNEAU GANTT (inchangé)
              ======================= -->
         <div #ganttScroll class="roadmap-right-pane" style="overflow-x: auto; overflow-y: hidden;">
-          <div style="width: max-content; min-width: 100%;">
+          <div class="roadmap-gantt-content" style="width: max-content; min-width: 100%;">
 
             <!-- Row 1 : milestones + phases -->
             <svg class="gantt-svg" [attr.width]="ganttViewportWidth" [attr.height]="headerRow1Height" style="display:block;">
@@ -470,6 +480,8 @@
                   [attr.width]="task.width"
                   [attr.height]="task.height"
                   (mousedown)="onGanttBarMouseDown($event, task)"
+                  (mouseenter)="showTaskHoverCard(task)"
+                  (mouseleave)="hideTaskHoverCard()"
                 ></rect>
 
                 <circle
@@ -500,6 +512,20 @@
                 >
                   {{ task.label }}
                 </text>
+
+                <g *ngIf="hoveredTaskId === task.id && !task.id.startsWith('summary-')" class="gantt-click-hint">
+                  <circle
+                    [attr.cx]="task.x + task.width - 8"
+                    [attr.cy]="task.y + 8"
+                    r="7"
+                  ></circle>
+                  <text
+                    [attr.x]="task.x + task.width - 10.5"
+                    [attr.y]="task.y + 10.5"
+                  >
+                    ✎
+                  </text>
+                </g>
               </g>
 
               <!-- hints -->
@@ -543,6 +569,17 @@
                 </text>
               </g>
             </svg>
+
+            <app-task-hover-tooltip
+              *ngIf="taskHoverCard as hc"
+              [visible]="true"
+              [x]="hc.x"
+              [y]="hc.y"
+              [title]="hc.label"
+              [start]="hc.start"
+              [end]="hc.end"
+              [status]="hc.status"
+            ></app-task-hover-tooltip>
           </div>
         </div>
       </div>

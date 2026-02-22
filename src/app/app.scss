@@ -11,3 +11,32 @@ main.flex-fill {
 footer {
   flex-shrink: 0;
 }
+
+.avatar-logout-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f8f9fa;
+  color: #212529;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.avatar-logout-btn:hover .avatar-circle {
+  filter: brightness(0.95);
+}

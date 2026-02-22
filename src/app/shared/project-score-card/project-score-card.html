@@ -2,7 +2,7 @@
   <div class="card-body">
     <h3 class="h6 mb-3">Scorecard – Matrice détaillée des activités</h3>
 
-    <div class="table-responsive scorecard-table-wrap">
+    <div #scorecardWrap class="table-responsive scorecard-table-wrap" (scroll)="hideTaskHoverCard()">
       <table class="table table-bordered table-sm activity-matrix-detail scorecard-table text-center align-middle mb-0">
         <thead>
           <tr>
@@ -23,12 +23,23 @@
             </td>
 
             <!-- Cellules : tâches (1 à 4) sous forme de cartouches -->
-            <td *ngFor="let phase of getPhases()" class="phase-cell">
+            <td
+              *ngFor="let phase of getPhases()"
+              class="phase-cell"
+              [class.drop-target]="isDropTarget(activity.id, phase)"
+              (dragover)="onTaskDragOver($event, activity.id, phase)"
+              (dragleave)="onTaskDragLeave(activity.id, phase)"
+              (drop)="onTaskDrop($event, activity.id, phase)">
               <div class="cell-tasks">
                 <div
                   *ngFor="let task of getTasks(activity.id, phase)"
                   class="task-pill"
                   [ngClass]="getStatusClass(task.status)"
+                  draggable="true"
+                  (dragstart)="onTaskDragStart($event, activity.id, phase, task)"
+                  (dragend)="onTaskDragEnd()"
+                  (mouseenter)="showTaskHoverCard($event, task)"
+                  (mouseleave)="hideTaskHoverCard()"
                   (click)="openTaskEditModal(taskEditModal, activity.id, phase, task)">
                   {{ task.label }}
                 </div>
@@ -41,6 +52,17 @@
           </tr>
         </tbody>
       </table>
+
+      <app-task-hover-tooltip
+        *ngIf="taskHoverCard as hc"
+        [visible]="true"
+        [x]="hc.x"
+        [y]="hc.y"
+        [title]="hc.label"
+        [start]="hc.start"
+        [end]="hc.end"
+        [status]="hc.status"
+      ></app-task-hover-tooltip>
     </div>
 
   </div>

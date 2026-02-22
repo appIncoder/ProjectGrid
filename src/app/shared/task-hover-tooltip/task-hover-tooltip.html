@@ -1,0 +1,12 @@
+<div
+  *ngIf="visible"
+  class="task-hover-tooltip"
+  [style.left.px]="x"
+  [style.top.px]="y"
+>
+  <div class="task-hover-tooltip__hint"><span>✎</span> Cliquer pour éditer</div>
+  <div class="task-hover-tooltip__title" [title]="title">{{ title || 'Tâche sans nom' }}</div>
+  <div class="task-hover-tooltip__line">Début: {{ start || '—' }}</div>
+  <div class="task-hover-tooltip__line">Fin: {{ end || '—' }}</div>
+  <div class="task-hover-tooltip__line task-hover-tooltip__status">Statut: {{ status || '—' }}</div>
+</div>

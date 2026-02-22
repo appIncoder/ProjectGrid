@@ -79,15 +79,12 @@
 
         <!-- Boutons de test Login / Logout -->
         <div class="d-flex">
-          <button *ngIf="!auth.isAuthenticated"
-                  class="btn btn-outline-light btn-sm"
-                  (click)="loginMock()">
-            (Test) Se connecter
-          </button>
           <button *ngIf="auth.isAuthenticated"
-                  class="btn btn-outline-light btn-sm"
+                  class="avatar-logout-btn"
                   (click)="logoutMock()">
-            (Test) Se déconnecter
+            <span class="avatar-circle" aria-hidden="true">
+              {{ (auth.user?.label || auth.user?.username || 'U').charAt(0).toUpperCase() }}
+            </span>
           </button>
         </div>
       </div>

@@ -41,61 +41,42 @@ export class ProjectDataService {
   }
 
   async getProjectById(projectId: string | null): Promise<ProjectDetail | null> {
-  const requestedProjectId = projectId;
+    const requestedProjectId = projectId;
 
-  // même comportement qu’avant : si pas d’id, on prend le “premier”
-  if (!projectId) {
-    const list = await this.listProjects();
-    if (!list.length) return null;
-    projectId = list[0].id;
-  }
-
-  const fetchOne = async (id: string): Promise<ProjectDetail | null> => {
-    const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}`;
-    const res = await firstValueFrom(this.http.get<any>(url));
-
-    console.log('[ProjectDataService] raw response', { url, res });
-
-    // Cas standard: API renvoie un ProjectDetail reconstruit depuis les tables SQL
-    if (res?.activities && res?.taskMatrix) {
-      return this.normalizeProjectDetail(res, id);
+    if (!projectId) {
+      const list = await this.listProjects();
+      if (!list.length) return null;
+      projectId = list[0].id;
     }
 
-    // Fallback rétro-compatibilité uniquement si backend legacy
-    if (typeof res?.payload === 'string') {
-      try {
-        const parsed = JSON.parse(res.payload);
-        return this.normalizeProjectDetail(parsed, id);
-      } catch (e) {
-        console.error('[ProjectDataService] payload string invalid JSON', e, res.payload);
+    const fetchOne = async (id: string): Promise<ProjectDetail | null> => {
+      const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}`;
+      const res = await firstValueFrom(this.http.get<any>(url));
+
+      console.log('[ProjectDataService] raw response', { url, res });
+
+      if (!res?.activities || !res?.taskMatrix) {
+        console.warn('[ProjectDataService] unexpected response shape (tables required)', res);
         return null;
       }
+
+      return this.normalizeProjectDetail(res, id);
+    };
+
+    try {
+      return await fetchOne(projectId);
+    } catch (err) {
+      console.error('[ProjectDataService] getProjectById error', { requestedProjectId, err });
+
+      if (requestedProjectId) {
+        return null;
+      }
+
+      const list = await this.listProjects();
+      if (!list.length) return null;
+      return await fetchOne(list[0].id);
     }
-
-    // Fallback rétro-compatibilité uniquement si backend legacy
-    if (res?.payload && typeof res.payload === 'object') {
-      return this.normalizeProjectDetail(res.payload, id);
-    }
-
-    console.warn('[ProjectDataService] unexpected response shape', res);
-    return null;
-  };
-
-  try {
-    return await fetchOne(projectId);
-  } catch (err) {
-    console.error('[ProjectDataService] getProjectById error', { requestedProjectId, err });
-
-    // Si un id explicite est demandé, on ne substitue pas un autre projet.
-    if (requestedProjectId) {
-      return null;
-    }
-
-    const list = await this.listProjects();
-    if (!list.length) return null;
-    return await fetchOne(list[0].id);
   }
-}
 
 
   async saveProject(project: ProjectDetail): Promise<void> {
@@ -112,6 +93,29 @@ export class ProjectDataService {
     await firstValueFrom(this.http.post<ProjectDetail>(url, project));
 
     console.log('[ProjectDataService] saveProject() OK', { url, projectId: project?.id });
+  }
+
+  async runProjectProcedure(
+    projectId: string,
+    procedure: 'save_project',
+    payload: { project: ProjectDetail }
+  ): Promise<void> {
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/procedure`;
+    try {
+      await firstValueFrom(this.http.post(url, { procedure, payload }));
+    } catch (err) {
+      console.error('[ProjectDataService] runProjectProcedure failed', {
+        url,
+        procedure,
+        projectId,
+        backendError: (err as any)?.error,
+        status: (err as any)?.status,
+      });
+
+      // Fallback compat: certaines instances backend peuvent échouer sur /procedure
+      // mais accepter encore l'endpoint historique /projects.
+      await this.saveProject(payload.project);
+    }
   }
 
   private normalizeProjectDetail(raw: any, fallbackId: string): ProjectDetail {

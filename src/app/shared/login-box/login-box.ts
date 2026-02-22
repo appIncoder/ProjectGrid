@@ -33,7 +33,7 @@ export class LoginBox {
         return;
       }
       this.model.password = '';
-      await this.router.navigateByUrl('/');
+      await this.router.navigateByUrl('/projects-overview');
     } catch {
       this.errorMessage = 'Connexion impossible pour le moment.';
     } finally {
