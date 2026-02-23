@@ -11,20 +11,26 @@
           <span class="roadmap-kpi">Groups: {{ getActivityGroupCount() }}</span>
           <span class="roadmap-kpi">Collapsed: {{ getCollapsedGroupCount() }}</span>
         </div>
+        <div class="roadmap-add-task-hint">Hint: nom, phase, activite, date debut et date fin sont obligatoires.</div>
       </div>
 
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button class="btn roadmap-add-task-btn" (click)="openCreateTaskModal()">
+          <span class="roadmap-add-task-btn__plus">+</span>
+          <span>Add new task</span>
+        </button>
+
         <!-- Modes d’affichage (Split supprimé) -->
         <div class="btn-group btn-group-sm">
           <button
-            class="btn btn-outline-secondary"
+            class="btn roadmap-chip-btn"
             (click)="setViewMode('focusLeft')"
             [class.active]="viewMode==='focusLeft'"
           >
             Agrandir table
           </button>
           <button
-            class="btn btn-outline-secondary"
+            class="btn roadmap-chip-btn"
             (click)="setViewMode('focusRight')"
             [class.active]="viewMode==='focusRight'"
           >
@@ -60,17 +66,17 @@
             [(ngModel)]="customMonths"
             placeholder="Mois"
           />
-          <button class="btn btn-sm btn-outline-primary" (click)="applyCustomPeriod()">
+          <button class="btn roadmap-chip-btn roadmap-chip-btn--primary" (click)="applyCustomPeriod()">
             Appliquer
           </button>
         </div>
 
-        <button class="btn btn-sm btn-primary" (click)="centerOnToday()">
+        <button class="btn roadmap-chip-btn roadmap-chip-btn--primary" (click)="centerOnToday()">
           Centrer sur aujourd&apos;hui
         </button>
 
         <!-- ✅ Recalcul dépendances + contraintes -->
-        <button class="btn btn-sm btn-outline-success" (click)="recalculateSchedule()">
+        <button class="btn roadmap-chip-btn roadmap-chip-btn--success" (click)="recalculateSchedule()">
           Recalculer
         </button>
 
@@ -92,7 +98,7 @@
       style="
         max-height: 560px;
         overflow-y: auto;
-        overflow-x: hidden;
+        overflow-x: auto;
         border: 1px solid #e9ecef;
         border-radius: 10px;
         background: #fff;
@@ -103,7 +109,8 @@
         class="roadmap-main-grid"
         style="
           display: grid;
-          grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px 1fr;
+          grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px {{ganttViewportWidth}}px;
+          width: max-content;
           align-items: start;
           background: #fff;
           font-size: 0.72rem;
@@ -113,11 +120,11 @@
         <!-- =======================
              PANNEAU TABLEAU (scroll X indépendant)
              ======================= -->
-        <div class="roadmap-left-pane" style="overflow-x: auto; overflow-y: hidden;">
+        <div class="roadmap-left-pane" style="width: {{tablePanelWidthPx}}px; overflow: hidden;">
           <div
             class="roadmap-table-grid"
             [style.gridTemplateColumns]="tableInnerGridTemplate"
-            style="display: grid; width: max-content;"
+            style="display: grid; width: 100%;"
           >
             <!-- ROW 1 tableau vide -->
             <div [style.gridColumn]="'1 / span 7'" style="height: 44px;"></div>
@@ -159,7 +166,7 @@
               <!-- Col1 -->
               <div
                 [class]="row.isHeader ? 'roadmap-row-cell roadmap-row-header-cell ' + getActivityCssClass(row.activityId) : 'roadmap-row-cell roadmap-row-task-cell'"
-                style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;"
+                style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;"
                 [style.fontWeight]="row.isHeader ? '600' : '400'"
               >
                 <button *ngIf="row.isHeader" type="button" class="roadmap-row-header-btn" (click)="onRowLabelClick(row)">
@@ -178,7 +185,7 @@
               </div>
 
               <!-- Col2 : Début -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
+              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash1">
                   <div style="display:flex; flex-direction:column;">
                     <input
@@ -198,7 +205,7 @@
               </div>
 
               <!-- Col3 : Fin -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
+              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash2">
                   <div style="display:flex; flex-direction:column;">
                     <input
@@ -218,13 +225,13 @@
               </div>
 
               <!-- Col4 -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
                 <span *ngIf="getRowTask(row.rowIndex) as t; else dash3">{{ t.phase }}</span>
                 <ng-template #dash3><span class="text-muted">—</span></ng-template>
               </div>
 
               <!-- Col5 -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash4">
                   <div class="d-flex align-items-center gap-2 w-100">
                     <div class="progress flex-grow-1" style="height: 8px; min-width: 70px;">
@@ -246,7 +253,7 @@
               </div>
 
               <!-- Col6 : Type de lien -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash5">
                   <select
                     class="form-select form-select-sm"
@@ -263,7 +270,7 @@
               </div>
 
               <!-- Col7 : Activité liée -->
-              <div style="height: 32px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
+              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
                 <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash6">
                   <select
                     class="form-select form-select-sm"
@@ -307,10 +314,10 @@
         <!-- =======================
              PANNEAU GANTT (inchangé)
              ======================= -->
-        <div #ganttScroll class="roadmap-right-pane" style="overflow-x: auto; overflow-y: hidden;">
-          <div class="roadmap-gantt-content" style="width: max-content; min-width: 100%;">
+        <div #ganttScroll class="roadmap-right-pane" style="width: {{ganttViewportWidth}}px; overflow: hidden;">
+          <div class="roadmap-gantt-content" style="width: 100%; min-width: 0;">
 
-            <!-- Row 1 : milestones + phases -->
+            <!-- Row 1 : milestones -->
             <svg class="gantt-svg" [attr.width]="ganttViewportWidth" [attr.height]="headerRow1Height" style="display:block;">
               <defs>
                 <marker id="ganttArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
@@ -332,24 +339,6 @@
                   style="font-size: 0.58rem;"
                 >
                   {{ ms.label }}
-                </text>
-              </g>
-
-              <g *ngFor="let band of ganttPhaseBands">
-                <rect
-                  class="gantt-phase-band"
-                  [attr.x]="ganttLeftPadding + band.startMonthIndex * ganttColWidth"
-                  [attr.y]="28"
-                  [attr.width]="(band.endMonthIndex - band.startMonthIndex + 1) * ganttColWidth"
-                  [attr.height]="10"
-                ></rect>
-                <text
-                  class="gantt-phase-text"
-                  [attr.x]="ganttLeftPadding + (band.startMonthIndex + band.endMonthIndex + 1) * ganttColWidth / 2"
-                  [attr.y]="40"
-                  style="font-size: 0.58rem;"
-                >
-                  {{ band.label }}
                 </text>
               </g>
             </svg>
@@ -400,9 +389,9 @@
                 <line
                   class="gantt-row-line"
                   [attr.x1]="0"
-                  [attr.y1]="r.rowIndex * bodyRowHeight"
+                  [attr.y1]="getRowCenterY(r.rowIndex)"
                   [attr.x2]="ganttViewportWidth"
-                  [attr.y2]="r.rowIndex * bodyRowHeight"
+                  [attr.y2]="getRowCenterY(r.rowIndex)"
                 ></line>
               </g>
 
@@ -590,6 +579,7 @@
 <!-- ✅ Modal Roadmap -->
 <ng-template #taskEditModal let-modal>
   <app-project-task-edit-modal
+    [isCreateMode]="isCreateMode"
     [editError]="editError"
     [(editedTaskLabel)]="editedTaskLabel"
     [(editedTaskStatus)]="editedTaskStatus"

@@ -26,6 +26,7 @@ export class ProjectTaskEditModal {
   pendingAssignUserId = '';
 
   @Input() editError: string | null = null;
+  @Input() isCreateMode = false;
 
   @Input() editedTaskLabel = '';
   @Output() editedTaskLabelChange = new EventEmitter<string>();
@@ -68,6 +69,17 @@ export class ProjectTaskEditModal {
 
   @Output() cancel = new EventEmitter<void>();
   @Output() save = new EventEmitter<void>();
+
+  get modalTitle(): string {
+    return this.isCreateMode ? 'Add new task' : 'Modifier l activite';
+  }
+
+  get modalSubtitle(): string {
+    if (this.isCreateMode) {
+      return 'Champs obligatoires: nom, phase, activite, debut, fin.';
+    }
+    return this.editedTaskLabel || 'Activite sans titre';
+  }
 
   openAssignPopover(field: 'reporter' | 'accountant' | 'responsible'): void {
     this.assignPopoverField = field;

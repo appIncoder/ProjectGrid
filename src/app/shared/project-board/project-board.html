@@ -1,23 +1,31 @@
 <div class="card project-board">
 
   <!-- En-tête Sprint -->
-  <div class="card-body pb-2">
-    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
-      <div>
+  <div class="card-body board-card-body pb-2">
+    <div class="board-toolbar mb-3">
+      <div class="board-toolbar-left">
         <h3 class="h6 mb-1">Sprint : {{ sprint.name }}</h3>
+        <div class="board-kpis">
+          <span class="board-kpi" *ngFor="let st of statuses; trackBy: trackByStatusId">
+            {{ st.label }}: {{ getTicketCountByStatus(st.id) }}
+          </span>
+        </div>
+        <div class="board-add-task-hint">Hint: nom, phase, activite, debut et fin sont obligatoires.</div>
         <div class="text-muted small" *ngIf="sprint.goal">
           <strong>Goal :</strong> {{ sprint.goal }}
         </div>
       </div>
 
-      <div class="text-muted small text-end">
-        <div *ngIf="sprint.start"><strong>Début :</strong> {{ sprint.start }}</div>
-        <div *ngIf="sprint.end"><strong>Fin :</strong> {{ sprint.end }}</div>
+      <div class="board-header-actions">
+        <button type="button" class="btn board-add-task-btn" (click)="openCreateTaskModal(taskEditModal)">
+          <span class="board-add-task-btn__plus">+</span>
+          <span>Add new task</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <div class="card-body pt-2">
+  <div #boardWrap class="card-body pt-2 board-wrap" (scroll)="hideTaskHoverCard()">
     <!-- Lanes -->
 <div class="lane" *ngFor="let lane of lanes; trackBy: trackByLaneId">
   <!-- Lane header -->
@@ -27,7 +35,7 @@
 
       <button
         type="button"
-        class="btn btn-sm btn-outline-secondary lane-toggle"
+        class="btn lane-toggle board-chip-btn"
         (click)="toggleLane(lane.id)"
         [attr.aria-expanded]="!isLaneCollapsed(lane.id)">
         <span *ngIf="isLaneCollapsed(lane.id)">▸ Ouvrir</span>
@@ -57,6 +65,8 @@
           *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
           cdkDrag
           [cdkDragPreviewContainer]="'parent'"
+          (mouseenter)="showTaskHoverCard($event, c)"
+          (mouseleave)="hideTaskHoverCard()"
           (click)="openTaskEditModal(taskEditModal, c)">
 
           <div class="kanban-card-title">{{ c.title }}</div>
@@ -100,6 +110,7 @@
 
 <ng-template #taskEditModal let-modal>
   <app-project-task-edit-modal
+    [isCreateMode]="isCreateMode"
     [editError]="editError"
     [(editedTaskLabel)]="editedTaskLabel"
     [(editedTaskStatus)]="editedTaskStatus"
@@ -123,6 +134,17 @@
     (save)="saveTaskEdit(modal)"
   ></app-project-task-edit-modal>
 </ng-template>
+
+<app-task-hover-tooltip
+  *ngIf="taskHoverCard as hc"
+  [visible]="true"
+  [x]="hc.x"
+  [y]="hc.y"
+  [title]="hc.label"
+  [start]="hc.start"
+  [end]="hc.end"
+  [status]="hc.status"
+></app-task-hover-tooltip>
 
   </div>
 </div>

@@ -1,8 +1,8 @@
 <div class="modal-header py-2">
   <div class="d-flex align-items-start justify-content-between w-100 gap-2">
     <div>
-      <h5 class="modal-title fs-6 mb-0">Modifier l’activité</h5>
-      <div class="modal-subtitle">{{ editedTaskLabel || 'Activité sans titre' }}</div>
+      <h5 class="modal-title fs-6 mb-0">{{ modalTitle }}</h5>
+      <div class="modal-subtitle">{{ modalSubtitle }}</div>
     </div>
 
     <div class="assignments-quick-wrap" #assignmentsQuickWrap>
@@ -228,6 +228,6 @@
     Annuler
   </button>
   <button type="button" class="btn btn-sm btn-primary" (click)="save.emit()">
-    Enregistrer
+    {{ isCreateMode ? 'Creer la tache' : 'Enregistrer' }}
   </button>
 </div>

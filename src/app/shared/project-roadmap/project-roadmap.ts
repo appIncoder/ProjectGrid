@@ -201,13 +201,6 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   ganttStartDate: Date | null = null;
   todayDayIndex: number | null = null;
 
-  private readonly fallbackDependencies: GanttDependency[] = [
-    { fromId: 'p1-1', toId: 'p2-1', type: 'F2S' },
-    { fromId: 'p2-1', toId: 'p3-1', type: 'F2S' },
-    { fromId: 'm2-1', toId: 'm3-1', type: 'F2S' },
-    { fromId: 't2-1', toId: 't3-1', type: 'F2S' },
-  ];
-
   private depsSignature = '';
 
   private baseTasks: {
@@ -217,9 +210,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     phase: PhaseId;
   }[] = [];
 
-  private readonly orderedActivities: ActivityId[] = ['projet', 'metier', 'changement', 'technologie'];
-
-  private readonly activityThemeLabel: Record<ActivityId, string> = {
+  private readonly fallbackActivityLabels: Record<ActivityId, string> = {
     projet: 'Gestion du projet',
     metier: 'Gestion du métier',
     changement: 'Gestion du changement',
@@ -244,6 +235,25 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private dragMode: 'move' | 'resize-end' | 'link-create' = 'move';
+
+  private getOrderedActivities(): ActivityId[] {
+    if (!this.project?.activities) {
+      return ['projet', 'metier', 'changement', 'technologie'];
+    }
+
+    return Object.values(this.project.activities)
+      .sort((a, b) => {
+        const aSeq = Number.isFinite(a.sequence as number) ? Number(a.sequence) : Number.POSITIVE_INFINITY;
+        const bSeq = Number.isFinite(b.sequence as number) ? Number(b.sequence) : Number.POSITIVE_INFINITY;
+        if (aSeq !== bSeq) return aSeq - bSeq;
+        return (a.label ?? '').localeCompare(b.label ?? '', 'fr', { sensitivity: 'base' });
+      })
+      .map((a) => a.id);
+  }
+
+  private getActivityThemeLabel(activityId: ActivityId): string {
+    return this.project?.activities?.[activityId]?.label ?? this.fallbackActivityLabels[activityId] ?? activityId;
+  }
 
   private columnResizing = false;
   private resizingCol: RoadmapColKey | null = null;
@@ -301,6 +311,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   private editingActivityId: ActivityId | null = null;
   private editingPhase: PhaseId | null = null;
   private taskBeingEdited: Task | null = null;
+  isCreateMode = false;
 
   editedTaskLabel = '';
   editedTaskStatus: ActivityStatus = 'todo';
@@ -591,10 +602,10 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private getProjectDependencies(): GanttDependency[] {
-    if (!this.project) return this.fallbackDependencies;
+    if (!this.project) return [];
     const anyProj = this.project as any;
     const deps = (Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : []) as GanttDependency[];
-    return deps.length ? deps : this.fallbackDependencies;
+    return deps;
   }
 
   private getPrimaryDependencyForTask(fromId: string): GanttDependency | null {
@@ -820,9 +831,11 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.seedOverridesFromTaskDates();
 
     const flat: typeof this.baseTasks = [];
-    const activities = Object.values(this.project.activities);
+    const activityIds = this.getOrderedActivities();
 
-    for (const activity of activities) {
+    for (const activityId of activityIds) {
+      const activity = this.project.activities[activityId];
+      if (!activity) continue;
       for (const phase of this.project.phases) {
         const tasks = this.project.taskMatrix[activity.id]?.[phase] ?? [];
         for (const task of tasks) {
@@ -879,11 +892,11 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     const tasksView: GanttTaskView[] = [];
     let rowIndex = 0;
 
-    for (const activityId of this.orderedActivities) {
+    for (const activityId of this.getOrderedActivities()) {
       const activityTasks = this.baseTasks.filter(t => t.activityId === activityId);
       if (!activityTasks.length) continue;
 
-      rows.push({ activityId, label: this.activityThemeLabel[activityId], rowIndex, isHeader: true });
+      rows.push({ activityId, label: this.getActivityThemeLabel(activityId), rowIndex, isHeader: true });
 
       let minStart = Number.POSITIVE_INFINITY;
       let maxEnd = Number.NEGATIVE_INFINITY;
@@ -948,13 +961,13 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     endDayIndex: number
   ): GanttTaskView {
     const x = this.ganttLeftPadding + startDayIndex * this.dayWidth + this.taskInnerMargin;
-    const y = this.ganttTopPadding + rowIndex * this.bodyRowHeight + 6;
     const width = (endDayIndex - startDayIndex + 1) * this.dayWidth - 2 * this.taskInnerMargin;
     const height = this.bodyRowHeight - 12;
+    const y = this.getRowCenterY(rowIndex) - height / 2;
 
     return {
       id: `summary-${activityId}`,
-      label: `${this.activityThemeLabel[activityId]} (synthèse)`,
+      label: `${this.getActivityThemeLabel(activityId)} (synthèse)`,
       activityId,
       phase: 'Phase1',
       rowIndex,
@@ -1000,9 +1013,9 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     const mEnd = this.dayIndexToMonthIndex(end);
 
     const x = this.ganttLeftPadding + start * this.dayWidth + this.taskInnerMargin;
-    const y = this.ganttTopPadding + rowIndex * this.bodyRowHeight + 6;
     const width = (end - start + 1) * this.dayWidth - 2 * this.taskInnerMargin;
     const height = this.bodyRowHeight - 12;
+    const y = this.getRowCenterY(rowIndex) - height / 2;
 
     return {
       id,
@@ -1043,8 +1056,12 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   private getAnchor(task: GanttTaskView, side: 'start' | 'finish'): { x: number; y: number } {
     return {
       x: side === 'start' ? task.x : task.x + task.width,
-      y: task.y + task.height / 2,
+      y: this.getRowCenterY(task.rowIndex),
     };
+  }
+
+  getRowCenterY(rowIndex: number): number {
+    return this.ganttTopPadding + rowIndex * this.bodyRowHeight + this.bodyRowHeight / 2;
   }
 
   private getLinkSides(type: DependencyType): { fromSide: 'start' | 'finish'; toSide: 'start' | 'finish' } {
@@ -1754,7 +1771,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     }
 
     // 6) Recalcule synthèses + liens
-    for (const a of this.orderedActivities) this.updateSummaryForActivity(a);
+    for (const a of this.getOrderedActivities()) this.updateSummaryForActivity(a);
     this.updateGanttLinks();
   }
 
@@ -1766,11 +1783,11 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   getCollapsedGroupCount(): number {
-    return this.orderedActivities.filter((id) => this.activityCollapse[id]).length;
+    return this.getOrderedActivities().filter((id) => this.activityCollapse[id]).length;
   }
 
   getActivityGroupCount(): number {
-    return this.orderedActivities.length;
+    return this.getOrderedActivities().length;
   }
 
   getActivityTaskCount(activityId: ActivityId): number {
@@ -2122,7 +2139,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   private getTaskAnchor(task: GanttTaskView, side: LinkAnchorSide): { x: number; y: number } {
     return {
       x: side === 'start' ? task.x : task.x + task.width,
-      y: task.y + task.height / 2,
+      y: this.getRowCenterY(task.rowIndex),
     };
   }
 
@@ -2485,6 +2502,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
 
     this.taskBeingEdited = ctx.task;
+    this.isCreateMode = false;
     this.editingActivityId = ctx.activityId;
     this.editingPhase = ctx.phase;
 
@@ -2515,6 +2533,62 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.showMoreInfos = false;
     this.editError = null;
     this.modalService.open(this.taskEditModalTpl, { size: 'lg', centered: true });
+  }
+
+  openCreateTaskModal(): void {
+    if (!this.project || !this.taskEditModalTpl) return;
+
+    const defaultActivityId = this.getOrderedActivities()[0] ?? 'projet';
+    const defaultPhase = this.project.phases[0] ?? 'Phase1';
+
+    this.taskBeingEdited = null;
+    this.isCreateMode = true;
+    this.editingActivityId = defaultActivityId;
+    this.editingPhase = defaultPhase;
+
+    this.editedTaskLabel = '';
+    this.editedTaskStatus = 'todo';
+    this.editedStartDate = '';
+    this.editedEndDate = '';
+    this.editedCategory = this.mapActivityToCategory(defaultActivityId);
+    this.editedPhase = defaultPhase;
+    this.editedReporterId = '';
+    this.editedAccountantId = '';
+    this.editedResponsibleId = '';
+    this.editedConstraints = {};
+    this.editedDependencies = [];
+    this.showMoreInfos = false;
+    this.editError = null;
+
+    this.modalService.open(this.taskEditModalTpl, { size: 'lg', centered: true });
+  }
+
+  private mapActivityToCategory(activityId: ActivityId): TaskCategory {
+    switch (activityId) {
+      case 'projet':
+        return 'projectManagement';
+      case 'metier':
+        return 'businessManagement';
+      case 'changement':
+        return 'changeManagement';
+      case 'technologie':
+      default:
+        return 'technologyManagement';
+    }
+  }
+
+  private mapCategoryToActivity(category: TaskCategory): ActivityId {
+    switch (category) {
+      case 'projectManagement':
+        return 'projet';
+      case 'businessManagement':
+        return 'metier';
+      case 'changeManagement':
+        return 'changement';
+      case 'technologyManagement':
+      default:
+        return 'technologie';
+    }
   }
 
   getAllTasksFlat(): Task[] {
@@ -2549,7 +2623,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   saveTaskEdit(modal: any): void {
-    if (!this.project || !this.taskBeingEdited || !this.editingActivityId || !this.editingPhase || !this.editedPhase) {
+    if (!this.project) {
       modal.dismiss();
       return;
     }
@@ -2560,6 +2634,21 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     if (!label) {
       this.editError = "Le nom de l’activité ne peut pas être vide.";
       return;
+    }
+
+    if (this.isCreateMode) {
+      if (!this.editedPhase) {
+        this.editError = 'La phase est obligatoire.';
+        return;
+      }
+      if (!this.editedCategory) {
+        this.editError = "Le type d'activité est obligatoire.";
+        return;
+      }
+      if (!this.editedStartDate || !this.editedEndDate) {
+        this.editError = 'Les dates de debut et de fin sont obligatoires.';
+        return;
+      }
     }
 
     if (this.editedStartDate && this.editedEndDate) {
@@ -2579,14 +2668,14 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       endNoLaterThan: (this.editedConstraints.endNoLaterThan ?? '').trim() || undefined,
     };
 
-    const curTaskId = this.taskBeingEdited.id;
+    const curTaskId = this.taskBeingEdited?.id ?? null;
     const linkableIds = new Set(this.getLinkableTasks().map(t => t.id));
 
     const cleaned = (this.editedDependencies ?? [])
       .map(r => ({ toId: (r.toId ?? '').trim(), type: (r.type ?? 'F2S') as DependencyType }))
       .filter(r => !!r.toId);
 
-    if (cleaned.some(r => r.toId === curTaskId)) {
+    if (curTaskId && cleaned.some(r => r.toId === curTaskId)) {
       this.editError = "Une activité ne peut pas dépendre d’elle-même.";
       return;
     }
@@ -2605,34 +2694,68 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     }
 
     // ✅ appliquer contraintes sur la tâche (persistées dans la matrice)
-    this.setConstraintsOnTask(this.taskBeingEdited, constraints);
+    if (this.isCreateMode) {
+      const targetPhase: PhaseId = this.editedPhase ?? this.editingPhase ?? 'Phase1';
+      const activityId = this.mapCategoryToActivity(this.editedCategory);
+      const createdTask = this.projectService.createTask({
+        projectId: this.project.id,
+        activityId,
+        phase: targetPhase,
+        label,
+        status: this.editedTaskStatus,
+        startDate: this.editedStartDate,
+        endDate: this.editedEndDate,
+        category: this.editedCategory,
+        reporterId: this.editedReporterId,
+        accountantId: this.editedAccountantId,
+        responsibleId: this.editedResponsibleId,
+      });
+      if (!createdTask) {
+        this.editError = 'Impossible de creer la tache.';
+        return;
+      }
 
-    // ✅ deps -> project.ganttDependencies
-    this.ensureProjectDependenciesContainer();
-    const anyProj = this.project as any;
-    const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
-    const kept = allDeps.filter(d => d.fromId !== curTaskId);
-    const added: GanttDependency[] = cleaned.map(r => ({ fromId: curTaskId, toId: r.toId, type: r.type }));
-    anyProj.ganttDependencies = [...kept, ...added];
+      this.setConstraintsOnTask(createdTask, constraints);
 
-    // ✅ updateTask (ne touche pas aux contraintes)
-    this.projectService.updateTask({
-      projectId: this.project.id,
-      activityId: this.editingActivityId,
-      fromPhase: this.editingPhase,
-      toPhase: this.editedPhase,
-      taskId: this.taskBeingEdited.id,
+      if (cleaned.length) {
+        this.ensureProjectDependenciesContainer();
+        const anyProj = this.project as any;
+        const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+        const added: GanttDependency[] = cleaned.map((r) => ({ fromId: createdTask.id, toId: r.toId, type: r.type }));
+        anyProj.ganttDependencies = [...allDeps, ...added];
+      }
+    } else {
+      if (!this.taskBeingEdited || !this.editingActivityId || !this.editingPhase) {
+        modal.dismiss();
+        return;
+      }
 
-      label,
-      status: this.editedTaskStatus,
-      startDate: this.editedStartDate,
-      endDate: this.editedEndDate,
-      category: this.editedCategory,
-      reporterId: this.editedReporterId,
-      accountantId: this.editedAccountantId,
-      responsibleId: this.editedResponsibleId,
-      phase: this.editedPhase,
-    });
+      this.setConstraintsOnTask(this.taskBeingEdited, constraints);
+
+      this.ensureProjectDependenciesContainer();
+      const anyProj = this.project as any;
+      const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
+      const kept = allDeps.filter((d) => d.fromId !== this.taskBeingEdited!.id);
+      const added: GanttDependency[] = cleaned.map((r) => ({ fromId: this.taskBeingEdited!.id, toId: r.toId, type: r.type }));
+      anyProj.ganttDependencies = [...kept, ...added];
+
+      this.projectService.updateTask({
+        projectId: this.project.id,
+        activityId: this.editingActivityId,
+        fromPhase: this.editingPhase,
+        toPhase: this.editedPhase || undefined,
+        taskId: this.taskBeingEdited.id,
+        label,
+        status: this.editedTaskStatus,
+        startDate: this.editedStartDate,
+        endDate: this.editedEndDate,
+        category: this.editedCategory,
+        reporterId: this.editedReporterId,
+        accountantId: this.editedAccountantId,
+        responsibleId: this.editedResponsibleId,
+        phase: this.editedPhase || undefined,
+      });
+    }
 
     // ✅ rebuild
     this.buildRoadmap();

@@ -37,6 +37,20 @@ export interface UpdateTaskPayload {
   phase?: PhaseId;   // cohérence (optionnel)
 }
 
+export interface CreateTaskPayload {
+  projectId: string;
+  activityId: ActivityId;
+  phase: PhaseId;
+  label: string;
+  status: ActivityStatus;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  category: TaskCategory;
+  reporterId?: string;
+  accountantId?: string;
+  responsibleId?: string;
+}
+
 export interface ProjectMutationEvent {
   type: 'task_updated' | 'schedule_updated' | 'dependencies_updated';
   projectId: string;
@@ -120,9 +134,16 @@ export class ProjectService {
   }
 
   parseIsoDateToDayIndex(iso: string, ganttStartDate: Date): number | null {
-    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+    const raw = String(iso ?? '').trim();
+    if (!raw) return null;
 
-    const [y, m, d] = iso.split('-').map(Number);
+    // Accept both "YYYY-MM-DD" and full ISO datetime like "YYYY-MM-DDTHH:mm:ss".
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+
+    const y = Number(match[1]);
+    const m = Number(match[2]);
+    const d = Number(match[3]);
     const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
 
     const start = new Date(
@@ -213,6 +234,39 @@ export class ProjectService {
   // -----------------------------
   // Task CRUD (centralisé)
   // -----------------------------
+  createTask(payload: CreateTaskPayload): Task | null {
+    const project = this.projects.get(payload.projectId);
+    if (!project) return null;
+
+    const matrix = project.taskMatrix as Record<string, Record<string, Task[]>>;
+    if (!matrix[payload.activityId]) matrix[payload.activityId] = {};
+    if (!Array.isArray(matrix[payload.activityId][payload.phase])) {
+      matrix[payload.activityId][payload.phase] = [];
+    }
+
+    if (!project.phases.includes(payload.phase)) {
+      project.phases.push(payload.phase);
+    }
+
+    const taskId = this.generateTaskId(project);
+    const task: Task = {
+      id: taskId,
+      label: payload.label,
+      status: payload.status,
+      startDate: payload.startDate,
+      endDate: payload.endDate,
+      category: payload.category,
+      phase: payload.phase,
+      reporterId: payload.reporterId || undefined,
+      accountantId: payload.accountantId || undefined,
+      responsibleId: payload.responsibleId || undefined,
+    };
+
+    matrix[payload.activityId][payload.phase].push(task);
+    this.markProjectMutated(payload.projectId, 'task_updated');
+    return task;
+  }
+
   updateTask(payload: UpdateTaskPayload): void {
     const project = this.projects.get(payload.projectId);
     if (!project) return;
@@ -309,5 +363,28 @@ export class ProjectService {
       }
     }
     return null;
+  }
+
+  private generateTaskId(project: ProjectDetail): string {
+    const taken = new Set<string>();
+    const matrix = project.taskMatrix as Record<string, Record<string, Task[]>>;
+
+    for (const activityId of Object.keys(matrix)) {
+      const phaseMap = matrix[activityId] ?? {};
+      for (const phaseId of Object.keys(phaseMap)) {
+        const tasks = phaseMap[phaseId] ?? [];
+        for (const task of tasks) {
+          if (task?.id) taken.add(task.id);
+        }
+      }
+    }
+
+    const stamp = Date.now().toString(36);
+    let n = 1;
+    while (true) {
+      const candidate = `task-${stamp}-${n}`;
+      if (!taken.has(candidate)) return candidate;
+      n++;
+    }
   }
 }

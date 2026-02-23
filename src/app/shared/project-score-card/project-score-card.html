@@ -1,8 +1,24 @@
 <div class="card flex-fill">
-  <div class="card-body">
-    <h3 class="h6 mb-3">Scorecard – Matrice détaillée des activités</h3>
+  <div class="card-body scorecard-card-body">
+    <div class="scorecard-toolbar mb-3">
+      <div class="scorecard-toolbar-left">
+        <h3 class="h6 mb-1">Scorecard : Cartographie de vos activités</h3>
+        <div class="scorecard-kpis">
+          <span class="scorecard-kpi">Tasks: {{ getTotalTaskCount() }}</span>
+          <span class="scorecard-kpi">Activities: {{ getActivityCount() }}</span>
+          <span class="scorecard-kpi">Phases: {{ getPhaseCount() }}</span>
+        </div>
+        <div class="scorecard-toolbar-hint">Hint: creez une tache avec phase, activite et planning obligatoires.</div>
+      </div>
+      <div class="scorecard-toolbar-actions">
+        <button type="button" class="btn scorecard-add-task-btn" (click)="openCreateTaskModal(taskEditModal)">
+          <span class="scorecard-add-task-btn__plus">+</span>
+          <span>Add new task</span>
+        </button>
+      </div>
+    </div>
 
-    <div #scorecardWrap class="table-responsive scorecard-table-wrap" (scroll)="hideTaskHoverCard()">
+    <div #scorecardWrap class="table-responsive scorecard-table-wrap" (scroll)="hideTaskHoverCard(); closeContextMenu()">
       <table class="table table-bordered table-sm activity-matrix-detail scorecard-table text-center align-middle mb-0">
         <thead>
           <tr>
@@ -40,6 +56,7 @@
                   (dragend)="onTaskDragEnd()"
                   (mouseenter)="showTaskHoverCard($event, task)"
                   (mouseleave)="hideTaskHoverCard()"
+                  (contextmenu)="onTaskContextMenu($event, activity.id, phase, task)"
                   (click)="openTaskEditModal(taskEditModal, activity.id, phase, task)">
                   {{ task.label }}
                 </div>
@@ -63,6 +80,25 @@
         [end]="hc.end"
         [status]="hc.status"
       ></app-task-hover-tooltip>
+
+      <div
+        *ngIf="contextMenu as cm"
+        class="task-context-menu"
+        [style.left.px]="cm.x"
+        [style.top.px]="cm.y"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="task-context-menu__title">Changer le statut</div>
+        <button
+          *ngFor="let opt of taskStatusOptions"
+          type="button"
+          class="task-context-menu__item"
+          [class.is-active]="opt.value === cm.currentStatus"
+          (click)="applyQuickStatus(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
     </div>
 
   </div>
@@ -71,6 +107,7 @@
 <!-- Modal d'édition -->
 <ng-template #taskEditModal let-modal>
   <app-project-task-edit-modal
+    [isCreateMode]="isCreateMode"
     [editError]="editError"
     [(editedTaskLabel)]="editedTaskLabel"
     [(editedTaskStatus)]="editedTaskStatus"

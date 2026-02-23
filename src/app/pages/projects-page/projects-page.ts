@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
 import { Router, RouterModule } from '@angular/router';
 
-import { ProjectDataService } from '../../services/project-data.service';
-import type { ActivityStatus, Health, PhaseId, ProjectDetail, ProjectListItem, ProjectStatus } from '../../models';
+import { ProjectDataService, type ProjectTypeDefaults, type ProjectTypeRef } from '../../services/project-data.service';
+import { AuthService } from '../../services/auth.service';
+import type { ActivityId, ActivityStatus, Health, PhaseId, ProjectDetail, ProjectListItem, ProjectStatus } from '../../models';
 
 @Component({
   selector: 'app-projects-page',
@@ -24,11 +25,22 @@ export class ProjectsPage implements OnInit, OnDestroy {
   projects: ProjectListItem[] = [];
   isLoading = false;
   loadError: string | null = null;
+  isCreateModalOpen = false;
+  isCreatingProject = false;
+  isLoadingProjectTypes = false;
+  createProjectError: string | null = null;
+  projectTypeOptions: ProjectTypeRef[] = [];
+  createProjectForm = {
+    projectTypeId: '',
+    name: '',
+    description: '',
+  };
   private destroyed = false;
 
   constructor(
     private router: Router,
     private projectData: ProjectDataService,
+    private auth: AuthService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -86,11 +98,17 @@ export class ProjectsPage implements OnInit, OnDestroy {
 
   private extractOwner(detail: ProjectDetail): string {
     const anyDetail = detail as any;
+    const activityOwner =
+      anyDetail.activities?.projet?.owner ??
+      anyDetail.activities?.metier?.owner ??
+      anyDetail.activities?.changement?.owner ??
+      anyDetail.activities?.technologie?.owner;
     return (
       anyDetail.owner ??
       anyDetail.projectManager ??
       anyDetail.sponsor ??
       anyDetail.createdBy ??
+      activityOwner ??
       '—'
     );
   }
@@ -197,10 +215,95 @@ export class ProjectsPage implements OnInit, OnDestroy {
   }
 
   // Actions
-  // 🔹 Création projet (à adapter plus tard)
+  get connectedOwnerLabel(): string {
+    const user = this.auth.user;
+    return String(user?.label ?? user?.username ?? '—').trim() || '—';
+  }
+
   onCreateProject(): void {
-    // ex : page de création
-    this.router.navigate(['/project', 'new']);
+    this.isCreateModalOpen = true;
+    this.createProjectError = null;
+    this.createProjectForm = {
+      projectTypeId: '',
+      name: '',
+      description: '',
+    };
+    void this.loadProjectTypesForCreation();
+  }
+
+  closeCreateProjectModal(): void {
+    if (this.isCreatingProject) return;
+    this.isCreateModalOpen = false;
+    this.createProjectError = null;
+  }
+
+  async submitCreateProject(): Promise<void> {
+    const projectTypeId = this.createProjectForm.projectTypeId.trim();
+    const name = this.createProjectForm.name.trim();
+    const description = this.createProjectForm.description.trim();
+
+    if (!projectTypeId) {
+      this.createProjectError = 'Le type de projet est obligatoire.';
+      return;
+    }
+
+    if (!name) {
+      this.createProjectError = 'Le nom du projet est obligatoire.';
+      return;
+    }
+
+    const owner = this.connectedOwnerLabel;
+    const projectId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `p-${Date.now()}`;
+
+    const defaults = await this.projectData.getProjectTypeDefaults(projectTypeId);
+    if (!defaults) {
+      this.createProjectError = 'Impossible de charger les données du type de projet sélectionné.';
+      return;
+    }
+
+    const seeded = this.buildProjectSeedFromType(defaults, owner);
+    if (!seeded) {
+      this.createProjectError = "Le type de projet sélectionné n'est pas compatible avec la structure attendue.";
+      return;
+    }
+
+    const payload: ProjectDetail & {
+      owner?: string;
+      createdBy?: string;
+      projectManager?: string;
+      projectTypeId?: string;
+    } = {
+      id: projectId,
+      name,
+      description,
+      phases: seeded.phases,
+      activities: seeded.activities,
+      taskMatrix: seeded.taskMatrix,
+      owner,
+      createdBy: owner,
+      projectManager: owner,
+      projectTypeId,
+    };
+
+    this.isCreatingProject = true;
+    this.createProjectError = null;
+    try {
+      await this.projectData.saveProject(payload);
+      await this.loadProjectsFromApi();
+      this.isCreateModalOpen = false;
+      await this.router.navigate(['/project', projectId]);
+    } catch (e) {
+      console.error('[ProjectsPage] submitCreateProject error', e);
+      this.createProjectError = "Impossible de créer le projet pour l'instant.";
+    } finally {
+      this.isCreatingProject = false;
+      if (!this.destroyed) {
+        this.cdr.detectChanges();
+      }
+    }
   }
 
   // 🔹 Ouvrir la page détail du projet
@@ -218,5 +321,79 @@ export class ProjectsPage implements OnInit, OnDestroy {
 
   onArchive(project: ProjectListItem): void {
     project.status = 'Clôturé';
+  }
+
+  private async loadProjectTypesForCreation(): Promise<void> {
+    this.isLoadingProjectTypes = true;
+    try {
+      const rows = await this.projectData.listProjectTypes();
+      this.projectTypeOptions = rows;
+      if (!this.createProjectForm.projectTypeId && rows.length === 1) {
+        this.createProjectForm.projectTypeId = rows[0].id;
+      }
+    } catch (e) {
+      console.error('[ProjectsPage] loadProjectTypesForCreation error', e);
+      this.projectTypeOptions = [];
+      this.createProjectError = "Impossible de charger la liste des projets types.";
+    } finally {
+      this.isLoadingProjectTypes = false;
+      if (!this.destroyed) this.cdr.detectChanges();
+    }
+  }
+
+  private buildProjectSeedFromType(defaults: ProjectTypeDefaults, owner: string): {
+    phases: PhaseId[];
+    activities: ProjectDetail['activities'];
+    taskMatrix: ProjectDetail['taskMatrix'];
+  } | null {
+    const KNOWN_PHASES = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'] as const;
+    const KNOWN_ACTIVITIES = ['projet', 'metier', 'changement', 'technologie'] as const;
+
+    const phases = defaults.phases
+      .map((p) => p.id)
+      .filter((id): id is PhaseId => KNOWN_PHASES.includes(id as PhaseId));
+    const activitiesRaw = defaults.activities
+      .map((a) => ({ ...a, id: a.id }))
+      .filter((a): a is { id: ActivityId; label: string; sequence?: number | null } =>
+        KNOWN_ACTIVITIES.includes(a.id as ActivityId)
+      );
+
+    if (!phases.length || !activitiesRaw.length) return null;
+
+    const activities = {} as ProjectDetail['activities'];
+    const taskMatrix = {} as ProjectDetail['taskMatrix'];
+
+    for (const a of activitiesRaw) {
+      const aid = a.id as ActivityId;
+      activities[aid] = {
+        id: aid,
+        label: a.label || aid,
+        owner,
+        sequence: a.sequence ?? null,
+      };
+      taskMatrix[aid] = {} as Record<PhaseId, any[]>;
+      for (const ph of phases) {
+        taskMatrix[aid][ph] = [];
+      }
+    }
+
+    const uniqueByCell = new Set<string>();
+    for (const t of defaults.tasks) {
+      const aid = t.activityId as ActivityId;
+      const ph = t.phaseId as PhaseId;
+      if (!taskMatrix[aid] || !Array.isArray(taskMatrix[aid][ph])) continue;
+      const taskId = t.id || `${aid}-${ph}-${taskMatrix[aid][ph].length + 1}`;
+      const cellKey = `${aid}|${ph}|${taskId}`;
+      if (uniqueByCell.has(cellKey)) continue;
+      uniqueByCell.add(cellKey);
+      taskMatrix[aid][ph].push({
+        id: taskId,
+        label: t.label || taskId,
+        status: 'todo',
+        phase: ph,
+      });
+    }
+
+    return { phases, activities, taskMatrix };
   }
 }

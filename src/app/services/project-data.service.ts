@@ -5,15 +5,28 @@ import { firstValueFrom } from 'rxjs';
 import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, UserRef } from '../models';
 import { environment } from '../environments/environment';
 
+export interface ProjectTypeRef {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export interface ProjectTypeDefaults {
+  projectType: ProjectTypeRef;
+  phases: Array<{ id: string; label: string; sequence?: number | null }>;
+  activities: Array<{ id: string; label: string; sequence?: number | null }>;
+  tasks: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectDataService {
   private readonly baseUrl = environment.apiBaseUrl;
   private static readonly DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
   private static readonly DEFAULT_ACTIVITIES: Record<ActivityId, ActivityDefinition> = {
-    projet: { id: 'projet', label: 'Gestion du projet', owner: '—' },
-    metier: { id: 'metier', label: 'Gestion du métier', owner: '—' },
-    changement: { id: 'changement', label: 'Gestion du changement', owner: '—' },
-    technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: '—' },
+    projet: { id: 'projet', label: 'Gestion du projet', owner: '—', sequence: 1 },
+    metier: { id: 'metier', label: 'Gestion du métier', owner: '—', sequence: 2 },
+    changement: { id: 'changement', label: 'Gestion du changement', owner: '—', sequence: 3 },
+    technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: '—', sequence: 4 },
   };
 
   constructor(private http: HttpClient) {}
@@ -38,6 +51,59 @@ export class ProjectDataService {
         label: String((r?.label ?? r?.name ?? r?.id ?? '')).trim(),
       }))
       .filter((u) => !!u.id);
+  }
+
+  async listProjectTypes(): Promise<ProjectTypeRef[]> {
+    const url = `${this.baseUrl}/project-types`;
+    const rows = await firstValueFrom(
+      this.http.get<Array<{ id?: unknown; name?: unknown; description?: unknown }>>(url)
+    );
+    return (Array.isArray(rows) ? rows : [])
+      .map((r) => ({
+        id: String(r?.id ?? '').trim(),
+        name: String(r?.name ?? '').trim(),
+        description: String(r?.description ?? '').trim(),
+      }))
+      .filter((t) => !!t.id && !!t.name);
+  }
+
+  async getProjectTypeDefaults(projectTypeId: string): Promise<ProjectTypeDefaults | null> {
+    const id = String(projectTypeId ?? '').trim();
+    if (!id) return null;
+    const url = `${this.baseUrl}/project-types/${encodeURIComponent(id)}/defaults`;
+    const raw = await firstValueFrom(this.http.get<any>(url));
+    if (!raw || !raw.projectType) return null;
+
+    return {
+      projectType: {
+        id: String(raw?.projectType?.id ?? '').trim(),
+        name: String(raw?.projectType?.name ?? '').trim(),
+        description: String(raw?.projectType?.description ?? '').trim(),
+      },
+      phases: Array.isArray(raw?.phases)
+        ? raw.phases.map((p: any) => ({
+            id: String(p?.id ?? '').trim(),
+            label: String(p?.label ?? p?.id ?? '').trim(),
+            sequence: Number.isFinite(Number(p?.sequence)) ? Number(p.sequence) : null,
+          }))
+        : [],
+      activities: Array.isArray(raw?.activities)
+        ? raw.activities.map((a: any) => ({
+            id: String(a?.id ?? '').trim(),
+            label: String(a?.label ?? a?.id ?? '').trim(),
+            sequence: Number.isFinite(Number(a?.sequence)) ? Number(a.sequence) : null,
+          }))
+        : [],
+      tasks: Array.isArray(raw?.tasks)
+        ? raw.tasks.map((t: any) => ({
+            id: String(t?.id ?? '').trim(),
+            label: String(t?.label ?? t?.id ?? '').trim(),
+            phaseId: String(t?.phaseId ?? '').trim(),
+            activityId: String(t?.activityId ?? '').trim(),
+            sequence: Number.isFinite(Number(t?.sequence)) ? Number(t.sequence) : null,
+          }))
+        : [],
+    };
   }
 
   async getProjectById(projectId: string | null): Promise<ProjectDetail | null> {

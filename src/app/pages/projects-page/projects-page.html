@@ -152,3 +152,86 @@
     </div>
   </div>
 </div>
+
+<div
+  *ngIf="isCreateModalOpen"
+  class="project-create-modal-backdrop"
+  (click)="closeCreateProjectModal()"
+  aria-hidden="true">
+</div>
+
+<div *ngIf="isCreateModalOpen" class="project-create-modal" role="dialog" aria-modal="true" aria-labelledby="projectCreateTitle">
+  <div class="project-create-modal__panel" (click)="$event.stopPropagation()">
+    <div class="project-create-modal__header">
+      <h3 id="projectCreateTitle" class="mb-0">Nouveau projet</h3>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fermer"
+        [disabled]="isCreatingProject"
+        (click)="closeCreateProjectModal()">
+      </button>
+    </div>
+
+    <div class="project-create-modal__body">
+      <p class="text-muted small mb-3">
+        Créez un projet à partir d'un projet type. Le propriétaire est l'utilisateur connecté.
+      </p>
+
+      <div *ngIf="createProjectError" class="alert alert-danger py-2 mb-3">
+        {{ createProjectError }}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Projet type <span class="text-danger">*</span></label>
+        <select
+          class="form-select"
+          [(ngModel)]="createProjectForm.projectTypeId"
+          [disabled]="isCreatingProject || isLoadingProjectTypes">
+          <option value="" disabled>Sélectionnez un projet type</option>
+          <option *ngFor="let pt of projectTypeOptions" [value]="pt.id">
+            {{ pt.name }}
+          </option>
+        </select>
+        <div *ngIf="isLoadingProjectTypes" class="small text-muted mt-1">
+          Chargement des projets types...
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Nom du projet <span class="text-danger">*</span></label>
+        <input
+          type="text"
+          class="form-control"
+          [(ngModel)]="createProjectForm.name"
+          [disabled]="isCreatingProject"
+          placeholder="Ex: Programme Transformation CRM" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea
+          class="form-control"
+          rows="3"
+          [(ngModel)]="createProjectForm.description"
+          [disabled]="isCreatingProject"
+          placeholder="Contexte et objectifs du projet">
+        </textarea>
+      </div>
+
+      <div class="mb-0">
+        <label class="form-label">Owner</label>
+        <input type="text" class="form-control" [value]="connectedOwnerLabel" readonly />
+      </div>
+    </div>
+
+    <div class="project-create-modal__footer">
+      <button type="button" class="btn btn-outline-secondary" [disabled]="isCreatingProject" (click)="closeCreateProjectModal()">
+        Annuler
+      </button>
+      <button type="button" class="btn btn-primary" [disabled]="isCreatingProject" (click)="submitCreateProject()">
+        {{ isCreatingProject ? 'Création...' : 'Créer le projet' }}
+      </button>
+    </div>
+  </div>
+</div>

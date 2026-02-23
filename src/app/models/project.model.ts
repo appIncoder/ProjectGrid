@@ -32,6 +32,7 @@ export interface ActivityDefinition {
   id: ActivityId;
   label: string;
   owner: string; // responsable du suivi de la thématique
+  sequence?: number | null;
 }
 
 

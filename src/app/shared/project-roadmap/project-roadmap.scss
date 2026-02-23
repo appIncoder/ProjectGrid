@@ -32,12 +32,103 @@
   background: #f8fbff;
 }
 
+.roadmap-add-task-hint {
+  margin-top: 0.28rem;
+  font-size: 0.7rem;
+  color: #4f5f76;
+}
+
+.roadmap-add-task-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #56a47f;
+  border-radius: 999px;
+  background: #e9f7ef;
+  color: #198754;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.34rem 0.95rem;
+}
+
+.roadmap-add-task-btn:hover {
+  background: #dff3e8;
+}
+
+.roadmap-add-task-btn__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: #198754;
+  color: #fff;
+  line-height: 1;
+}
+
+.roadmap-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c8d6ea;
+  border-radius: 999px;
+  background: #f7faff;
+  color: #334a68;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  padding: 0.34rem 0.8rem;
+}
+
+.roadmap-chip-btn:hover {
+  background: #edf3ff;
+  color: #233a57;
+}
+
+.roadmap-chip-btn.active {
+  border-color: #8eb1e5;
+  background: #e7f0ff;
+  color: #1f4f9a;
+}
+
+.roadmap-chip-btn--primary {
+  border-color: #5e95df;
+  background: #e6f0ff;
+  color: #1f4f9a;
+}
+
+.roadmap-chip-btn--primary:hover {
+  background: #dce9ff;
+}
+
+.roadmap-chip-btn--success {
+  border-color: #7ab79b;
+  background: #ecf8f1;
+  color: #1b6f47;
+}
+
+.roadmap-chip-btn--success:hover {
+  background: #e2f3e9;
+}
+
 .roadmap-scroll-frame {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .roadmap-main-grid {
   background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
+}
+
+.roadmap-left-pane,
+.roadmap-right-pane {
+  position: relative;
+  z-index: 1;
+}
+
+.roadmap-right-pane {
+  border-left: 1px solid #eef2f8;
+  background: #fff;
 }
 
 .roadmap-table-grid {
@@ -257,18 +348,6 @@
 }
 
 .gantt-milestone-text {
-  font-size: 0.60rem;
-}
-
-/* ===========================
-   Phases (bandes)
-   =========================== */
-
-.gantt-phase-band {
-  fill: rgba(13, 110, 253, 0.1);
-}
-
-.gantt-phase-text {
   font-size: 0.60rem;
 }
 

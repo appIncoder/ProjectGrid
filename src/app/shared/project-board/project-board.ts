@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, TemplateRef } from '@angular/core';
+import { Component, ElementRef, EventEmitter, Input, OnChanges, Output, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 
@@ -18,6 +18,7 @@ import type {
 } from '../../models';
 import { ProjectService } from '../../services/project.service';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
+import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 
 // Lane type imported from models (see import above)
 
@@ -31,7 +32,7 @@ const STATUSES: Array<{ id: KanbanStatus; label: string }> = [
 @Component({
   selector: 'app-project-board',
   standalone: true,
-  imports: [CommonModule, DragDropModule, NgbModalModule, ProjectTaskEditModal],
+  imports: [CommonModule, DragDropModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip],
   templateUrl: './project-board.html',
   styleUrls: ['./project-board.scss'],
 })
@@ -45,6 +46,7 @@ export class ProjectBoard implements OnChanges {
    * Si non fourni, le composant peut générer une base à partir du projet (fallback simple).
    */
   @Input() cards: KanbanCard[] | null = null;
+  @ViewChild('boardWrap', { static: false }) boardWrapRef?: ElementRef<HTMLElement>;
 
   /** Infos sprint affichées dans l’en-tête */
   @Input() sprint: SprintInfo = {
@@ -56,6 +58,15 @@ export class ProjectBoard implements OnChanges {
 
   /** Notifie le parent après un déplacement */
   @Output() cardsChange = new EventEmitter<KanbanCard[]>();
+
+  taskHoverCard: {
+    x: number;
+    y: number;
+    label: string;
+    start: string;
+    end: string;
+    status: string;
+  } | null = null;
 
   taskStatusOptions: { value: ActivityStatus; label: string }[] = [
     { value: 'todo', label: 'À faire (blanc)' },
@@ -82,6 +93,7 @@ export class ProjectBoard implements OnChanges {
   private editingActivityId: ActivityId | null = null;
   private editingPhase: PhaseId | null = null;
   private taskBeingEdited: Task | null = null;
+  isCreateMode = false;
 
   editedTaskLabel = '';
   editedTaskStatus: ActivityStatus = 'todo';
@@ -160,9 +172,16 @@ for (const lane of this.lanes) {
 
   /** Lanes = catégories d’activité du projet */
   private buildLanesFromProject(project: ProjectDetail | null): Lane[] {
-    const acts = (project as any)?.activities as Record<string, { id: string; label: string }> | undefined;
+    const acts = (project as any)?.activities as Record<string, { id: string; label: string; sequence?: number | null }> | undefined;
     if (acts && Object.keys(acts).length) {
-      return Object.values(acts).map(a => ({ id: a.id, label: a.label }));
+      return Object.values(acts)
+        .sort((a, b) => {
+          const aSeq = Number.isFinite(a.sequence as number) ? Number(a.sequence) : Number.POSITIVE_INFINITY;
+          const bSeq = Number.isFinite(b.sequence as number) ? Number(b.sequence) : Number.POSITIVE_INFINITY;
+          if (aSeq !== bSeq) return aSeq - bSeq;
+          return (a.label ?? '').localeCompare(b.label ?? '', 'fr', { sensitivity: 'base' });
+        })
+        .map((a) => ({ id: a.id, label: a.label }));
     }
 
     // fallback si activities absent
@@ -236,7 +255,93 @@ for (const lane of this.lanes) {
     return this.statuses.map(s => this.dropListId(laneId, s.id));
   }
 
+  private formatIsoDate(iso?: string): string {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '—';
+    const [year, month, day] = iso.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  private getTaskStatusText(status: ActivityStatus): string {
+    switch (status) {
+      case 'done':
+        return 'Done';
+      case 'inprogress':
+        return 'In progress';
+      case 'onhold':
+        return 'On hold';
+      case 'notdone':
+        return 'Not done';
+      case 'notapplicable':
+        return 'N/A';
+      case 'todo':
+      default:
+        return 'Todo';
+    }
+  }
+
+  private mapCardStatusToLabel(status: KanbanStatus): string {
+    switch (status) {
+      case 'done':
+        return 'Done';
+      case 'inprogress':
+        return 'In progress';
+      case 'waiting':
+        return 'On hold';
+      case 'todo':
+      default:
+        return 'Todo';
+    }
+  }
+
+  private getTaskFromCard(card: KanbanCard): Task | null {
+    if (!this.project) return null;
+    const parsed = this.parseFallbackCardId(card.id);
+    if (!parsed) return null;
+    return this.project.taskMatrix?.[parsed.activityId]?.[parsed.phase]?.find((t) => t.id === parsed.taskId) ?? null;
+  }
+
+  showTaskHoverCard(event: MouseEvent, card: KanbanCard): void {
+    const wrap = this.boardWrapRef?.nativeElement;
+    const target = event.currentTarget as HTMLElement | null;
+    if (!wrap || !target) return;
+
+    const task = this.getTaskFromCard(card);
+    const boxW = 280;
+    const boxH = 84;
+    const margin = 8;
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const scrollLeft = wrap.scrollLeft;
+    const scrollTop = wrap.scrollTop;
+
+    const preferredX = targetRect.right - wrapRect.left + scrollLeft + 12;
+    const fallbackX = targetRect.left - wrapRect.left + scrollLeft - boxW - 12;
+    const minX = scrollLeft + margin;
+    const maxX = scrollLeft + wrap.clientWidth - boxW - margin;
+    const x = preferredX <= maxX ? preferredX : Math.max(minX, Math.min(maxX, fallbackX));
+
+    const centerY = targetRect.top - wrapRect.top + scrollTop + targetRect.height / 2;
+    const minY = scrollTop + margin;
+    const maxY = scrollTop + wrap.clientHeight - boxH - margin;
+    const y = Math.max(minY, Math.min(maxY, centerY - boxH / 2));
+
+    this.taskHoverCard = {
+      x,
+      y,
+      label: task?.label ?? card.title ?? '',
+      start: this.formatIsoDate(task?.startDate),
+      end: this.formatIsoDate(task?.endDate),
+      status: task ? this.getTaskStatusText(task.status) : this.mapCardStatusToLabel(card.status),
+    };
+  }
+
+  hideTaskHoverCard(): void {
+    this.taskHoverCard = null;
+  }
+
   onDrop(laneId: string, status: KanbanStatus, ev: CdkDragDrop<KanbanCard[]>): void {
+    this.hideTaskHoverCard();
     const target = this.laneBuckets[laneId][status];
 
     if (ev.previousContainer === ev.container) {
@@ -270,6 +375,7 @@ for (const lane of this.lanes) {
     if (!task) return;
 
     this.taskBeingEdited = task;
+    this.isCreateMode = false;
     this.editingActivityId = parsed.activityId;
     this.editingPhase = parsed.phase;
 
@@ -291,8 +397,34 @@ for (const lane of this.lanes) {
     this.modalService.open(content, { size: 'lg', centered: true });
   }
 
+  openCreateTaskModal(content: TemplateRef<any>, laneId?: string): void {
+    if (!this.project) return;
+
+    const defaultActivityId = (laneId as ActivityId) || (this.lanes[0]?.id as ActivityId) || 'projet';
+    const defaultPhase = this.project.phases[0] ?? 'Phase1';
+
+    this.taskBeingEdited = null;
+    this.isCreateMode = true;
+    this.editingActivityId = defaultActivityId;
+    this.editingPhase = defaultPhase;
+
+    this.editedTaskLabel = '';
+    this.editedTaskStatus = 'todo';
+    this.editedStartDate = '';
+    this.editedEndDate = '';
+    this.editedCategory = this.mapActivityToCategory(defaultActivityId);
+    this.editedPhase = defaultPhase;
+    this.editedReporterId = '';
+    this.editedAccountantId = '';
+    this.editedResponsibleId = '';
+    this.editedDependencies = [];
+    this.editError = null;
+
+    this.modalService.open(content, { size: 'lg', centered: true });
+  }
+
   saveTaskEdit(modal: any): void {
-    if (!this.project || !this.taskBeingEdited || !this.editingActivityId || !this.editingPhase || !this.editedPhase) {
+    if (!this.project) {
       modal.dismiss();
       return;
     }
@@ -304,6 +436,21 @@ for (const lane of this.lanes) {
       return;
     }
 
+    if (this.isCreateMode) {
+      if (!this.editedPhase) {
+        this.editError = 'La phase est obligatoire.';
+        return;
+      }
+      if (!this.editedCategory) {
+        this.editError = "Le type d'activité est obligatoire.";
+        return;
+      }
+      if (!this.editedStartDate || !this.editedEndDate) {
+        this.editError = 'Les dates de debut et de fin sont obligatoires.';
+        return;
+      }
+    }
+
     if (this.editedStartDate && this.editedEndDate) {
       const start = new Date(this.editedStartDate);
       const end = new Date(this.editedEndDate);
@@ -313,13 +460,13 @@ for (const lane of this.lanes) {
       }
     }
 
-    const curTaskId = this.taskBeingEdited.id;
+    const curTaskId = this.taskBeingEdited?.id ?? null;
     const linkableIds = new Set(this.getLinkableTasks().map((t) => t.id));
     const cleanedRows: EditableDependencyRow[] = (this.editedDependencies ?? [])
       .map((r) => ({ toId: (r.toId ?? '').trim(), type: (r.type ?? 'F2S') as DependencyType }))
       .filter((r) => !!r.toId);
 
-    if (cleanedRows.some((r) => r.toId === curTaskId)) {
+    if (curTaskId && cleanedRows.some((r) => r.toId === curTaskId)) {
       this.editError = 'Une activité ne peut pas dépendre d’elle-même.';
       return;
     }
@@ -339,34 +486,99 @@ for (const lane of this.lanes) {
     }
 
     this.ensureProjectDependenciesContainer();
-    const allDeps = this.getProjectDependencies();
-    const kept = allDeps.filter((d) => d.fromId !== curTaskId);
-    const added: GanttDependency[] = cleanedRows.map((r) => ({
-      fromId: curTaskId,
-      toId: r.toId,
-      type: r.type,
-    }));
-    this.setProjectDependencies([...kept, ...added]);
+    if (this.isCreateMode) {
+      const targetPhase: PhaseId = this.editedPhase ?? this.editingPhase ?? 'Phase1';
+      const activityId = this.mapCategoryToActivity(this.editedCategory);
+      const createdTask = this.projectService.createTask({
+        projectId: this.project.id,
+        activityId,
+        phase: targetPhase,
+        label,
+        status: this.editedTaskStatus,
+        startDate: this.editedStartDate,
+        endDate: this.editedEndDate,
+        category: this.editedCategory,
+        reporterId: this.editedReporterId,
+        accountantId: this.editedAccountantId,
+        responsibleId: this.editedResponsibleId,
+      });
+      if (!createdTask) {
+        this.editError = 'Impossible de creer la tache.';
+        return;
+      }
 
-    this.projectService.updateTask({
-      projectId: this.project.id,
-      activityId: this.editingActivityId,
-      fromPhase: this.editingPhase,
-      toPhase: this.editedPhase,
-      taskId: this.taskBeingEdited.id,
-      label,
-      status: this.editedTaskStatus,
-      startDate: this.editedStartDate,
-      endDate: this.editedEndDate,
-      category: this.editedCategory,
-      reporterId: this.editedReporterId,
-      accountantId: this.editedAccountantId,
-      responsibleId: this.editedResponsibleId,
-      phase: this.editedPhase,
-    });
+      if (cleanedRows.length) {
+        const allDeps = this.getProjectDependencies();
+        const added: GanttDependency[] = cleanedRows.map((r) => ({
+          fromId: createdTask.id,
+          toId: r.toId,
+          type: r.type,
+        }));
+        this.setProjectDependencies([...allDeps, ...added]);
+      }
+    } else {
+      if (!this.taskBeingEdited || !this.editingActivityId || !this.editingPhase) {
+        modal.dismiss();
+        return;
+      }
+
+      const allDeps = this.getProjectDependencies();
+      const kept = allDeps.filter((d) => d.fromId !== this.taskBeingEdited!.id);
+      const added: GanttDependency[] = cleanedRows.map((r) => ({
+        fromId: this.taskBeingEdited!.id,
+        toId: r.toId,
+        type: r.type,
+      }));
+      this.setProjectDependencies([...kept, ...added]);
+
+      this.projectService.updateTask({
+        projectId: this.project.id,
+        activityId: this.editingActivityId,
+        fromPhase: this.editingPhase,
+        toPhase: this.editedPhase || undefined,
+        taskId: this.taskBeingEdited.id,
+        label,
+        status: this.editedTaskStatus,
+        startDate: this.editedStartDate,
+        endDate: this.editedEndDate,
+        category: this.editedCategory,
+        reporterId: this.editedReporterId,
+        accountantId: this.editedAccountantId,
+        responsibleId: this.editedResponsibleId,
+        phase: this.editedPhase || undefined,
+      });
+    }
 
     this.buildBoard();
     modal.close();
+  }
+
+  private mapActivityToCategory(activityId: ActivityId): TaskCategory {
+    switch (activityId) {
+      case 'projet':
+        return 'projectManagement';
+      case 'metier':
+        return 'businessManagement';
+      case 'changement':
+        return 'changeManagement';
+      case 'technologie':
+      default:
+        return 'technologyManagement';
+    }
+  }
+
+  private mapCategoryToActivity(category: TaskCategory): ActivityId {
+    switch (category) {
+      case 'projectManagement':
+        return 'projet';
+      case 'businessManagement':
+        return 'metier';
+      case 'changeManagement':
+        return 'changement';
+      case 'technologyManagement':
+      default:
+        return 'technologie';
+    }
   }
 
   getAllTasksFlat(): Task[] {
@@ -464,6 +676,14 @@ for (const lane of this.lanes) {
   private extractStatusFromDropId(id: string): KanbanStatus {
     const m = id.match(/:status:(todo|inprogress|waiting|done)$/);
     return (m?.[1] as KanbanStatus) ?? 'todo';
+  }
+
+  getTicketCountByStatus(status: KanbanStatus): number {
+    let total = 0;
+    for (const lane of this.lanes) {
+      total += this.laneBuckets[lane.id]?.[status]?.length ?? 0;
+    }
+    return total;
   }
 
   initials(name: string): string {

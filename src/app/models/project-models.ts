@@ -27,6 +27,7 @@ export interface ActivityDefinition {
   id: ActivityId;
   label: string;
   owner: string; // responsable du suivi de la thématique
+  sequence?: number | null;
 }
 
 export interface ProjectDetail {
@@ -126,4 +127,3 @@ export interface GanttActivityRow {
   rowIndex: number;
   // Compatibility re-export for legacy imports. Prefer importing from './project.model'.
 }
-

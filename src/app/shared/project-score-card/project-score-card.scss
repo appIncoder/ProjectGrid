@@ -1,4 +1,5 @@
 :host {
+  display: block;
   --scorecard-row-height: 6.4rem;
   --scorecard-cell-pad-y: 0.3rem;
   --scorecard-cell-pad-x: 0.4rem;
@@ -6,11 +7,148 @@
   --task-pill-width: 210px;
 }
 
+.scorecard-card-body {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-radius: 0.85rem;
+}
+
+.scorecard-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  border: 1px solid #d8dee8;
+  border-radius: 0.8rem;
+  padding: 1rem 1.1rem;
+  background: white;
+}
+
+.scorecard-toolbar-left h3 {
+  margin-bottom: 0.25rem !important;
+  font-size: 1rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: inherit;
+}
+
+.scorecard-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.scorecard-kpi {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #d7e0ef;
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #45556d;
+  background: #f8fbff;
+}
+
+.scorecard-toolbar-hint {
+  margin-top: 0.28rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: #4f5f76;
+}
+
+.scorecard-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+}
+
+.scorecard-add-task-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #56a47f;
+  border-radius: 999px;
+  background: #e9f7ef;
+  color: #198754;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.34rem 0.95rem;
+  line-height: 1.1;
+}
+
+.scorecard-add-task-btn:hover {
+  background: #dff3e8;
+}
+
+.scorecard-add-task-btn__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: #198754;
+  color: #fff;
+  line-height: 1;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+@media (max-width: 991.98px) {
+  .scorecard-toolbar-left h3 { font-size: 1rem; }
+  .scorecard-toolbar-hint { font-size: 0.7rem; }
+  .scorecard-add-task-btn { font-size: 0.74rem; }
+}
+
 .scorecard-table-wrap {
   position: relative;
   margin-bottom: 0;
   max-height: var(--scorecard-grid-height);
   overflow: auto;
+}
+
+.task-context-menu {
+  position: absolute;
+  z-index: 30;
+  width: 220px;
+  border: 1px solid #d5dce8;
+  border-radius: 0.55rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(17, 32, 61, 0.18);
+  padding: 0.35rem;
+}
+
+.task-context-menu__title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #47566f;
+  padding: 0.2rem 0.35rem 0.35rem;
+}
+
+.task-context-menu__item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d3deef;
+  background: #f7faff;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: #1f2c3d;
+  margin-bottom: 0.22rem;
+}
+
+.task-context-menu__item:hover {
+  background: #eaf2ff;
+}
+
+.task-context-menu__item.is-active {
+  border-color: #8eb1e5;
+  background: #e3eeff;
+  font-weight: 700;
 }
 
 .scorecard-table {

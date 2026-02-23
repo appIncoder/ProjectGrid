@@ -183,10 +183,10 @@ export class ProjectPage implements OnInit, OnDestroy {
     const activities = ((p as any)?.activities && typeof (p as any).activities === 'object')
       ? (p as any).activities
       : {
-          projet: { id: 'projet', label: 'Gestion du projet', owner: '—' },
-          metier: { id: 'metier', label: 'Gestion du métier', owner: '—' },
-          changement: { id: 'changement', label: 'Gestion du changement', owner: '—' },
-          technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: '—' },
+          projet: { id: 'projet', label: 'Gestion du projet', owner: '—', sequence: 1 },
+          metier: { id: 'metier', label: 'Gestion du métier', owner: '—', sequence: 2 },
+          changement: { id: 'changement', label: 'Gestion du changement', owner: '—', sequence: 3 },
+          technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: '—', sequence: 4 },
         };
 
     const taskMatrix = ((p as any)?.taskMatrix && typeof (p as any).taskMatrix === 'object')

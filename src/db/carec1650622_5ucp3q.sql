@@ -133,6 +133,7 @@ CREATE TABLE IF NOT EXISTS `project_activities` (
   `activity_id` varchar(64) NOT NULL,
   `label` varchar(255) NOT NULL,
   `owner_name` varchar(180) DEFAULT NULL,
+  `sequence` int DEFAULT NULL,
   PRIMARY KEY (`project_id`,`activity_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -146,6 +147,8 @@ CREATE TABLE IF NOT EXISTS `project_tasks` (
   `phase_id` varchar(32) NOT NULL,
   `task_id` varchar(128) NOT NULL,
   `label` varchar(255) NOT NULL,
+  `startdate` timestamp NOT NULL DEFAULT current_timestamp(),
+  `enddate` timestamp NOT NULL DEFAULT (current_timestamp() + interval 5 day),
   `status` varchar(32) NOT NULL,
   PRIMARY KEY (`project_id`,`activity_id`,`phase_id`,`task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -176,18 +179,67 @@ CREATE TABLE IF NOT EXISTS `activities` (
   PRIMARY KEY (`uuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Structure de la table `phases` (paramètres)
+-- Structure de la table `project_type_phases_default`
 --
 
-CREATE TABLE IF NOT EXISTS `phases` (
+CREATE TABLE IF NOT EXISTS `project_type_phases_default` (
   `uuid` uuid NOT NULL DEFAULT uuid(),
+  `project_type_id` uuid NOT NULL,
   `sequence` int NOT NULL,
-  `short_name` varchar(64) NOT NULL,
-  `long_name` varchar(255) NOT NULL,
-  `id_project_type` uuid NOT NULL,
+  `shortname` varchar(64) NOT NULL,
+  `longname` varchar(255) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'Active',
   `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_type_activities_default`
+--
+
+CREATE TABLE IF NOT EXISTS `project_type_activities_default` (
+  `uuid` uuid NOT NULL DEFAULT uuid(),
+  `project_type_id` uuid NOT NULL,
+  `sequence` int NOT NULL,
+  `shortname` varchar(64) NOT NULL,
+  `longname` varchar(255) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'Active',
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_type_tasks_default`
+--
+
+CREATE TABLE IF NOT EXISTS `project_type_tasks_default` (
+  `uuid` uuid NOT NULL DEFAULT uuid(),
+  `project_type_id` uuid NOT NULL,
+  `phaseId` varchar(64) NOT NULL,
+  `activitiesId` varchar(64) NOT NULL,
+  `sequence` int NOT NULL,
+  `shortname` varchar(64) NOT NULL,
+  `longname` varchar(255) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'Active',
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_tasks_links`
+--
+
+CREATE TABLE IF NOT EXISTS `project_tasks_links` (
+  `project_id` uuid NOT NULL,
+  `idTasksFrom` varchar(128) NOT NULL,
+  `idTaskTo` varchar(128) NOT NULL,
+  `dependency_type` varchar(32) NOT NULL DEFAULT 'finish-to-start',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`project_id`,`idTasksFrom`,`idTaskTo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -324,15 +376,34 @@ ALTER TABLE `project_task_assignments`
   ADD COLUMN IF NOT EXISTS `accountant_id` uuid DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `responsible_id` uuid DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp();
+ALTER TABLE `project_tasks`
+  ADD COLUMN IF NOT EXISTS `startdate` timestamp NOT NULL DEFAULT current_timestamp(),
+  ADD COLUMN IF NOT EXISTS `enddate` timestamp NOT NULL DEFAULT (current_timestamp() + interval 5 day);
+ALTER TABLE `project_type_tasks_default`
+  ADD COLUMN IF NOT EXISTS `phaseId` varchar(64) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `activitiesId` varchar(64) DEFAULT NULL;
+ALTER TABLE `project_tasks_links`
+  ADD COLUMN IF NOT EXISTS `project_id` uuid NOT NULL,
+  ADD COLUMN IF NOT EXISTS `idTasksFrom` varchar(128) NOT NULL,
+  ADD COLUMN IF NOT EXISTS `idTaskTo` varchar(128) NOT NULL,
+  ADD COLUMN IF NOT EXISTS `dependency_type` varchar(32) NOT NULL DEFAULT 'finish-to-start',
+  ADD COLUMN IF NOT EXISTS `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  ADD COLUMN IF NOT EXISTS `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp();
 CREATE INDEX IF NOT EXISTS `idx_pta_reporter` ON `project_task_assignments` (`reporter_id`);
 CREATE INDEX IF NOT EXISTS `idx_pta_accountant` ON `project_task_assignments` (`accountant_id`);
 CREATE INDEX IF NOT EXISTS `idx_pta_responsible` ON `project_task_assignments` (`responsible_id`);
 CREATE INDEX IF NOT EXISTS `idx_project_phases_order` ON `project_phases` (`project_id`,`phase_order`);
 CREATE INDEX IF NOT EXISTS `idx_project_activities_owner` ON `project_activities` (`owner_name`);
 CREATE INDEX IF NOT EXISTS `idx_project_tasks_status` ON `project_tasks` (`status`);
+CREATE INDEX IF NOT EXISTS `idx_project_type_tasks_default_phase` ON `project_type_tasks_default` (`project_type_id`, `phaseId`);
+CREATE INDEX IF NOT EXISTS `idx_project_type_tasks_default_activity` ON `project_type_tasks_default` (`project_type_id`, `activitiesId`);
+CREATE INDEX IF NOT EXISTS `idx_project_tasks_links_to` ON `project_tasks_links` (`project_id`, `idTaskTo`);
+CREATE INDEX IF NOT EXISTS `idx_project_tasks_links_type` ON `project_tasks_links` (`dependency_type`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_name` ON `project_type` (`name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_activities_type_short` ON `activities` (`id_project_type`, `short_name`);
-CREATE UNIQUE INDEX IF NOT EXISTS `uidx_phases_type_short` ON `phases` (`id_project_type`, `short_name`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_phases_default_type_short` ON `project_type_phases_default` (`project_type_id`, `shortname`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_short` ON `project_type_activities_default` (`project_type_id`, `shortname`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_tasks_default_type_short` ON `project_type_tasks_default` (`project_type_id`, `shortname`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_risks_name` ON `risks` (`name`);
 CREATE INDEX IF NOT EXISTS `idx_risks_name` ON `risks` (`name`);
 CREATE INDEX IF NOT EXISTS `idx_risks_probability` ON `risks` (`probability`);
@@ -382,19 +453,23 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET FOREIGN_KEY_CHECKS = 0;
 DELETE FROM `project_task_assignments`;
 DELETE FROM `project_tasks`;
+DELETE FROM `project_tasks_links`;
 DELETE FROM `project_activities`;
 DELETE FROM `project_phases`;
 DELETE FROM `users_roles_projects`;
 DELETE FROM `project_risks`;
 DELETE FROM `project_changes`;
 DELETE FROM `risks`;
-DELETE FROM `phases`;
 DELETE FROM `activities`;
+DELETE FROM `project_type_phases_default`;
+DELETE FROM `project_type_activities_default`;
+DELETE FROM `project_type_tasks_default`;
 DELETE FROM `project_type`;
 DELETE FROM `users`;
 DELETE FROM `roles`;
 DELETE FROM `projects`;
 SET FOREIGN_KEY_CHECKS = 1;
+DROP TABLE IF EXISTS `phases`;
 
 -- Réinjection explicite du projet de référence (requis avant tasks/assignments/risks)
 INSERT INTO `projects` (`id`, `name`, `description`, `payload`, `status`)
@@ -427,13 +502,26 @@ INSERT IGNORE INTO `activities` (`sequence`, `short_name`, `long_name`, `id_proj
 (3, 'changement', 'Gestion du changement', @id_project_type_pmbok, NOW()),
 (4, 'technologie', 'Gestion de la technologie', @id_project_type_pmbok, NOW());
 
-INSERT IGNORE INTO `phases` (`sequence`, `short_name`, `long_name`, `id_project_type`, `date_created`) VALUES
-(1, 'Phase1', 'Phase 1', @id_project_type_pmbok, NOW()),
-(2, 'Phase2', 'Phase 2', @id_project_type_pmbok, NOW()),
-(3, 'Phase3', 'Phase 3', @id_project_type_pmbok, NOW()),
-(4, 'Phase4', 'Phase 4', @id_project_type_pmbok, NOW()),
-(5, 'Phase5', 'Phase 5', @id_project_type_pmbok, NOW()),
-(6, 'Phase6', 'Phase 6', @id_project_type_pmbok, NOW());
+-- Données par défaut: activités et phases d'un projet type
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `sequence`, `shortname`, `longname`, `status`, `date_created`)
+SELECT
+  a.`id_project_type`,
+  a.`sequence`,
+  a.`short_name`,
+  a.`long_name`,
+  'Active',
+  NOW()
+FROM `activities` a;
+
+INSERT IGNORE INTO `project_type_phases_default`
+(`project_type_id`, `sequence`, `shortname`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_pmbok, 1, 'Phase1', 'Phase 1', 'Active', NOW()),
+(@id_project_type_pmbok, 2, 'Phase2', 'Phase 2', 'Active', NOW()),
+(@id_project_type_pmbok, 3, 'Phase3', 'Phase 3', 'Active', NOW()),
+(@id_project_type_pmbok, 4, 'Phase4', 'Phase 4', 'Active', NOW()),
+(@id_project_type_pmbok, 5, 'Phase5', 'Phase 5', 'Active', NOW()),
+(@id_project_type_pmbok, 6, 'Phase6', 'Phase 6', 'Active', NOW());
 
 INSERT IGNORE INTO `risks` (`uuid`, `name`, `description`, `probability`, `criticity`, `date_created`) VALUES
 ('10000000-0000-0000-0000-000000000001', 'Indisponibilité d''un sponsor métier', 'Disponibilité clé métier', 'Moyenne', 'high', NOW()),
@@ -530,11 +618,11 @@ INSERT IGNORE INTO `project_phases` (`project_id`, `phase_id`, `phase_order`) VA
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase5', 5),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase6', 6);
 
-INSERT IGNORE INTO `project_activities` (`project_id`, `activity_id`, `label`, `owner_name`) VALUES
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Gestion du projet', 'Alice Dupont'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Gestion du métier', 'Claire Leroy'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Gestion du changement', 'Bruno Martin'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Gestion de la technologie', 'David Lambert');
+INSERT IGNORE INTO `project_activities` (`project_id`, `activity_id`, `label`, `owner_name`, `sequence`) VALUES
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Gestion du projet', 'Alice Dupont', 1),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Gestion du métier', 'Claire Leroy', 2),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Gestion du changement', 'Bruno Martin', 3),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Gestion de la technologie', 'David Lambert', 4);
 
 INSERT INTO `project_tasks` (`project_id`, `activity_id`, `phase_id`, `task_id`, `label`, `status`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'Charte projet', 'done'),
@@ -581,6 +669,41 @@ ON DUPLICATE KEY UPDATE
   `reporter_id` = VALUES(`reporter_id`),
   `accountant_id` = VALUES(`accountant_id`),
   `responsible_id` = VALUES(`responsible_id`);
+
+-- Données par défaut: tâches d'un projet type
+-- Source: premier projet "Projet A – Plateforme opérationnelle"
+SET @seed_project_id := (
+  SELECT `id`
+  FROM `projects`
+  WHERE `name` = 'Projet A – Plateforme opérationnelle'
+  ORDER BY `created_at` ASC, `id` ASC
+  LIMIT 1
+);
+
+SET @task_seq := 0;
+INSERT IGNORE INTO `project_type_tasks_default`
+(`project_type_id`, `phaseId`, `activitiesId`, `sequence`, `shortname`, `longname`, `status`, `date_created`)
+SELECT
+  @id_project_type_pmbok AS `project_type_id`,
+  t.`phase_id` AS `phaseId`,
+  t.`activity_id` AS `activitiesId`,
+  (@task_seq := @task_seq + 1) AS `sequence`,
+  t.`task_id` AS `shortname`,
+  t.`label` AS `longname`,
+  'Active' AS `status`,
+  NOW() AS `date_created`
+FROM `project_tasks` t
+LEFT JOIN `project_activities` a
+  ON a.`project_id` = t.`project_id`
+ AND a.`activity_id` = t.`activity_id`
+LEFT JOIN `project_phases` p
+  ON p.`project_id` = t.`project_id`
+ AND p.`phase_id` = t.`phase_id`
+WHERE t.`project_id` = @seed_project_id
+ORDER BY
+  COALESCE(a.`sequence`, 999),
+  COALESCE(p.`phase_order`, 999),
+  t.`task_id` ASC;
 
 --
 -- Enrichissement non destructif des données existantes
@@ -996,6 +1119,133 @@ SET @col_match := (
 );
 SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
   'ALTER TABLE `project_risks` ADD CONSTRAINT `fk_project_risks_risk` FOREIGN KEY (`riskId`) REFERENCES `risks` (`uuid`)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_tasks_default'
+    AND CONSTRAINT_NAME = 'fk_pttd_phase'
+);
+SET @fk_ref_table := (
+  SELECT kcu.REFERENCED_TABLE_NAME
+  FROM information_schema.KEY_COLUMN_USAGE kcu
+  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+    AND kcu.TABLE_NAME = 'project_type_tasks_default'
+    AND kcu.CONSTRAINT_NAME = 'fk_pttd_phase'
+  LIMIT 1
+);
+SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'project_type_phases_default',
+  'ALTER TABLE `project_type_tasks_default` DROP FOREIGN KEY `fk_pttd_phase`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_tasks_default'
+    AND CONSTRAINT_NAME = 'fk_pttd_phase'
+);
+SET @col_match := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS c1
+  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  JOIN information_schema.COLUMNS c3 ON c3.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  JOIN information_schema.COLUMNS c4 ON c4.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  WHERE c1.TABLE_SCHEMA = DATABASE()
+    AND c1.TABLE_NAME = 'project_type_tasks_default' AND c1.COLUMN_NAME = 'project_type_id'
+    AND c2.TABLE_NAME = 'project_type_phases_default' AND c2.COLUMN_NAME = 'project_type_id'
+    AND c3.TABLE_NAME = 'project_type_tasks_default' AND c3.COLUMN_NAME = 'phaseId'
+    AND c4.TABLE_NAME = 'project_type_phases_default' AND c4.COLUMN_NAME = 'shortname'
+    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+    AND c3.COLUMN_TYPE = c4.COLUMN_TYPE
+);
+SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
+  'ALTER TABLE `project_type_tasks_default` ADD CONSTRAINT `fk_pttd_phase` FOREIGN KEY (`project_type_id`, `phaseId`) REFERENCES `project_type_phases_default` (`project_type_id`, `shortname`)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_tasks_default'
+    AND CONSTRAINT_NAME = 'fk_pttd_activity'
+);
+SET @fk_ref_table := (
+  SELECT kcu.REFERENCED_TABLE_NAME
+  FROM information_schema.KEY_COLUMN_USAGE kcu
+  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+    AND kcu.TABLE_NAME = 'project_type_tasks_default'
+    AND kcu.CONSTRAINT_NAME = 'fk_pttd_activity'
+  LIMIT 1
+);
+SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'project_type_activities_default',
+  'ALTER TABLE `project_type_tasks_default` DROP FOREIGN KEY `fk_pttd_activity`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_tasks_default'
+    AND CONSTRAINT_NAME = 'fk_pttd_activity'
+);
+SET @col_match := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS c1
+  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  JOIN information_schema.COLUMNS c3 ON c3.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  JOIN information_schema.COLUMNS c4 ON c4.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  WHERE c1.TABLE_SCHEMA = DATABASE()
+    AND c1.TABLE_NAME = 'project_type_tasks_default' AND c1.COLUMN_NAME = 'project_type_id'
+    AND c2.TABLE_NAME = 'project_type_activities_default' AND c2.COLUMN_NAME = 'project_type_id'
+    AND c3.TABLE_NAME = 'project_type_tasks_default' AND c3.COLUMN_NAME = 'activitiesId'
+    AND c4.TABLE_NAME = 'project_type_activities_default' AND c4.COLUMN_NAME = 'shortname'
+    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+    AND c3.COLUMN_TYPE = c4.COLUMN_TYPE
+);
+SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
+  'ALTER TABLE `project_type_tasks_default` ADD CONSTRAINT `fk_pttd_activity` FOREIGN KEY (`project_type_id`, `activitiesId`) REFERENCES `project_type_activities_default` (`project_type_id`, `shortname`)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_tasks_default'
+    AND CONSTRAINT_NAME = 'fk_project_type_tasks_default_project_type'
+);
+SET @fk_ref_table := (
+  SELECT kcu.REFERENCED_TABLE_NAME
+  FROM information_schema.KEY_COLUMN_USAGE kcu
+  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+    AND kcu.TABLE_NAME = 'project_type_tasks_default'
+    AND kcu.CONSTRAINT_NAME = 'fk_project_type_tasks_default_project_type'
+  LIMIT 1
+);
+SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'project_type',
+  'ALTER TABLE `project_type_tasks_default` DROP FOREIGN KEY `fk_project_type_tasks_default_project_type`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @fk_exists := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_tasks_default'
+    AND CONSTRAINT_NAME = 'fk_project_type_tasks_default_project_type'
+);
+SET @col_match := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS c1
+  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+  WHERE c1.TABLE_SCHEMA = DATABASE()
+    AND c1.TABLE_NAME = 'project_type_tasks_default' AND c1.COLUMN_NAME = 'project_type_id'
+    AND c2.TABLE_NAME = 'project_type' AND c2.COLUMN_NAME = 'uuid'
+    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+);
+SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
+  'ALTER TABLE `project_type_tasks_default` ADD CONSTRAINT `fk_project_type_tasks_default_project_type` FOREIGN KEY (`project_type_id`) REFERENCES `project_type` (`uuid`)',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 COMMIT;

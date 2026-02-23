@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnChanges, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, Input, OnChanges, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
@@ -64,6 +64,7 @@ export class ProjectScorecard implements OnChanges {
   private editingActivityId: ActivityId | null = null;
   private editingPhase: PhaseId | null = null;
   private taskBeingEdited: Task | null = null;
+  isCreateMode = false;
 
   editedTaskLabel = '';
   editedTaskStatus: ActivityStatus = 'todo';
@@ -93,6 +94,14 @@ export class ProjectScorecard implements OnChanges {
   ];
 
   editError: string | null = null;
+  contextMenu: {
+    x: number;
+    y: number;
+    activityId: ActivityId;
+    phase: PhaseId;
+    taskId: string;
+    currentStatus: ActivityStatus;
+  } | null = null;
 
   constructor(
     private modalService: NgbModal,
@@ -112,7 +121,12 @@ export class ProjectScorecard implements OnChanges {
   // ---- Data helpers ----
   getActivities(): ActivityDefinition[] {
     if (!this.project) return [];
-    return Object.values(this.project.activities);
+    return Object.values(this.project.activities).sort((a, b) => {
+      const aSeq = Number.isFinite(a.sequence as number) ? Number(a.sequence) : Number.POSITIVE_INFINITY;
+      const bSeq = Number.isFinite(b.sequence as number) ? Number(b.sequence) : Number.POSITIVE_INFINITY;
+      if (aSeq !== bSeq) return aSeq - bSeq;
+      return (a.label ?? '').localeCompare(b.label ?? '', 'fr', { sensitivity: 'base' });
+    });
   }
 
   getPhases(): PhaseId[] {
@@ -122,6 +136,26 @@ export class ProjectScorecard implements OnChanges {
   getTasks(activityId: ActivityId, phase: PhaseId): Task[] {
     if (!this.project) return [];
     return this.project.taskMatrix[activityId]?.[phase] ?? [];
+  }
+
+  getTotalTaskCount(): number {
+    if (!this.project) return 0;
+    let total = 0;
+    for (const activityId of Object.keys(this.project.taskMatrix) as ActivityId[]) {
+      const phaseMap = this.project.taskMatrix[activityId] ?? {};
+      for (const phaseId of this.project.phases) {
+        total += (phaseMap[phaseId] ?? []).length;
+      }
+    }
+    return total;
+  }
+
+  getActivityCount(): number {
+    return this.getActivities().length;
+  }
+
+  getPhaseCount(): number {
+    return this.getPhases().length;
   }
 
   getStatusClass(status: ActivityStatus): string {
@@ -198,6 +232,66 @@ export class ProjectScorecard implements OnChanges {
 
   hideTaskHoverCard(): void {
     this.taskHoverCard = null;
+  }
+
+  onTaskContextMenu(event: MouseEvent, activityId: ActivityId, phase: PhaseId, task: Task): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const wrap = this.scorecardWrapRef?.nativeElement;
+    if (!wrap) return;
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const scrollLeft = wrap.scrollLeft;
+    const scrollTop = wrap.scrollTop;
+
+    const menuW = 220;
+    const menuH = 210;
+    const margin = 8;
+
+    const rawX = event.clientX - wrapRect.left + scrollLeft;
+    const rawY = event.clientY - wrapRect.top + scrollTop;
+
+    const minX = scrollLeft + margin;
+    const minY = scrollTop + margin;
+    const maxX = scrollLeft + wrap.clientWidth - menuW - margin;
+    const maxY = scrollTop + wrap.clientHeight - menuH - margin;
+
+    this.contextMenu = {
+      x: Math.max(minX, Math.min(maxX, rawX)),
+      y: Math.max(minY, Math.min(maxY, rawY)),
+      activityId,
+      phase,
+      taskId: task.id,
+      currentStatus: task.status,
+    };
+  }
+
+  applyQuickStatus(status: ActivityStatus): void {
+    if (!this.project || !this.contextMenu) return;
+    const ctx = this.contextMenu;
+    this.projectService.updateTask({
+      projectId: this.project.id,
+      activityId: ctx.activityId,
+      fromPhase: ctx.phase,
+      taskId: ctx.taskId,
+      status,
+    });
+    this.closeContextMenu();
+  }
+
+  closeContextMenu(): void {
+    this.contextMenu = null;
+  }
+
+  @HostListener('window:click')
+  onWindowClick(): void {
+    this.closeContextMenu();
+  }
+
+  @HostListener('window:keydown.escape')
+  onEscape(): void {
+    this.closeContextMenu();
   }
 
   getPhaseLabel(phase: PhaseId): string {
@@ -336,6 +430,7 @@ export class ProjectScorecard implements OnChanges {
     if (!this.project) return;
 
     this.taskBeingEdited = task;
+    this.isCreateMode = false;
     this.editingActivityId = activityId;
     this.editingPhase = phase;
 
@@ -363,8 +458,48 @@ export class ProjectScorecard implements OnChanges {
     this.modalService.open(content, { size: 'lg', centered: true });
   }
 
+  openCreateTaskModal(content: TemplateRef<any>): void {
+    if (!this.project) return;
+
+    const defaultActivityId = this.getActivities()[0]?.id ?? 'projet';
+    const defaultPhase = this.getPhases()[0] ?? 'Phase1';
+
+    this.taskBeingEdited = null;
+    this.isCreateMode = true;
+    this.editingActivityId = defaultActivityId;
+    this.editingPhase = defaultPhase;
+
+    this.editedTaskLabel = '';
+    this.editedTaskStatus = 'todo';
+    this.editedStartDate = '';
+    this.editedEndDate = '';
+    this.editedCategory = this.mapActivityToCategory(defaultActivityId);
+    this.editedPhase = defaultPhase;
+    this.editedReporterId = '';
+    this.editedAccountantId = '';
+    this.editedResponsibleId = '';
+    this.editedDependencies = [];
+    this.editError = null;
+
+    this.modalService.open(content, { size: 'lg', centered: true });
+  }
+
+  private mapCategoryToActivity(category: TaskCategory): ActivityId {
+    switch (category) {
+      case 'projectManagement':
+        return 'projet';
+      case 'businessManagement':
+        return 'metier';
+      case 'changeManagement':
+        return 'changement';
+      case 'technologyManagement':
+      default:
+        return 'technologie';
+    }
+  }
+
   saveTaskEdit(modal: any): void {
-    if (!this.project || !this.taskBeingEdited || !this.editingActivityId || !this.editingPhase || !this.editedPhase) {
+    if (!this.project) {
       modal.dismiss();
       return;
     }
@@ -375,6 +510,21 @@ export class ProjectScorecard implements OnChanges {
     if (!label) {
       this.editError = "Le nom de l’activité ne peut pas être vide.";
       return;
+    }
+
+    if (this.isCreateMode) {
+      if (!this.editedPhase) {
+        this.editError = 'La phase est obligatoire.';
+        return;
+      }
+      if (!this.editedCategory) {
+        this.editError = "Le type d'activité est obligatoire.";
+        return;
+      }
+      if (!this.editedStartDate || !this.editedEndDate) {
+        this.editError = 'Les dates de debut et de fin sont obligatoires.';
+        return;
+      }
     }
 
     if (this.editedStartDate && this.editedEndDate) {
@@ -389,7 +539,7 @@ export class ProjectScorecard implements OnChanges {
     // =======================
     // ✅ Validation + sauvegarde dépendances
     // =======================
-    const curTaskId = this.taskBeingEdited.id;
+    const curTaskId = this.taskBeingEdited?.id ?? null;
     const linkableIds = new Set(this.getLinkableTasks().map(t => t.id));
 
     const cleanedRows: EditableDependencyRow[] = (this.editedDependencies ?? [])
@@ -397,7 +547,7 @@ export class ProjectScorecard implements OnChanges {
       .filter(r => !!r.toId); // ignore lignes vides
 
     // pas de self-link
-    if (cleanedRows.some(r => r.toId === curTaskId)) {
+    if (curTaskId && cleanedRows.some(r => r.toId === curTaskId)) {
       this.editError = "Une activité ne peut pas dépendre d’elle-même.";
       return;
     }
@@ -421,43 +571,70 @@ export class ProjectScorecard implements OnChanges {
 
     // ✅ commit dans project.ganttDependencies
     this.ensureProjectDependenciesContainer();
-    const allDeps = this.getProjectDependencies();
+    if (this.isCreateMode) {
+      const targetPhase: PhaseId = this.editedPhase ?? this.editingPhase ?? 'Phase1';
+      const activityId = this.mapCategoryToActivity(this.editedCategory);
+      const createdTask = this.projectService.createTask({
+        projectId: this.project.id,
+        activityId,
+        phase: targetPhase,
+        label,
+        status: this.editedTaskStatus,
+        startDate: this.editedStartDate,
+        endDate: this.editedEndDate,
+        category: this.editedCategory,
+        reporterId: this.editedReporterId,
+        accountantId: this.editedAccountantId,
+        responsibleId: this.editedResponsibleId,
+      });
+      if (!createdTask) {
+        this.editError = 'Impossible de creer la tache.';
+        return;
+      }
 
-    // retire les anciennes deps de cette tâche
-    const kept = allDeps.filter(d => d.fromId !== curTaskId);
+      if (cleanedRows.length) {
+        const allDeps = this.getProjectDependencies();
+        const added: GanttDependency[] = cleanedRows.map((r) => ({
+          fromId: createdTask.id,
+          toId: r.toId,
+          type: r.type,
+        }));
+        this.setProjectDependencies([...allDeps, ...added]);
+      }
+    } else {
+      if (!this.taskBeingEdited || !this.editingActivityId || !this.editingPhase) {
+        modal.dismiss();
+        return;
+      }
 
-    // ajoute les nouvelles
-    const added: GanttDependency[] = cleanedRows.map(r => ({
-      fromId: curTaskId,
-      toId: r.toId,
-      type: r.type,
-    }));
+      const allDeps = this.getProjectDependencies();
+      const kept = allDeps.filter((d) => d.fromId !== this.taskBeingEdited!.id);
+      const added: GanttDependency[] = cleanedRows.map((r) => ({
+        fromId: this.taskBeingEdited!.id,
+        toId: r.toId,
+        type: r.type,
+      }));
+      this.setProjectDependencies([...kept, ...added]);
 
-    this.setProjectDependencies([...kept, ...added]);
+      this.projectService.updateTask({
+        projectId: this.project.id,
+        activityId: this.editingActivityId,
+        fromPhase: this.editingPhase,
+        toPhase: this.editedPhase || undefined,
+        taskId: this.taskBeingEdited.id,
+        label,
+        status: this.editedTaskStatus,
+        startDate: this.editedStartDate,
+        endDate: this.editedEndDate,
+        category: this.editedCategory,
+        reporterId: this.editedReporterId,
+        accountantId: this.editedAccountantId,
+        responsibleId: this.editedResponsibleId,
+        phase: this.editedPhase || undefined,
+      });
 
-    // =======================
-    // ✅ Toute la mutation "task" passe par ProjectService
-    // =======================
-    this.projectService.updateTask({
-      projectId: this.project.id,
-      activityId: this.editingActivityId,
-      fromPhase: this.editingPhase,
-      toPhase: this.editedPhase,
-      taskId: this.taskBeingEdited.id,
-
-      label,
-      status: this.editedTaskStatus,
-      startDate: this.editedStartDate,
-      endDate: this.editedEndDate,
-      category: this.editedCategory,
-      reporterId: this.editedReporterId,
-      accountantId: this.editedAccountantId,
-      responsibleId: this.editedResponsibleId,
-      phase: this.editedPhase,
-    });
-
-    // Mise à jour du contexte local (utile si l’utilisateur ré-ouvre direct)
-    this.editingPhase = this.editedPhase;
+      this.editingPhase = this.editedPhase;
+    }
 
     modal.close();
   }

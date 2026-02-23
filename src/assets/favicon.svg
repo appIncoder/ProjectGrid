@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="pgBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f766e" />
+      <stop offset="100%" stop-color="#0ea5e9" />
+    </linearGradient>
+  </defs>
+
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#pgBg)" />
+
+  <g stroke="#d1fae5" stroke-width="1.6" opacity="0.45">
+    <line x1="27" y1="14" x2="27" y2="50" />
+    <line x1="40" y1="14" x2="40" y2="50" />
+    <line x1="14" y1="27" x2="50" y2="27" />
+    <line x1="14" y1="40" x2="50" y2="40" />
+  </g>
+
+  <g fill="#ffffff">
+    <rect x="14" y="14" width="10" height="10" rx="2" opacity="0.9" />
+    <rect x="27" y="14" width="10" height="10" rx="2" opacity="0.9" />
+    <rect x="40" y="14" width="10" height="10" rx="2" opacity="0.9" />
+
+    <rect x="14" y="27" width="10" height="10" rx="2" opacity="0.9" />
+    <rect x="27" y="27" width="10" height="10" rx="2" fill="#fef08a" />
+    <rect x="40" y="27" width="10" height="10" rx="2" opacity="0.9" />
+
+    <rect x="14" y="40" width="10" height="10" rx="2" opacity="0.9" />
+    <rect x="27" y="40" width="10" height="10" rx="2" opacity="0.9" />
+    <rect x="40" y="40" width="10" height="10" rx="2" opacity="0.9" />
+  </g>
+
+  <path
+    d="M19 19h13v13h13v13"
+    fill="none"
+    stroke="#fde047"
+    stroke-width="3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.95"
+  />
+</svg>
