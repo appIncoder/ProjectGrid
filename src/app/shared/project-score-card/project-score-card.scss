@@ -1,10 +1,17 @@
 :host {
   display: block;
-  --scorecard-row-height: 6.4rem;
+  --scorecard-row-height-max: 9rem;
+  --scorecard-row-height-min: 4.25rem;
+  --scorecard-head-height: 2.25rem;
   --scorecard-cell-pad-y: 0.3rem;
   --scorecard-cell-pad-x: 0.4rem;
-  --scorecard-grid-height: calc((var(--scorecard-row-height) * 4) + 3rem);
-  --task-pill-width: 210px;
+  --scorecard-bottom-gap: 0.45rem;
+  --scorecard-viewport-offset: 24.5rem;
+  --scorecard-grid-height: min(
+    560px,
+    max(300px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
+  );
+  --task-pill-max-width: 210px;
 }
 
 .scorecard-card-body {
@@ -106,8 +113,17 @@
 .scorecard-table-wrap {
   position: relative;
   margin-bottom: 0;
+  height: var(--scorecard-grid-height);
   max-height: var(--scorecard-grid-height);
   overflow: auto;
+}
+
+.scorecard-table-wrap {
+  --scorecard-dynamic-row-height: clamp(
+    var(--scorecard-row-height-min),
+    calc((var(--scorecard-grid-height) - var(--scorecard-head-height)) / var(--scorecard-activity-count, 1)),
+    var(--scorecard-row-height-max)
+  );
 }
 
 .task-context-menu {
@@ -169,12 +185,12 @@
 }
 
 .activity-row {
-  height: var(--scorecard-row-height);
+  height: var(--scorecard-dynamic-row-height);
 }
 
 .activity-cell,
 .phase-cell {
-  height: var(--scorecard-row-height);
+  height: var(--scorecard-dynamic-row-height);
 }
 
 .phase-cell {
@@ -203,7 +219,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.16rem;
-  height: calc(var(--scorecard-row-height) - (var(--scorecard-cell-pad-y) * 2));
+  height: calc(var(--scorecard-dynamic-row-height) - (var(--scorecard-cell-pad-y) * 2));
   min-height: 0;
   overflow-y: auto;
 }
@@ -211,12 +227,13 @@
 .task-pill {
   display: block;
   position: relative;
-  width: var(--task-pill-width);
-  min-width: var(--task-pill-width);
-  max-width: var(--task-pill-width);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  width: min(100%, var(--task-pill-max-width));
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
   border-radius: 999px;
   border: 1px solid #000;
   padding: 0.1rem 1.2rem 0.1rem 0.38rem;
@@ -289,11 +306,32 @@
 
 @media (max-width: 991.98px) {
   :host {
-    --scorecard-row-height: 5.6rem;
-    --scorecard-grid-height: calc((var(--scorecard-row-height) * 4) + 2.6rem);
+    --scorecard-row-height-max: 8rem;
+    --scorecard-row-height-min: 3.9rem;
+    --scorecard-head-height: 2.1rem;
+    --scorecard-bottom-gap: 0.4rem;
+    --scorecard-viewport-offset: 25.5rem;
+    --scorecard-grid-height: min(
+      520px,
+      max(260px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
+    );
   }
 
   .activity-header-col {
     min-width: 150px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  :host {
+    --scorecard-row-height-max: 7rem;
+    --scorecard-row-height-min: 3.5rem;
+    --scorecard-head-height: 2rem;
+    --scorecard-bottom-gap: 0.35rem;
+    --scorecard-viewport-offset: 27.5rem;
+    --scorecard-grid-height: min(
+      470px,
+      max(220px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
+    );
   }
 }

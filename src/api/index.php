@@ -22,6 +22,7 @@ $routesHint = [
   'POST /projects/{id}/rebuild-payload',
   'GET /projects',
   'GET /projects/{id}',
+  'DELETE /projects/{id}',
   'POST /projects',
 ];
 
@@ -560,6 +561,34 @@ function rebuild_project_payload(PDO $pdo, string $projectId): array {
   return $detail;
 }
 
+function delete_project_everywhere(PDO $pdo, string $projectId): bool {
+  $existsStmt = $pdo->prepare('SELECT COUNT(*) FROM projects WHERE id = :id');
+  $existsStmt->execute([':id' => $projectId]);
+  $exists = (int)$existsStmt->fetchColumn() > 0;
+  if (!$exists) return false;
+
+  $pdo->beginTransaction();
+  try {
+    // Enfants -> parent pour respecter les FKs éventuelles.
+    $pdo->prepare('DELETE FROM project_tasks_links WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_task_assignments WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_tasks WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_activities WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_phases WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM users_roles_projects WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_risks WHERE projectId = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_changes WHERE project_id = :id')->execute([':id' => $projectId]);
+
+    $pdo->prepare('DELETE FROM projects WHERE id = :id')->execute([':id' => $projectId]);
+    $pdo->commit();
+  } catch (Throwable $inner) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    throw $inner;
+  }
+
+  return true;
+}
+
 function fetch_users(PDO $pdo): array {
   $columnsStmt = $pdo->query('SHOW COLUMNS FROM users');
   $columns = array_map(
@@ -961,6 +990,22 @@ try {
       send_json(['error' => 'Project not found', 'requestedId' => $id], 404);
     }
     send_json($detail);
+  }
+
+  // -----------------------------
+  // DELETE /projects/{id}
+  // Supprime définitivement le projet et toutes ses données liées.
+  // -----------------------------
+  if ($method === 'DELETE' && preg_match('#^/projects/([^/]+)$#', $path, $m)) {
+    $id = normalize_id(urldecode($m[1]));
+    if ($id === '') send_json(['error' => 'Missing id'], 400);
+
+    $pdo = db();
+    $deleted = delete_project_everywhere($pdo, $id);
+    if (!$deleted) {
+      send_json(['error' => 'Project not found', 'requestedId' => $id], 404);
+    }
+    send_json(['ok' => true, 'id' => $id, 'deleted' => true]);
   }
 
   // -----------------------------

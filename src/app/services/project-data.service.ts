@@ -161,6 +161,14 @@ export class ProjectDataService {
     console.log('[ProjectDataService] saveProject() OK', { url, projectId: project?.id });
   }
 
+  async deleteProject(projectId: string): Promise<void> {
+    const id = String(projectId ?? '').trim();
+    if (!id) throw new Error('Missing project id');
+
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}`;
+    await firstValueFrom(this.http.delete<{ ok?: boolean; id?: string }>(url));
+  }
+
   async runProjectProcedure(
     projectId: string,
     procedure: 'save_project',

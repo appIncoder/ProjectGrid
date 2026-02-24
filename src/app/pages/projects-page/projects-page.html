@@ -12,10 +12,10 @@
             </p>
           </div>
           <div class="projects-header-actions">
-            <button class="btn btn-outline-secondary btn-sm" (click)="refreshProjects()" [disabled]="isLoading">
+            <button class="btn projects-cart-btn" (click)="refreshProjects()" [disabled]="isLoading">
               ↻ Rafraîchir
             </button>
-            <button class="btn btn-primary btn-sm" (click)="onCreateProject()">
+            <button class="btn projects-cart-btn projects-cart-btn--primary" (click)="onCreateProject()">
               + Nouveau projet
             </button>
           </div>
@@ -109,7 +109,7 @@
               <td class="text-end" (click)="$event.stopPropagation()">
                 <div ngbDropdown [container]="'body'" class="d-inline-block">
                   <button
-                    class="btn btn-sm btn-link text-dark p-0"
+                    class="btn projects-icon-btn"
                     ngbDropdownToggle
                     aria-label="Menu projet">
                     &#8226;&#8226;&#8226;
@@ -135,6 +135,12 @@
                         <span class="me-2">🗄️</span> Archiver
                       </button>
                     </li>
+                    <li><hr class="dropdown-divider" /></li>
+                    <li>
+                      <button ngbDropdownItem class="text-danger" (click)="onDelete(project)">
+                        <span class="me-2">🗑️</span> Supprimer définitivement
+                      </button>
+                    </li>
                   </ul>
                 </div>
               </td>
@@ -152,6 +158,30 @@
     </div>
   </div>
 </div>
+
+<app-confirm-dialog
+  [open]="isDeleteModalOpen"
+  title="Supprimer définitivement ce projet ?"
+  [message]="getDeleteProjectMessage()"
+  cancelLabel="Annuler"
+  confirmLabel="Supprimer définitivement"
+  tone="danger"
+  [busy]="isDeletingProject"
+  [error]="deleteProjectError"
+  (cancel)="closeDeleteProjectModal()"
+  (confirm)="confirmDeleteProject()">
+</app-confirm-dialog>
+
+<app-confirm-dialog
+  [open]="isSuccessModalOpen"
+  [title]="successTitle"
+  [message]="successMessage"
+  [showCancel]="false"
+  confirmLabel="OK"
+  tone="success"
+  (cancel)="closeSuccessModal()"
+  (confirm)="closeSuccessModal()">
+</app-confirm-dialog>
 
 <div
   *ngIf="isCreateModalOpen"
@@ -226,10 +256,10 @@
     </div>
 
     <div class="project-create-modal__footer">
-      <button type="button" class="btn btn-outline-secondary" [disabled]="isCreatingProject" (click)="closeCreateProjectModal()">
+      <button type="button" class="btn projects-cart-btn" [disabled]="isCreatingProject" (click)="closeCreateProjectModal()">
         Annuler
       </button>
-      <button type="button" class="btn btn-primary" [disabled]="isCreatingProject" (click)="submitCreateProject()">
+      <button type="button" class="btn projects-cart-btn projects-cart-btn--primary" [disabled]="isCreatingProject" (click)="submitCreateProject()">
         {{ isCreatingProject ? 'Création...' : 'Créer le projet' }}
       </button>
     </div>

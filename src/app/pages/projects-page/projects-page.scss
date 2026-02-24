@@ -52,6 +52,61 @@
   flex-shrink: 0;
 }
 
+.projects-cart-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c8d6ea;
+  border-radius: 999px;
+  background: #f7faff;
+  color: #334a68;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  padding: 0.34rem 0.8rem;
+}
+
+.projects-cart-btn:hover {
+  background: #edf3ff;
+  color: #233a57;
+}
+
+.projects-cart-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.projects-cart-btn--primary {
+  border-color: #5e95df;
+  background: #e6f0ff;
+  color: #1f4f9a;
+}
+
+.projects-cart-btn--primary:hover {
+  background: #dce9ff;
+  color: #1a427d;
+}
+
+.projects-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid #c8d6ea;
+  border-radius: 999px;
+  background: #f7faff;
+  color: #334a68;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.projects-icon-btn:hover {
+  background: #edf3ff;
+  color: #233a57;
+}
+
 .projects-filters.card {
   border: 1px solid var(--panel-border);
   border-radius: 0.9rem;
@@ -204,7 +259,7 @@
     width: 100%;
   }
 
-  .projects-header-actions .btn {
+  .projects-header-actions .projects-cart-btn {
     flex: 1 1 auto;
   }
 

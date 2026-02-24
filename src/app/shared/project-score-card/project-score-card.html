@@ -18,7 +18,11 @@
       </div>
     </div>
 
-    <div #scorecardWrap class="table-responsive scorecard-table-wrap" (scroll)="hideTaskHoverCard(); closeContextMenu()">
+    <div
+      #scorecardWrap
+      class="table-responsive scorecard-table-wrap"
+      [style.--scorecard-activity-count]="getActivityCount() || 1"
+      (scroll)="hideTaskHoverCard(); closeContextMenu()">
       <table class="table table-bordered table-sm activity-matrix-detail scorecard-table text-center align-middle mb-0">
         <thead>
           <tr>

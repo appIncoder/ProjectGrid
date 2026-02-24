@@ -1,0 +1,49 @@
+<div
+  *ngIf="open"
+  class="confirm-dialog-backdrop"
+  (click)="!busy && cancel.emit()"
+  aria-hidden="true">
+</div>
+
+<div *ngIf="open" class="confirm-dialog" role="dialog" aria-modal="true" [attr.aria-label]="title">
+  <div class="confirm-dialog__panel" (click)="$event.stopPropagation()">
+    <div class="confirm-dialog__header">
+      <h3 class="mb-0">{{ title }}</h3>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fermer"
+        [disabled]="busy"
+        (click)="cancel.emit()">
+      </button>
+    </div>
+
+    <div class="confirm-dialog__body">
+      <p class="mb-0">{{ message }}</p>
+      <div *ngIf="error" class="alert alert-danger py-2 mt-3 mb-0">
+        {{ error }}
+      </div>
+    </div>
+
+    <div class="confirm-dialog__footer">
+      <button
+        *ngIf="showCancel"
+        type="button"
+        class="btn confirm-dialog__btn"
+        [disabled]="busy"
+        (click)="cancel.emit()">
+        {{ cancelLabel }}
+      </button>
+      <button
+        *ngIf="showConfirm"
+        type="button"
+        class="btn confirm-dialog__btn"
+        [class.confirm-dialog__btn--danger]="tone === 'danger'"
+        [class.confirm-dialog__btn--success]="tone === 'success'"
+        [disabled]="busy"
+        (click)="confirm.emit()">
+        {{ busy ? 'Traitement...' : confirmLabel }}
+      </button>
+    </div>
+  </div>
+</div>

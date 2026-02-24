@@ -19,71 +19,9 @@ type RiskStatePayload = {
 };
 
 const DEFAULT_RISK_MATRIX: Record<string, RiskCellItem[]> = {
-  'Significatif|Moyenne': [{ id: 'R1', label: 'Disponibilité clé métier', level: 'high' }],
-  'Majeur|Élevée': [
-    { id: 'R2', label: 'Retard de livraison IT', level: 'critical' },
-    { id: 'R3', label: 'Sous-estimation charge', level: 'high' },
-  ],
-  'Modéré|Moyenne': [{ id: 'R4', label: 'Turn-over équipe', level: 'medium' }],
-  'Critique|Faible': [{ id: 'R5', label: 'Faille de sécurité majeure', level: 'critical' }],
 };
 
 const DEFAULT_TOP_RISKS: TopRiskExtended[] = [
-  {
-    id: 'R2',
-    title: 'Retard de livraison IT critique',
-    impact: 'Majeur',
-    probability: 'Élevée',
-    level: 'critical',
-    owner: 'David Lambert',
-    dueDate: '30/09/2025',
-    status: 'IN_PROGRESS',
-    residualRiskId: 'R2-RES',
-  },
-  {
-    id: 'R3',
-    title: 'Sous-estimation des charges projet',
-    impact: 'Majeur',
-    probability: 'Élevée',
-    level: 'high',
-    owner: 'Alice Dupont',
-    dueDate: '15/09/2025',
-    status: 'OPEN',
-    residualRiskId: null,
-  },
-  {
-    id: 'R1',
-    title: 'Indisponibilité d’un sponsor métier',
-    impact: 'Significatif',
-    probability: 'Moyenne',
-    level: 'high',
-    owner: 'Claire Leroy',
-    dueDate: '01/09/2025',
-    status: 'ON_HOLD',
-    residualRiskId: null,
-  },
-  {
-    id: 'R4',
-    title: 'Turn-over dans l’équipe projet',
-    impact: 'Modéré',
-    probability: 'Moyenne',
-    level: 'medium',
-    owner: 'Bruno Martin',
-    dueDate: '15/10/2025',
-    status: 'RESOLVED',
-    residualRiskId: 'R4-RES',
-  },
-  {
-    id: 'R5',
-    title: 'Risque de faille de sécurité',
-    impact: 'Critique',
-    probability: 'Faible',
-    level: 'critical',
-    owner: 'Security Officer',
-    dueDate: '31/12/2025',
-    status: 'OPEN',
-    residualRiskId: null,
-  },
 ];
 
 @Component({

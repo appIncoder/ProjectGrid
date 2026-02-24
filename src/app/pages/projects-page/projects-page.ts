@@ -7,11 +7,12 @@ import { Router, RouterModule } from '@angular/router';
 import { ProjectDataService, type ProjectTypeDefaults, type ProjectTypeRef } from '../../services/project-data.service';
 import { AuthService } from '../../services/auth.service';
 import type { ActivityId, ActivityStatus, Health, PhaseId, ProjectDetail, ProjectListItem, ProjectStatus } from '../../models';
+import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-projects-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, NgbDropdownModule],
+  imports: [CommonModule, FormsModule, RouterModule, NgbDropdownModule, ConfirmDialog],
   templateUrl: './projects-page.html',
   styleUrls: ['./projects-page.scss'],
 })
@@ -35,6 +36,13 @@ export class ProjectsPage implements OnInit, OnDestroy {
     name: '',
     description: '',
   };
+  isDeleteModalOpen = false;
+  isDeletingProject = false;
+  deleteProjectError: string | null = null;
+  deleteTargetProject: ProjectListItem | null = null;
+  isSuccessModalOpen = false;
+  successTitle = '';
+  successMessage = '';
   private destroyed = false;
 
   constructor(
@@ -74,7 +82,6 @@ export class ProjectsPage implements OnInit, OnDestroy {
     } catch (e) {
       console.error('[ProjectsPage] loadProjectsFromApi error', e);
       this.loadError = "Impossible de charger les projets depuis l'API.";
-      this.projects = [];
     } finally {
       this.isLoading = false;
       if (!this.destroyed) {
@@ -275,6 +282,15 @@ export class ProjectsPage implements OnInit, OnDestroy {
       createdBy?: string;
       projectManager?: string;
       projectTypeId?: string;
+      risks?: unknown[];
+      budgetSummary?: {
+        initial: number;
+        engaged: number;
+        spent: number;
+        forecast: number;
+        currency: string;
+      };
+      budgetLines?: unknown[];
     } = {
       id: projectId,
       name,
@@ -286,6 +302,15 @@ export class ProjectsPage implements OnInit, OnDestroy {
       createdBy: owner,
       projectManager: owner,
       projectTypeId,
+      risks: [],
+      budgetSummary: {
+        initial: 0,
+        engaged: 0,
+        spent: 0,
+        forecast: 0,
+        currency: '€',
+      },
+      budgetLines: [],
     };
 
     this.isCreatingProject = true;
@@ -323,6 +348,59 @@ export class ProjectsPage implements OnInit, OnDestroy {
     project.status = 'Clôturé';
   }
 
+  async onDelete(project: ProjectListItem): Promise<void> {
+    const id = String(project?.id ?? '').trim();
+    if (!id) return;
+    this.deleteTargetProject = project;
+    this.deleteProjectError = null;
+    this.isDeleteModalOpen = true;
+  }
+
+  closeDeleteProjectModal(): void {
+    if (this.isDeletingProject) return;
+    this.isDeleteModalOpen = false;
+    this.deleteProjectError = null;
+    this.deleteTargetProject = null;
+  }
+
+  closeSuccessModal(): void {
+    this.isSuccessModalOpen = false;
+    this.successTitle = '';
+    this.successMessage = '';
+  }
+
+  getDeleteProjectMessage(): string {
+    const name = this.deleteTargetProject?.name ?? 'ce projet';
+    return `Vous êtes sur le point de supprimer définitivement "${name}". Cette action est irréversible et effacera toutes les données liées en base.`;
+  }
+
+  async confirmDeleteProject(): Promise<void> {
+    const id = String(this.deleteTargetProject?.id ?? '').trim();
+    if (!id) return;
+
+    this.isDeletingProject = true;
+    this.deleteProjectError = null;
+    let deleted = false;
+    try {
+      await this.projectData.deleteProject(id);
+      this.projects = this.projects.filter((p) => p.id !== id);
+      await this.loadProjectsFromApi();
+      deleted = true;
+      this.successTitle = 'Suppression terminée';
+      this.successMessage = 'Le projet a été supprimé définitivement avec succès.';
+      this.isSuccessModalOpen = true;
+    } catch (e) {
+      console.error('[ProjectsPage] confirmDeleteProject error', e);
+      this.deleteProjectError = "Impossible de supprimer le projet pour l'instant.";
+    } finally {
+      this.isDeletingProject = false;
+      if (deleted) {
+        this.closeDeleteProjectModal();
+      }
+      if (!this.destroyed) this.cdr.detectChanges();
+    }
+  }
+
   private async loadProjectTypesForCreation(): Promise<void> {
     this.isLoadingProjectTypes = true;
     try {
@@ -346,17 +424,16 @@ export class ProjectsPage implements OnInit, OnDestroy {
     activities: ProjectDetail['activities'];
     taskMatrix: ProjectDetail['taskMatrix'];
   } | null {
-    const KNOWN_PHASES = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'] as const;
-    const KNOWN_ACTIVITIES = ['projet', 'metier', 'changement', 'technologie'] as const;
-
     const phases = defaults.phases
-      .map((p) => p.id)
-      .filter((id): id is PhaseId => KNOWN_PHASES.includes(id as PhaseId));
+      .map((p) => String(p.id ?? '').trim())
+      .filter((id): id is PhaseId => !!id);
     const activitiesRaw = defaults.activities
-      .map((a) => ({ ...a, id: a.id }))
-      .filter((a): a is { id: ActivityId; label: string; sequence?: number | null } =>
-        KNOWN_ACTIVITIES.includes(a.id as ActivityId)
-      );
+      .map((a) => ({
+        id: String(a.id ?? '').trim() as ActivityId,
+        label: String(a.label ?? '').trim(),
+        sequence: a.sequence ?? null,
+      }))
+      .filter((a) => !!a.id);
 
     if (!phases.length || !activitiesRaw.length) return null;
 
