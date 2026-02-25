@@ -28,7 +28,9 @@
           <tr>
             <th class="text-start activity-header-col">Activités</th>
             <th *ngFor="let phase of getPhases()">
-              {{ getPhaseLabel(phase) }}
+              <span [attr.title]="getPhaseLongName(phase)">
+                {{ getPhaseLabel(phase) }}
+              </span>
             </th>
           </tr>
         </thead>

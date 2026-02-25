@@ -18,9 +18,19 @@ export interface ProjectTypeDefaults {
   tasks: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
 }
 
+export interface ProjectHealthDefaultRef {
+  healthId: string;
+  shortName: string;
+  longName: string;
+  status: string;
+  dateCreated: string;
+  dateLastUpdated: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectDataService {
   private readonly baseUrl = environment.apiBaseUrl;
+  private readonly projectsCache = new Map<string, ProjectDetail>();
   private static readonly DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
   private static readonly DEFAULT_ACTIVITIES: Record<ActivityId, ActivityDefinition> = {
     projet: { id: 'projet', label: 'Gestion du projet', owner: '—', sequence: 1 },
@@ -31,8 +41,31 @@ export class ProjectDataService {
 
   constructor(private http: HttpClient) {}
 
+  private withNoCache(url: string): string {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_ts=${Date.now()}`;
+  }
+
+  cacheProject(project: ProjectDetail): void {
+    const id = String(project?.id ?? '').trim();
+    if (!id) return;
+    this.projectsCache.set(id, project);
+  }
+
+  getCachedProject(projectId: string): ProjectDetail | undefined {
+    const id = String(projectId ?? '').trim();
+    if (!id) return undefined;
+    return this.projectsCache.get(id);
+  }
+
+  removeCachedProject(projectId: string): void {
+    const id = String(projectId ?? '').trim();
+    if (!id) return;
+    this.projectsCache.delete(id);
+  }
+
   async listProjects(): Promise<Array<Pick<ProjectDetail, 'id' | 'name'>>> {
-    const url = `${this.baseUrl}/projects`;
+    const url = this.withNoCache(`${this.baseUrl}/projects`);
     const list = await firstValueFrom(
       this.http.get<Array<Pick<ProjectDetail, 'id' | 'name'>>>(url)
     );
@@ -43,7 +76,7 @@ export class ProjectDataService {
   }
 
   async listUsers(): Promise<UserRef[]> {
-    const url = `${this.baseUrl}/users`;
+    const url = this.withNoCache(`${this.baseUrl}/users`);
     const rows = await firstValueFrom(this.http.get<Array<{ id?: unknown; label?: unknown; name?: unknown }>>(url));
     return (Array.isArray(rows) ? rows : [])
       .map((r) => ({
@@ -54,7 +87,7 @@ export class ProjectDataService {
   }
 
   async listProjectTypes(): Promise<ProjectTypeRef[]> {
-    const url = `${this.baseUrl}/project-types`;
+    const url = this.withNoCache(`${this.baseUrl}/project-types`);
     const rows = await firstValueFrom(
       this.http.get<Array<{ id?: unknown; name?: unknown; description?: unknown }>>(url)
     );
@@ -67,10 +100,38 @@ export class ProjectDataService {
       .filter((t) => !!t.id && !!t.name);
   }
 
+  async listProjectHealthDefaults(): Promise<ProjectHealthDefaultRef[]> {
+    const url = this.withNoCache(`${this.baseUrl}/project-health-defaults`);
+    const rows = await firstValueFrom(this.http.get<any[]>(url));
+    return (Array.isArray(rows) ? rows : []).map((r: any) => ({
+      healthId: String(r?.healthId ?? '').trim(),
+      shortName: String(r?.shortName ?? '').trim(),
+      longName: String(r?.longName ?? '').trim(),
+      status: String(r?.status ?? 'active').trim(),
+      dateCreated: String(r?.dateCreated ?? '').trim(),
+      dateLastUpdated: String(r?.dateLastUpdated ?? '').trim(),
+    }));
+  }
+
+  async updateProjectHealth(projectId: string, healthShortName: string, description?: string): Promise<any[]> {
+    const id = String(projectId ?? '').trim();
+    const shortName = String(healthShortName ?? '').trim();
+    if (!id || !shortName) {
+      throw new Error('Missing projectId or healthShortName');
+    }
+
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}/health`;
+    const payload: any = { healthShortName: shortName };
+    if (typeof description === 'string') payload.description = description;
+
+    const res = await firstValueFrom(this.http.post<any>(url, payload));
+    return Array.isArray(res?.projectHealth) ? res.projectHealth : [];
+  }
+
   async getProjectTypeDefaults(projectTypeId: string): Promise<ProjectTypeDefaults | null> {
     const id = String(projectTypeId ?? '').trim();
     if (!id) return null;
-    const url = `${this.baseUrl}/project-types/${encodeURIComponent(id)}/defaults`;
+    const url = this.withNoCache(`${this.baseUrl}/project-types/${encodeURIComponent(id)}/defaults`);
     const raw = await firstValueFrom(this.http.get<any>(url));
     if (!raw || !raw.projectType) return null;
 
@@ -116,7 +177,7 @@ export class ProjectDataService {
     }
 
     const fetchOne = async (id: string): Promise<ProjectDetail | null> => {
-      const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}`;
+      const url = this.withNoCache(`${this.baseUrl}/projects/${encodeURIComponent(id)}`);
       const res = await firstValueFrom(this.http.get<any>(url));
 
       console.log('[ProjectDataService] raw response', { url, res });
@@ -126,7 +187,9 @@ export class ProjectDataService {
         return null;
       }
 
-      return this.normalizeProjectDetail(res, id);
+      const normalized = this.normalizeProjectDetail(res, id);
+      this.cacheProject(normalized);
+      return normalized;
     };
 
     try {
@@ -157,6 +220,7 @@ export class ProjectDataService {
 
     // POST upsert
     await firstValueFrom(this.http.post<ProjectDetail>(url, project));
+    this.cacheProject(project);
 
     console.log('[ProjectDataService] saveProject() OK', { url, projectId: project?.id });
   }
@@ -167,6 +231,7 @@ export class ProjectDataService {
 
     const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}`;
     await firstValueFrom(this.http.delete<{ ok?: boolean; id?: string }>(url));
+    this.removeCachedProject(id);
   }
 
   async runProjectProcedure(
@@ -204,6 +269,20 @@ export class ProjectDataService {
     const taskMatrix = (raw?.taskMatrix && typeof raw.taskMatrix === 'object')
       ? (raw.taskMatrix as Record<ActivityId, Record<PhaseId, any[]>>)
       : {} as Record<ActivityId, Record<PhaseId, any[]>>;
+    const phaseDefinitionsRaw = (raw?.phaseDefinitions && typeof raw.phaseDefinitions === 'object')
+      ? raw.phaseDefinitions
+      : {};
+    const phaseDefinitions: Record<PhaseId, any> = {} as Record<PhaseId, any>;
+    for (const phase of phases) {
+      const def = phaseDefinitionsRaw?.[phase];
+      const label = String(def?.label ?? phase).trim() || phase;
+      phaseDefinitions[phase] = {
+        id: phase,
+        label,
+        startDate: String(def?.startDate ?? ''),
+        endDate: String(def?.endDate ?? ''),
+      };
+    }
 
     // Garantit une matrice complète pour éviter les trous en template/components
     for (const activityId of Object.keys(activities) as ActivityId[]) {
@@ -222,7 +301,19 @@ export class ProjectDataService {
       id: String(raw?.id ?? fallbackId),
       name: String(raw?.name ?? `Projet ${fallbackId}`),
       description: String(raw?.description ?? ''),
+      projectHealth: Array.isArray(raw?.projectHealth)
+        ? raw.projectHealth.map((h: any) => ({
+            healthId: String(h?.healthId ?? '').trim(),
+            shortName: String(h?.shortName ?? '').trim(),
+            longName: String(h?.longName ?? '').trim(),
+            description: String(h?.description ?? '').trim(),
+            status: String(h?.status ?? 'active').trim(),
+            dateCreated: String(h?.dateCreated ?? '').trim(),
+            dateLastUpdated: String(h?.dateLastUpdated ?? '').trim(),
+          }))
+        : [],
       phases,
+      phaseDefinitions: phaseDefinitions as any,
       activities,
       taskMatrix,
     } as ProjectDetail;

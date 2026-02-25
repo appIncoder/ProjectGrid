@@ -16,8 +16,10 @@ $routesHint = [
   'GET /db-check',
   'GET /users',
   'GET /project-types',
+  'GET /project-health-defaults',
   'GET /project-types/{id}/defaults',
   'POST /auth/login',
+  'POST /projects/{id}/health',
   'POST /projects/{id}/procedure',
   'POST /projects/{id}/rebuild-payload',
   'GET /projects',
@@ -90,6 +92,33 @@ function build_payload_task_lookup(array $payload): array {
   return $lookup;
 }
 
+function default_phase_long_name(string $phaseId): string {
+  if (preg_match('/^Phase\s*([0-9]+)$/i', trim($phaseId), $m)) {
+    return 'Phase ' . $m[1];
+  }
+  return $phaseId;
+}
+
+function resolve_project_phases_schema(PDO $pdo): array {
+  static $schema = null;
+  if (is_array($schema)) return $schema;
+
+  $columnsStmt = $pdo->query('SHOW COLUMNS FROM project_phases');
+  $columns = array_map(
+    static fn(array $row): string => (string)($row['Field'] ?? ''),
+    $columnsStmt->fetchAll()
+  );
+
+  $shortColumn = in_array('shortname', $columns, true) ? 'shortname' : 'phase_id';
+  $hasLongName = in_array('longName', $columns, true);
+  $schema = [
+    'shortColumn' => $shortColumn,
+    'hasLongName' => $hasLongName,
+  ];
+
+  return $schema;
+}
+
 function task_date_to_db_value(?string $input, bool $isEndDate): ?string {
   if ($input === null) return null;
   $raw = trim($input);
@@ -141,6 +170,211 @@ function ensure_project_task_links_table(PDO $pdo): void {
   $ready = true;
 }
 
+function ensure_project_health_default_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `project_health_default` (
+      `health_id` uuid NOT NULL DEFAULT uuid(),
+      `health_short_name` varchar(64) NOT NULL,
+      `health_long_name` varchar(255) NOT NULL,
+      `status` varchar(32) NOT NULL DEFAULT 'active',
+      `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+      `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      PRIMARY KEY (`health_id`),
+      UNIQUE KEY `uidx_project_health_default_short_name` (`health_short_name`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  $ready = true;
+}
+
+function ensure_project_health_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `project_health` (
+      `health_id` uuid NOT NULL DEFAULT uuid(),
+      `project_id` uuid NOT NULL,
+      `health_short_name` varchar(64) NOT NULL,
+      `health_long_name` varchar(255) NOT NULL,
+      `description` text DEFAULT NULL,
+      `status` varchar(32) NOT NULL DEFAULT 'active',
+      `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+      `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      PRIMARY KEY (`health_id`),
+      UNIQUE KEY `uidx_project_health_project_short` (`project_id`, `health_short_name`),
+      KEY `idx_project_health_project` (`project_id`),
+      KEY `idx_project_health_status` (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+  $pdo->exec("ALTER TABLE `project_health` ADD COLUMN IF NOT EXISTS `description` text DEFAULT NULL");
+
+  $ready = true;
+}
+
+function ensure_project_health_seed_defaults(PDO $pdo): void {
+  ensure_project_health_default_table($pdo);
+  $pdo->exec("
+    INSERT IGNORE INTO `project_health_default` (`health_short_name`, `health_long_name`, `status`) VALUES
+    ('Good', 'No known issues', 'active'),
+    ('Average', 'Non blocking issues to manage', 'active'),
+    ('Bad', 'Severe issues requiring action', 'active'),
+    ('Blocked', 'Blocking issues requiring immediate action', 'active')
+  ");
+}
+
+function ensure_project_health_infra(PDO $pdo): void {
+  ensure_project_health_default_table($pdo);
+  ensure_project_health_table($pdo);
+  ensure_project_health_seed_defaults($pdo);
+}
+
+function ensure_project_health_for_project(PDO $pdo, string $projectId): void {
+  ensure_project_health_infra($pdo);
+
+  $stmt = $pdo->prepare("
+    INSERT IGNORE INTO `project_health` (`project_id`, `health_short_name`, `health_long_name`, `description`, `status`)
+    SELECT :project_id, `health_short_name`, `health_long_name`, `health_long_name`, 'active'
+    FROM `project_health_default`
+    WHERE LOWER(`health_short_name`) = 'good'
+  ");
+  $stmt->execute([':project_id' => $projectId]);
+}
+
+function fetch_project_health_defaults(PDO $pdo): array {
+  ensure_project_health_infra($pdo);
+
+  $stmt = $pdo->query("
+    SELECT health_id, health_short_name, health_long_name, status, date_created, date_last_updated
+    FROM project_health_default
+    ORDER BY
+      FIELD(LOWER(health_short_name), 'good', 'average', 'bad', 'blocked'),
+      health_short_name ASC
+  ");
+
+  return array_map(static function (array $r): array {
+    return [
+      'healthId' => trim((string)($r['health_id'] ?? '')),
+      'shortName' => trim((string)($r['health_short_name'] ?? '')),
+      'longName' => trim((string)($r['health_long_name'] ?? '')),
+      'status' => trim((string)($r['status'] ?? 'active')),
+      'dateCreated' => trim((string)($r['date_created'] ?? '')),
+      'dateLastUpdated' => trim((string)($r['date_last_updated'] ?? '')),
+    ];
+  }, $stmt->fetchAll());
+}
+
+function set_project_health_active(PDO $pdo, string $projectId, string $healthShortName, ?string $description = null): array {
+  ensure_project_health_infra($pdo);
+  ensure_project_health_for_project($pdo, $projectId);
+
+  $healthShortName = trim($healthShortName);
+  if ($healthShortName === '') {
+    throw new InvalidArgumentException('Missing healthShortName');
+  }
+
+  $defaultStmt = $pdo->prepare("
+    SELECT health_short_name, health_long_name
+    FROM project_health_default
+    WHERE LOWER(health_short_name) = LOWER(:short_name)
+    LIMIT 1
+  ");
+  $defaultStmt->execute([':short_name' => $healthShortName]);
+  $defaultRow = $defaultStmt->fetch();
+  if (!$defaultRow) {
+    throw new InvalidArgumentException('Unknown health status: ' . $healthShortName);
+  }
+
+  $resolvedShortName = trim((string)($defaultRow['health_short_name'] ?? $healthShortName));
+  $resolvedLongName = trim((string)($defaultRow['health_long_name'] ?? $resolvedShortName));
+  $resolvedDescription = $description !== null && trim($description) !== ''
+    ? trim($description)
+    : $resolvedLongName;
+
+  $ownsTransaction = !$pdo->inTransaction();
+  if ($ownsTransaction) $pdo->beginTransaction();
+  try {
+    $upsert = $pdo->prepare("
+      INSERT INTO project_health (project_id, health_short_name, health_long_name, description, status)
+      VALUES (:project_id, :short_name, :long_name, :description, 'active')
+      ON DUPLICATE KEY UPDATE
+        health_long_name = VALUES(health_long_name),
+        description = VALUES(description),
+        status = 'active',
+        date_last_updated = CURRENT_TIMESTAMP
+    ");
+    $upsert->execute([
+      ':project_id' => $projectId,
+      ':short_name' => $resolvedShortName,
+      ':long_name' => $resolvedLongName,
+      ':description' => $resolvedDescription,
+    ]);
+
+    $deactivate = $pdo->prepare("
+      UPDATE project_health
+      SET status = 'inactive', date_last_updated = CURRENT_TIMESTAMP
+      WHERE project_id = :project_id
+        AND LOWER(health_short_name) <> LOWER(:short_name)
+        AND LOWER(COALESCE(status, 'active')) = 'active'
+    ");
+    $deactivate->execute([
+      ':project_id' => $projectId,
+      ':short_name' => $resolvedShortName,
+    ]);
+
+    if ($ownsTransaction) $pdo->commit();
+  } catch (Throwable $inner) {
+    if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+    throw $inner;
+  }
+
+  return fetch_project_health($pdo, $projectId);
+}
+
+function detect_active_health_short_name(array $project): ?string {
+  $rows = $project['projectHealth'] ?? null;
+  if (!is_array($rows)) return null;
+
+  foreach ($rows as $row) {
+    if (!is_array($row)) continue;
+    $status = strtolower(trim((string)($row['status'] ?? '')));
+    if ($status !== 'active') continue;
+    $short = trim((string)($row['shortName'] ?? ''));
+    if ($short !== '') return $short;
+  }
+
+  return null;
+}
+
+function fetch_project_health(PDO $pdo, string $projectId): array {
+  ensure_project_health_for_project($pdo, $projectId);
+
+  $stmt = $pdo->prepare("
+    SELECT health_id, health_short_name, health_long_name, description, status, date_created, date_last_updated
+    FROM project_health
+    WHERE project_id = :id
+    ORDER BY
+      FIELD(LOWER(health_short_name), 'good', 'average', 'bad', 'blocked'),
+      health_short_name ASC
+  ");
+  $stmt->execute([':id' => $projectId]);
+
+  return array_map(static function (array $r): array {
+    return [
+      'healthId' => trim((string)($r['health_id'] ?? '')),
+      'shortName' => trim((string)($r['health_short_name'] ?? '')),
+      'longName' => trim((string)($r['health_long_name'] ?? '')),
+      'description' => trim((string)($r['description'] ?? '')),
+      'status' => trim((string)($r['status'] ?? 'active')),
+      'dateCreated' => trim((string)($r['date_created'] ?? '')),
+      'dateLastUpdated' => trim((string)($r['date_last_updated'] ?? '')),
+    ];
+  }, $stmt->fetchAll());
+}
+
 function fetch_project_dependencies(PDO $pdo, string $projectId): array {
   ensure_project_task_links_table($pdo);
 
@@ -180,18 +414,41 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     'name' => (string)($row['name'] ?? ''),
     'description' => (string)($row['description'] ?? ''),
     'phases' => [],
+    'phaseDefinitions' => [],
     'activities' => [],
     'taskMatrix' => [],
+    'projectHealth' => [],
   ];
 
-  $phaseStmt = $pdo->prepare('SELECT phase_id FROM project_phases WHERE project_id = :id ORDER BY phase_order ASC, phase_id ASC');
+  $phaseSchema = resolve_project_phases_schema($pdo);
+  $phaseShortColumn = $phaseSchema['shortColumn'];
+  $phaseLongExpr = $phaseSchema['hasLongName'] ? '`longName`' : 'NULL';
+  $phaseStmt = $pdo->prepare("
+    SELECT `{$phaseShortColumn}` AS `shortname`, {$phaseLongExpr} AS `longname`
+    FROM project_phases
+    WHERE project_id = :id
+    ORDER BY phase_order ASC, `{$phaseShortColumn}` ASC
+  ");
   $phaseStmt->execute([':id' => $projectId]);
   foreach ($phaseStmt->fetchAll() as $p) {
-    $phaseId = trim((string)($p['phase_id'] ?? ''));
-    if ($phaseId !== '') $detail['phases'][] = $phaseId;
+    $phaseId = trim((string)($p['shortname'] ?? ''));
+    if ($phaseId === '') continue;
+    $phaseLabel = trim((string)($p['longname'] ?? ''));
+    if ($phaseLabel === '') $phaseLabel = default_phase_long_name($phaseId);
+    $detail['phases'][] = $phaseId;
+    $detail['phaseDefinitions'][$phaseId] = [
+      'id' => $phaseId,
+      'label' => $phaseLabel,
+    ];
   }
   if (!$detail['phases']) {
     $detail['phases'] = project_default_phases();
+    foreach ($detail['phases'] as $phaseId) {
+      $detail['phaseDefinitions'][$phaseId] = [
+        'id' => $phaseId,
+        'label' => default_phase_long_name($phaseId),
+      ];
+    }
   }
 
   $actStmt = $pdo->prepare('
@@ -253,6 +510,12 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     if (!in_array($phaseId, $detail['phases'], true)) {
       $detail['phases'][] = $phaseId;
     }
+    if (!isset($detail['phaseDefinitions'][$phaseId])) {
+      $detail['phaseDefinitions'][$phaseId] = [
+        'id' => $phaseId,
+        'label' => default_phase_long_name($phaseId),
+      ];
+    }
     if (!isset($detail['taskMatrix'][$activityId][$phaseId])) {
       $detail['taskMatrix'][$activityId][$phaseId] = [];
     }
@@ -305,6 +568,7 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
   }
 
   $detail['ganttDependencies'] = fetch_project_dependencies($pdo, $projectId);
+  $detail['projectHealth'] = fetch_project_health($pdo, $projectId);
 
   return $detail;
 }
@@ -318,6 +582,9 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
     }
   }
   if (!$phases) $phases = project_default_phases();
+  $rawPhaseDefinitions = (isset($body['phaseDefinitions']) && is_array($body['phaseDefinitions']))
+    ? $body['phaseDefinitions']
+    : [];
 
   $activities = [];
   if (isset($body['activities']) && is_array($body['activities'])) {
@@ -346,13 +613,24 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
   $pdo->prepare('DELETE FROM project_activities WHERE project_id = :id')->execute([':id' => $projectId]);
   $pdo->prepare('DELETE FROM project_phases WHERE project_id = :id')->execute([':id' => $projectId]);
 
-  $phaseInsert = $pdo->prepare('INSERT INTO project_phases (project_id, phase_id, phase_order) VALUES (:project_id, :phase_id, :phase_order)');
+  $phaseSchema = resolve_project_phases_schema($pdo);
+  $phaseShortColumn = $phaseSchema['shortColumn'];
+  $phaseInsertSql = $phaseSchema['hasLongName']
+    ? "INSERT INTO project_phases (project_id, `{$phaseShortColumn}`, longName, phase_order) VALUES (:project_id, :phase_id, :long_name, :phase_order)"
+    : "INSERT INTO project_phases (project_id, `{$phaseShortColumn}`, phase_order) VALUES (:project_id, :phase_id, :phase_order)";
+  $phaseInsert = $pdo->prepare($phaseInsertSql);
   foreach ($phases as $idx => $phaseId) {
-    $phaseInsert->execute([
+    $phaseLabel = trim((string)($rawPhaseDefinitions[$phaseId]['label'] ?? ''));
+    if ($phaseLabel === '') $phaseLabel = default_phase_long_name($phaseId);
+    $params = [
       ':project_id' => $projectId,
       ':phase_id' => $phaseId,
       ':phase_order' => $idx + 1,
-    ]);
+    ];
+    if ($phaseSchema['hasLongName']) {
+      $params[':long_name'] = $phaseLabel;
+    }
+    $phaseInsert->execute($params);
   }
 
   $activityInsert = $pdo->prepare('
@@ -484,9 +762,11 @@ function save_project_detail(PDO $pdo, string $projectId, array $project, string
   // sinon commit implicite et "There is no active transaction".
   ensure_project_changes_table($pdo);
   ensure_project_task_links_table($pdo);
+  ensure_project_health_infra($pdo);
 
   $project['id'] = $projectId;
   $project = normalize_project_payload($project);
+  $activeHealthShortName = detect_active_health_short_name($project);
 
   $name = trim((string)($project['name'] ?? ''));
   if ($name === '') {
@@ -518,6 +798,10 @@ function save_project_detail(PDO $pdo, string $projectId, array $project, string
     ]);
 
     persist_project_tables($pdo, $project, $projectId);
+    ensure_project_health_for_project($pdo, $projectId);
+    if ($activeHealthShortName !== null) {
+      set_project_health_active($pdo, $projectId, $activeHealthShortName);
+    }
     insert_project_change($pdo, $projectId, 'save_project', $source, $payloadStr);
     $pdo->commit();
   } catch (Throwable $inner) {
@@ -562,6 +846,8 @@ function rebuild_project_payload(PDO $pdo, string $projectId): array {
 }
 
 function delete_project_everywhere(PDO $pdo, string $projectId): bool {
+  ensure_project_health_infra($pdo);
+
   $existsStmt = $pdo->prepare('SELECT COUNT(*) FROM projects WHERE id = :id');
   $existsStmt->execute([':id' => $projectId]);
   $exists = (int)$existsStmt->fetchColumn() > 0;
@@ -578,6 +864,7 @@ function delete_project_everywhere(PDO $pdo, string $projectId): bool {
     $pdo->prepare('DELETE FROM users_roles_projects WHERE project_id = :id')->execute([':id' => $projectId]);
     $pdo->prepare('DELETE FROM project_risks WHERE projectId = :id')->execute([':id' => $projectId]);
     $pdo->prepare('DELETE FROM project_changes WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare('DELETE FROM project_health WHERE project_id = :id')->execute([':id' => $projectId]);
 
     $pdo->prepare('DELETE FROM projects WHERE id = :id')->execute([':id' => $projectId]);
     $pdo->commit();
@@ -854,6 +1141,15 @@ try {
   }
 
   // -----------------------------
+  // GET /project-health-defaults
+  // -----------------------------
+  if ($method === 'GET' && $path === '/project-health-defaults') {
+    $pdo = db();
+    $rows = fetch_project_health_defaults($pdo);
+    send_json($rows);
+  }
+
+  // -----------------------------
   // GET /project-types/{id}/defaults
   // -----------------------------
   if ($method === 'GET' && preg_match('#^/project-types/([^/]+)/defaults$#', $path, $m)) {
@@ -900,6 +1196,44 @@ try {
     }
 
     send_json(['ok' => true, 'user' => $user]);
+  }
+
+  // -----------------------------
+  // POST /projects/{id}/health
+  // Body: { healthShortName: "Good"|"Average"|"Bad"|"Blocked", description?: string }
+  // -----------------------------
+  if ($method !== 'POST' && preg_match('#^/projects/([^/]+)/health$#', $path)) {
+    send_json([
+      'error' => 'Method not allowed',
+      'uri' => $path,
+      'method' => $method,
+      'allowed' => ['POST'],
+    ], 405);
+  }
+
+  if ($method === 'POST' && preg_match('#^/projects/([^/]+)/health$#', $path, $m)) {
+    $projectId = normalize_id(urldecode($m[1]));
+    if ($projectId === '') send_json(['error' => 'Missing project id in route'], 400);
+
+    $body = read_json_body();
+    $healthShortName = trim((string)($body['healthShortName'] ?? ''));
+    $description = array_key_exists('description', $body) ? (string)$body['description'] : null;
+
+    if ($healthShortName === '') {
+      send_json(['error' => 'Missing healthShortName'], 400);
+    }
+
+    $pdo = db();
+    try {
+      $projectHealth = set_project_health_active($pdo, $projectId, $healthShortName, $description);
+      send_json([
+        'ok' => true,
+        'id' => $projectId,
+        'projectHealth' => $projectHealth,
+      ]);
+    } catch (InvalidArgumentException $e) {
+      send_json(['error' => $e->getMessage()], 400);
+    }
   }
 
   // -----------------------------

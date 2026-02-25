@@ -15,11 +15,7 @@ export class App {
 
   constructor(public auth: AuthService) { }
 
-  loginMock() {
-    this.auth.loginMock();
-  }
-
-  logoutMock() {
-    this.auth.logoutMock();
+  logout() {
+    this.auth.logout();
   }
 }

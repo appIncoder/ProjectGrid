@@ -104,7 +104,7 @@
                     'health-critical': project.health === 'critical'
                   }">
                 </span>
-                {{ getHealthLabel(project.health) }}
+                {{ project.healthName || getHealthLabel(project.health) }}
               </td>
               <td class="text-end" (click)="$event.stopPropagation()">
                 <div ngbDropdown [container]="'body'" class="d-inline-block">

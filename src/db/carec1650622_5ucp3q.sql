@@ -119,9 +119,10 @@ CREATE TABLE IF NOT EXISTS `project_task_assignments` (
 
 CREATE TABLE IF NOT EXISTS `project_phases` (
   `project_id` uuid NOT NULL,
-  `phase_id` varchar(32) NOT NULL,
+  `shortname` varchar(32) NOT NULL,
+  `longName` varchar(255) DEFAULT NULL,
   `phase_order` int NOT NULL,
-  PRIMARY KEY (`project_id`,`phase_id`)
+  PRIMARY KEY (`project_id`,`shortname`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -269,6 +270,36 @@ CREATE TABLE IF NOT EXISTS `project_risks` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Structure de la table `project_health_default`
+--
+
+CREATE TABLE IF NOT EXISTS `project_health_default` (
+  `health_id` uuid NOT NULL DEFAULT uuid(),
+  `health_short_name` varchar(64) NOT NULL,
+  `health_long_name` varchar(255) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'active',
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`health_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_health`
+--
+
+CREATE TABLE IF NOT EXISTS `project_health` (
+  `health_id` uuid NOT NULL DEFAULT uuid(),
+  `project_id` uuid NOT NULL,
+  `health_short_name` varchar(64) NOT NULL,
+  `health_long_name` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'active',
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`health_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
 -- Structure de la table `project_changes` (historique des modifications)
 --
 
@@ -382,6 +413,8 @@ ALTER TABLE `project_tasks`
 ALTER TABLE `project_type_tasks_default`
   ADD COLUMN IF NOT EXISTS `phaseId` varchar(64) DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `activitiesId` varchar(64) DEFAULT NULL;
+ALTER TABLE `project_health`
+  ADD COLUMN IF NOT EXISTS `description` text DEFAULT NULL;
 ALTER TABLE `project_tasks_links`
   ADD COLUMN IF NOT EXISTS `project_id` uuid NOT NULL,
   ADD COLUMN IF NOT EXISTS `idTasksFrom` varchar(128) NOT NULL,
@@ -393,6 +426,62 @@ CREATE INDEX IF NOT EXISTS `idx_pta_reporter` ON `project_task_assignments` (`re
 CREATE INDEX IF NOT EXISTS `idx_pta_accountant` ON `project_task_assignments` (`accountant_id`);
 CREATE INDEX IF NOT EXISTS `idx_pta_responsible` ON `project_task_assignments` (`responsible_id`);
 CREATE INDEX IF NOT EXISTS `idx_project_phases_order` ON `project_phases` (`project_id`,`phase_order`);
+ALTER TABLE `project_phases`
+  ADD COLUMN IF NOT EXISTS `shortname` varchar(32) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `longName` varchar(255) DEFAULT NULL;
+SET @has_project_phases_phase_id := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_phases' AND COLUMN_NAME = 'phase_id'
+);
+SET @has_project_phases_shortname := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_phases' AND COLUMN_NAME = 'shortname'
+);
+SET @sql := IF(@has_project_phases_phase_id > 0 AND @has_project_phases_shortname > 0,
+  'UPDATE `project_phases` SET `shortname` = COALESCE(NULLIF(`shortname`, ''''), `phase_id`) WHERE `phase_id` IS NOT NULL',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @pk_has_phase_id := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_phases'
+    AND INDEX_NAME = 'PRIMARY'
+    AND COLUMN_NAME = 'phase_id'
+);
+SET @pk_has_shortname := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_phases'
+    AND INDEX_NAME = 'PRIMARY'
+    AND COLUMN_NAME = 'shortname'
+);
+SET @sql := IF(@pk_has_phase_id > 0 AND @pk_has_shortname = 0,
+  'ALTER TABLE `project_phases` DROP PRIMARY KEY, ADD PRIMARY KEY (`project_id`, `shortname`)',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has_project_phases_phase_id := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_phases' AND COLUMN_NAME = 'phase_id'
+);
+SET @sql := IF(@has_project_phases_phase_id > 0,
+  'ALTER TABLE `project_phases` DROP COLUMN `phase_id`',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE `project_phases` p
+LEFT JOIN (
+  SELECT `shortname`, MIN(`longname`) AS `longname`
+  FROM `project_type_phases_default`
+  GROUP BY `shortname`
+) d
+  ON d.`shortname` = p.`shortname`
+SET p.`longName` = COALESCE(NULLIF(p.`longName`, ''), d.`longname`, p.`shortname`)
+WHERE p.`shortname` IS NOT NULL;
 CREATE INDEX IF NOT EXISTS `idx_project_activities_owner` ON `project_activities` (`owner_name`);
 CREATE INDEX IF NOT EXISTS `idx_project_tasks_status` ON `project_tasks` (`status`);
 CREATE INDEX IF NOT EXISTS `idx_project_type_tasks_default_phase` ON `project_type_tasks_default` (`project_type_id`, `phaseId`);
@@ -404,6 +493,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS `uidx_activities_type_short` ON `activities` (
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_phases_default_type_short` ON `project_type_phases_default` (`project_type_id`, `shortname`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_short` ON `project_type_activities_default` (`project_type_id`, `shortname`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_tasks_default_type_short` ON `project_type_tasks_default` (`project_type_id`, `shortname`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_health_default_short_name` ON `project_health_default` (`health_short_name`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_health_project_short` ON `project_health` (`project_id`, `health_short_name`);
+CREATE INDEX IF NOT EXISTS `idx_project_health_project` ON `project_health` (`project_id`);
+CREATE INDEX IF NOT EXISTS `idx_project_health_status` ON `project_health` (`status`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_risks_name` ON `risks` (`name`);
 CREATE INDEX IF NOT EXISTS `idx_risks_name` ON `risks` (`name`);
 CREATE INDEX IF NOT EXISTS `idx_risks_probability` ON `risks` (`probability`);
@@ -458,8 +551,10 @@ DELETE FROM `project_activities`;
 DELETE FROM `project_phases`;
 DELETE FROM `users_roles_projects`;
 DELETE FROM `project_risks`;
+DELETE FROM `project_health`;
 DELETE FROM `project_changes`;
 DELETE FROM `risks`;
+DELETE FROM `project_health_default`;
 DELETE FROM `activities`;
 DELETE FROM `project_type_phases_default`;
 DELETE FROM `project_type_activities_default`;
@@ -485,8 +580,18 @@ ON DUPLICATE KEY UPDATE
   `description` = VALUES(`description`),
   `status` = VALUES(`status`);
 
+INSERT IGNORE INTO `project_health_default`
+(`health_short_name`, `health_long_name`, `status`) VALUES
+('Good', 'No known issues', 'active'),
+('Average', 'Non blocking issues to manage', 'active'),
+('Bad', 'Severe issues requiring action', 'active'),
+('Blocked', 'Blocking issues requiring immediate action', 'active');
+
 INSERT IGNORE INTO `project_type` (`name`, `description`, `date_created`)
-VALUES ('PMBOK', '6 phases', NOW());
+VALUES
+('PMBOK', '6 phases', NOW()),
+('AgilePM', 'Lifecycle AgilePM (DSDM): Pre-Project, Feasibility, Foundations, Exploration, Engineering, Deployment, Post-Project', NOW()),
+('Prince2', 'PRINCE2 process model: SU, IP, CS, MP, SB, DP, CP', NOW());
 
 SET @id_project_type_pmbok := (
   SELECT `uuid`
@@ -495,12 +600,34 @@ SET @id_project_type_pmbok := (
   ORDER BY `date_created` ASC
   LIMIT 1
 );
+SET @id_project_type_agilepm := (
+  SELECT `uuid`
+  FROM `project_type`
+  WHERE `name` = 'AgilePM'
+  ORDER BY `date_created` ASC
+  LIMIT 1
+);
+SET @id_project_type_prince2 := (
+  SELECT `uuid`
+  FROM `project_type`
+  WHERE `name` = 'Prince2'
+  ORDER BY `date_created` ASC
+  LIMIT 1
+);
 
 INSERT IGNORE INTO `activities` (`sequence`, `short_name`, `long_name`, `id_project_type`, `date_created`) VALUES
 (1, 'projet', 'Gestion du projet', @id_project_type_pmbok, NOW()),
 (2, 'metier', 'Gestion du métier', @id_project_type_pmbok, NOW()),
 (3, 'changement', 'Gestion du changement', @id_project_type_pmbok, NOW()),
-(4, 'technologie', 'Gestion de la technologie', @id_project_type_pmbok, NOW());
+(4, 'technologie', 'Gestion de la technologie', @id_project_type_pmbok, NOW()),
+(1, 'projet', 'Gestion du projet', @id_project_type_agilepm, NOW()),
+(2, 'metier', 'Gestion du métier', @id_project_type_agilepm, NOW()),
+(3, 'changement', 'Gestion du changement', @id_project_type_agilepm, NOW()),
+(4, 'technologie', 'Gestion de la technologie', @id_project_type_agilepm, NOW()),
+(1, 'projet', 'Gestion du projet', @id_project_type_prince2, NOW()),
+(2, 'metier', 'Gestion du métier', @id_project_type_prince2, NOW()),
+(3, 'changement', 'Gestion du changement', @id_project_type_prince2, NOW()),
+(4, 'technologie', 'Gestion de la technologie', @id_project_type_prince2, NOW());
 
 -- Données par défaut: activités et phases d'un projet type
 INSERT IGNORE INTO `project_type_activities_default`
@@ -521,7 +648,21 @@ INSERT IGNORE INTO `project_type_phases_default`
 (@id_project_type_pmbok, 3, 'Phase3', 'Phase 3', 'Active', NOW()),
 (@id_project_type_pmbok, 4, 'Phase4', 'Phase 4', 'Active', NOW()),
 (@id_project_type_pmbok, 5, 'Phase5', 'Phase 5', 'Active', NOW()),
-(@id_project_type_pmbok, 6, 'Phase6', 'Phase 6', 'Active', NOW());
+(@id_project_type_pmbok, 6, 'Phase6', 'Phase 6', 'Active', NOW()),
+(@id_project_type_agilepm, 1, 'pre_project', 'Pre-Project', 'Active', NOW()),
+(@id_project_type_agilepm, 2, 'feasibility', 'Feasibility', 'Active', NOW()),
+(@id_project_type_agilepm, 3, 'foundations', 'Foundations', 'Active', NOW()),
+(@id_project_type_agilepm, 4, 'exploration', 'Exploration', 'Active', NOW()),
+(@id_project_type_agilepm, 5, 'engineering', 'Engineering', 'Active', NOW()),
+(@id_project_type_agilepm, 6, 'deployment', 'Deployment', 'Active', NOW()),
+(@id_project_type_agilepm, 7, 'post_project', 'Post-Project', 'Active', NOW()),
+(@id_project_type_prince2, 1, 'su', 'Starting up a Project (SU)', 'Active', NOW()),
+(@id_project_type_prince2, 2, 'ip', 'Initiating a Project (IP)', 'Active', NOW()),
+(@id_project_type_prince2, 3, 'cs', 'Controlling a Stage (CS)', 'Active', NOW()),
+(@id_project_type_prince2, 4, 'mp', 'Managing Product Delivery (MP)', 'Active', NOW()),
+(@id_project_type_prince2, 5, 'sb', 'Managing a Stage Boundary (SB)', 'Active', NOW()),
+(@id_project_type_prince2, 6, 'dp', 'Directing a Project (DP)', 'Active', NOW()),
+(@id_project_type_prince2, 7, 'cp', 'Closing a Project (CP)', 'Active', NOW());
 
 INSERT IGNORE INTO `risks` (`uuid`, `name`, `description`, `probability`, `criticity`, `date_created`) VALUES
 ('10000000-0000-0000-0000-000000000001', 'Indisponibilité d''un sponsor métier', 'Disponibilité clé métier', 'Moyenne', 'high', NOW()),
@@ -547,6 +688,17 @@ SELECT
 FROM `projects` p
 JOIN `risks` r
 WHERE p.`id` = '6c4a8c7c-95ca-4b5d-8667-7e8242f73596';
+
+INSERT IGNORE INTO `project_health`
+(`project_id`, `health_short_name`, `health_long_name`, `description`, `status`)
+SELECT
+  '6c4a8c7c-95ca-4b5d-8667-7e8242f73596' AS `project_id`,
+  d.`health_short_name`,
+  d.`health_long_name`,
+  d.`health_long_name` AS `description`,
+  'active' AS `status`
+FROM `project_health_default` d
+WHERE LOWER(d.`health_short_name`) = 'good';
 
 SET @roles_pk_seed_col := IF(
   (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'roles' AND COLUMN_NAME = 'id') > 0,
@@ -610,13 +762,13 @@ SET @sql := IF(@urp_pk_seed_col IS NULL,
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-INSERT IGNORE INTO `project_phases` (`project_id`, `phase_id`, `phase_order`) VALUES
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase1', 1),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase2', 2),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase3', 3),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase4', 4),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase5', 5),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase6', 6);
+INSERT IGNORE INTO `project_phases` (`project_id`, `shortname`, `longName`, `phase_order`) VALUES
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase1', 'Phase 1', 1),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase2', 'Phase 2', 2),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase3', 'Phase 3', 3),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase4', 'Phase 4', 4),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase5', 'Phase 5', 5),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase6', 'Phase 6', 6);
 
 INSERT IGNORE INTO `project_activities` (`project_id`, `activity_id`, `label`, `owner_name`, `sequence`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Gestion du projet', 'Alice Dupont', 1),
@@ -698,12 +850,56 @@ LEFT JOIN `project_activities` a
  AND a.`activity_id` = t.`activity_id`
 LEFT JOIN `project_phases` p
   ON p.`project_id` = t.`project_id`
- AND p.`phase_id` = t.`phase_id`
+ AND p.`shortname` = t.`phase_id`
 WHERE t.`project_id` = @seed_project_id
 ORDER BY
   COALESCE(a.`sequence`, 999),
   COALESCE(p.`phase_order`, 999),
   t.`task_id` ASC;
+
+-- Données par défaut AgilePM
+INSERT IGNORE INTO `project_type_tasks_default`
+(`project_type_id`, `phaseId`, `activitiesId`, `sequence`, `shortname`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_agilepm, 'pre_project', 'projet', 1, 'agp-001', 'Nommer Executive et Business Sponsor', 'Active', NOW()),
+(@id_project_type_agilepm, 'pre_project', 'metier', 2, 'agp-002', 'Clarifier besoin métier initial', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'projet', 3, 'agp-003', 'Conduire l''étude de faisabilité', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'technologie', 4, 'agp-004', 'Valider faisabilité technique de haut niveau', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'metier', 5, 'agp-005', 'Établir Prioritised Requirements List (PRL)', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'projet', 6, 'agp-006', 'Produire Foundations Summary', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'projet', 7, 'agp-007', 'Construire Delivery Plan et Timeboxes', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'metier', 8, 'agp-008', 'Animer ateliers de clarification des exigences', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'technologie', 9, 'agp-009', 'Réaliser prototypage fonctionnel', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'changement', 10, 'agp-010', 'Préparer conduite du changement incrémentale', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'technologie', 11, 'agp-011', 'Développer solution en timebox', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'technologie', 12, 'agp-012', 'Exécuter tests techniques et qualité', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'metier', 13, 'agp-013', 'Valider fonctionnalités avec Business Ambassador', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'projet', 14, 'agp-014', 'Préparer déploiement incrémental', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'changement', 15, 'agp-015', 'Former utilisateurs et support', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'metier', 16, 'agp-016', 'Confirmer bénéfices attendus de l''incrément', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'projet', 17, 'agp-017', 'Mesurer bénéfices et retour d''expérience', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'changement', 18, 'agp-018', 'Consolider adoption et amélioration continue', 'Active', NOW());
+
+-- Données par défaut PRINCE2
+INSERT IGNORE INTO `project_type_tasks_default`
+(`project_type_id`, `phaseId`, `activitiesId`, `sequence`, `shortname`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_prince2, 'su', 'projet', 1, 'pr2-001', 'Désigner Executive et Project Manager', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 2, 'pr2-002', 'Capturer le Project Mandate', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 3, 'pr2-003', 'Assembler l''équipe de management projet', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'projet', 4, 'pr2-004', 'Élaborer Project Initiation Documentation (PID)', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'metier', 5, 'pr2-005', 'Définir Business Case détaillé', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'projet', 6, 'pr2-006', 'Mettre en place registres (risks, issues, quality)', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'projet', 7, 'pr2-007', 'Soumettre stage plan au Project Board', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'projet', 8, 'pr2-008', 'Obtenir autorisation de démarrage de stage', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'projet', 9, 'pr2-009', 'Suivre avancement et écarts du stage', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'projet', 10, 'pr2-010', 'Gérer risques et issues du stage', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'technologie', 11, 'pr2-011', 'Accepter work package', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'technologie', 12, 'pr2-012', 'Produire et vérifier produits', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'metier', 13, 'pr2-013', 'Livrer produits complétés au Project Manager', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'projet', 14, 'pr2-014', 'Préparer End Stage Report', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'projet', 15, 'pr2-015', 'Préparer plan du stage suivant', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'metier', 16, 'pr2-016', 'Mettre à jour Business Case pour décision', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'projet', 17, 'pr2-017', 'Préparer End Project Report', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'changement', 18, 'pr2-018', 'Planifier revue post-projet et transfert en BAU', 'Active', NOW());
 
 --
 -- Enrichissement non destructif des données existantes

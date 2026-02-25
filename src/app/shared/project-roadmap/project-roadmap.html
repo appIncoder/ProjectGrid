@@ -226,7 +226,7 @@
 
               <!-- Col4 -->
               <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <span *ngIf="getRowTask(row.rowIndex) as t; else dash3">{{ t.phase }}</span>
+                <span *ngIf="getRowTask(row.rowIndex) as t; else dash3" [attr.title]="getPhaseLongName(t.phase)">{{ t.phase }}</span>
                 <ng-template #dash3><span class="text-muted">—</span></ng-template>
               </div>
 

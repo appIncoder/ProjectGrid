@@ -81,7 +81,7 @@
         <div class="d-flex">
           <button *ngIf="auth.isAuthenticated"
                   class="avatar-logout-btn"
-                  (click)="logoutMock()">
+                  (click)="logout()">
             <span class="avatar-circle" aria-hidden="true">
               {{ (auth.user?.label || auth.user?.username || 'U').charAt(0).toUpperCase() }}
             </span>

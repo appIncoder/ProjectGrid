@@ -44,7 +44,7 @@ export class AuthService {
     );
 
     if (!res?.ok || !res.user?.id) {
-      this.logoutMock();
+      this.logout();
       return false;
     }
 
@@ -58,13 +58,7 @@ export class AuthService {
     return true;
   }
 
-  loginMock(): void {
-    this._isAuthenticated = true;
-    this._user = { id: 'mock', username: 'mock', label: 'Utilisateur Mock' };
-    this.persistToStorage();
-  }
-
-  logoutMock(): void {
+  logout(): void {
     this._isAuthenticated = false;
     this._user = null;
     this.clearStorage();

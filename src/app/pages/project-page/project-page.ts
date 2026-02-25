@@ -1,10 +1,11 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import type { ProjectDetail, ProjectTab, UserRef } from '../../models';
-import { ProjectDataService } from '../../services/project-data.service';
+import { ProjectDataService, type ProjectHealthDefaultRef } from '../../services/project-data.service';
 import { ProjectService } from '../../services/project.service';
 
 // Composants d’onglet
@@ -20,6 +21,7 @@ import { ProjectRessources } from '../../shared/project-ressources/project-resso
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterModule,
     ProjectScorecard,
     ProjectRisks,
@@ -35,12 +37,15 @@ import { ProjectRessources } from '../../shared/project-ressources/project-resso
 export class ProjectPage implements OnInit, OnDestroy {
   project: ProjectDetail | null = null;
   users: UserRef[] = [];
+  healthDefaults: ProjectHealthDefaultRef[] = [];
+  selectedHealthShortName = '';
   activeTab: ProjectTab = 'scorecard';
 
   isLoading = false;
   loadError: string | null = null;
   saveError: string | null = null;
   isSaving = false;
+  isUpdatingHealth = false;
 
   private readonly subs = new Subscription();
   private destroyed = false;
@@ -87,9 +92,10 @@ export class ProjectPage implements OnInit, OnDestroy {
     console.log('[ProjectPage] loadProject()', { projectId });
 
     try {
-      const [p, users] = await Promise.all([
+      const [p, users, healthDefaults] = await Promise.all([
         this.data.getProjectById(projectId),
         this.data.listUsers().catch(() => [] as UserRef[]),
+        this.data.listProjectHealthDefaults().catch(() => [] as ProjectHealthDefaultRef[]),
       ]);
 
       console.log('[ProjectPage] getProjectById result', { found: !!p, projectId });
@@ -102,6 +108,8 @@ export class ProjectPage implements OnInit, OnDestroy {
 
       this.project = this.normalizeForView(p, projectId);
       this.users = users;
+      this.healthDefaults = (healthDefaults ?? []).filter((h) => String(h?.status ?? '').toLowerCase() === 'active');
+      this.selectedHealthShortName = this.getActiveProjectHealthShortName(this.project) || 'Good';
       this.activeTab = this.activeTab || 'scorecard';
 
       console.log('[ProjectPage] project bound to template', {
@@ -173,6 +181,43 @@ export class ProjectPage implements OnInit, OnDestroy {
 
   setTab(tab: ProjectTab): void {
     this.activeTab = tab;
+  }
+
+  async onProjectHealthChange(nextShortName: string): Promise<void> {
+    if (!this.project || this.isUpdatingHealth) return;
+    const selected = String(nextShortName ?? '').trim();
+    if (!selected) return;
+
+    const current = this.getActiveProjectHealthShortName(this.project);
+    if (current && current.toLowerCase() === selected.toLowerCase()) return;
+
+    this.isUpdatingHealth = true;
+    this.isSaving = true;
+    this.saveError = null;
+    try {
+      const updated = await this.data.updateProjectHealth(this.project.id, selected);
+      this.project = {
+        ...this.project,
+        projectHealth: Array.isArray(updated) ? updated : [],
+      } as ProjectDetail;
+      this.selectedHealthShortName = this.getActiveProjectHealthShortName(this.project) || selected;
+      this.projectService.registerProject(this.project);
+      this.data.cacheProject(this.project);
+    } catch (e) {
+      console.error('[ProjectPage] onProjectHealthChange error', e);
+      this.saveError = "La mise à jour de l'état de santé a échoué.";
+      this.selectedHealthShortName = current || this.selectedHealthShortName;
+    } finally {
+      this.isUpdatingHealth = false;
+      this.isSaving = false;
+      if (!this.destroyed) this.cdr.detectChanges();
+    }
+  }
+
+  private getActiveProjectHealthShortName(project: ProjectDetail | null): string {
+    const rows = Array.isArray((project as any)?.projectHealth) ? (project as any).projectHealth : [];
+    const active = rows.find((h: any) => String(h?.status ?? '').toLowerCase() === 'active');
+    return String(active?.shortName ?? '').trim();
   }
 
   private normalizeForView(p: ProjectDetail, requestedId: string | null): ProjectDetail {

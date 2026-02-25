@@ -34,6 +34,21 @@
           <div class="project-meta">
             <span class="project-meta-item">ID: {{ p.id }}</span>
             <span class="project-meta-item">Vue détaillée active</span>
+            <span class="project-meta-item d-inline-flex align-items-center gap-2">
+              <label for="project-health-select" class="mb-0">Santé:</label>
+              <select
+                id="project-health-select"
+                class="form-select form-select-sm project-health-select"
+                style="min-width: 180px;"
+                [ngModel]="selectedHealthShortName"
+                (ngModelChange)="onProjectHealthChange($event)"
+                [disabled]="isUpdatingHealth || isSaving"
+              >
+                <option *ngFor="let h of healthDefaults" [ngValue]="h.shortName">
+                  {{ h.shortName }} - {{ h.longName }}
+                </option>
+              </select>
+            </span>
           </div>
         </div>
       </div>

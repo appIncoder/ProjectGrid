@@ -9,8 +9,7 @@ import type {
   TaskCategory,
   ActivityStatus,
 } from '../models';
-
-const DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
+import { ProjectDataService } from './project-data.service';
 
 export interface ProjectActionPayload {
   projectId: string;
@@ -60,19 +59,10 @@ export interface ProjectMutationEvent {
 export class ProjectService {
   private readonly mutationsSubject = new Subject<ProjectMutationEvent>();
 
-  // Mini store (en attendant un store global / backend temps réel)
-  private projects = new Map<string, ProjectDetail>();
-
   // Règles planning
   readonly daysPerMonth = 30;
-  readonly phaseToMonthIndex: Record<PhaseId, number> = {
-    Phase1: 0,
-    Phase2: 1,
-    Phase3: 2,
-    Phase4: 3,
-    Phase5: 4,
-    Phase6: 5,
-  };
+
+  constructor(private projectData: ProjectDataService) {}
 
   get mutations$(): Observable<ProjectMutationEvent> {
     return this.mutationsSubject.asObservable();
@@ -93,12 +83,21 @@ export class ProjectService {
     this.ensurePhaseDefinitions(project);
     this.seedMissingTaskDates(project);
 
-    // ✅ store
-    this.projects.set(project.id, project);
+    // Cache partagé avec la couche d'accès backend
+    this.projectData.cacheProject(project);
   }
 
   getProject(projectId: string): ProjectDetail | undefined {
-    return this.projects.get(projectId);
+    return this.projectData.getCachedProject(projectId);
+  }
+
+  getPhaseToMonthIndex(phases: PhaseId[]): Record<PhaseId, number> {
+    const ordered = this.uniquePhases(phases);
+    const map = {} as Record<PhaseId, number>;
+    ordered.forEach((p, idx) => {
+      map[p] = idx;
+    });
+    return map;
   }
 
   // -----------------------------
@@ -157,9 +156,10 @@ export class ProjectService {
     return Math.round(diffMs / 86400000);
   }
 
-  computeDefaultTaskDatesForPhase(phase: PhaseId): { startDate: string; endDate: string } {
+  computeDefaultTaskDatesForPhase(phase: PhaseId, phases: PhaseId[]): { startDate: string; endDate: string } {
     const ganttStart = this.getDefaultGanttStartDate();
-    const monthIndex = this.phaseToMonthIndex[phase] ?? 0;
+    const phaseMap = this.getPhaseToMonthIndex(phases);
+    const monthIndex = phaseMap[phase] ?? 0;
 
     const startDayIndex = monthIndex * this.daysPerMonth;
     const endDayIndex = startDayIndex + (this.daysPerMonth - 1);
@@ -193,8 +193,18 @@ export class ProjectService {
       }
     }
 
-    // 3) fallback
-    project.phases = DEFAULT_PHASES;
+    // 3) fallback minimal (évite tout hardcode de framework)
+    project.phases = ['Phase1'];
+  }
+
+  private uniquePhases(phases: PhaseId[]): PhaseId[] {
+    const out: PhaseId[] = [];
+    for (const phase of phases) {
+      const p = String(phase ?? '').trim() as PhaseId;
+      if (!p || out.includes(p)) continue;
+      out.push(p);
+    }
+    return out.length ? out : (['Phase1'] as PhaseId[]);
   }
 
   // -----------------------------
@@ -204,8 +214,7 @@ export class ProjectService {
     const taskMatrix: any = (project as any)?.taskMatrix;
     if (!taskMatrix || typeof taskMatrix !== 'object') return;
 
-    const phases: PhaseId[] =
-      Array.isArray(project.phases) && project.phases.length ? project.phases : DEFAULT_PHASES;
+    const phases: PhaseId[] = this.uniquePhases(project.phases as PhaseId[]);
 
     for (const activityId of Object.keys(taskMatrix ?? {})) {
       const phaseMap = taskMatrix?.[activityId];
@@ -215,7 +224,7 @@ export class ProjectService {
         const tasks = phaseMap?.[phaseId];
         if (!Array.isArray(tasks)) continue;
 
-        const defaults = this.computeDefaultTaskDatesForPhase(phaseId);
+        const defaults = this.computeDefaultTaskDatesForPhase(phaseId, phases);
 
         for (const task of tasks as Task[]) {
           if (!task || typeof task !== 'object') continue;
@@ -235,7 +244,7 @@ export class ProjectService {
   // Task CRUD (centralisé)
   // -----------------------------
   createTask(payload: CreateTaskPayload): Task | null {
-    const project = this.projects.get(payload.projectId);
+    const project = this.getProject(payload.projectId);
     if (!project) return null;
 
     const matrix = project.taskMatrix as Record<string, Record<string, Task[]>>;
@@ -268,7 +277,7 @@ export class ProjectService {
   }
 
   updateTask(payload: UpdateTaskPayload): void {
-    const project = this.projects.get(payload.projectId);
+    const project = this.getProject(payload.projectId);
     if (!project) return;
 
     const fromActivityId = payload.activityId;
@@ -328,7 +337,7 @@ export class ProjectService {
     startDayIndex?: number;
     endDayIndex?: number;
   }): void {
-    const project = this.projects.get(params.projectId);
+    const project = this.getProject(params.projectId);
     if (!project) return;
 
     const located = this.findTaskById(project, params.taskId);
@@ -351,8 +360,7 @@ export class ProjectService {
     project: ProjectDetail,
     taskId: string
   ): { activityId: ActivityId; phase: PhaseId; task: Task } | null {
-    const phases: PhaseId[] =
-      Array.isArray(project.phases) && project.phases.length ? project.phases : DEFAULT_PHASES;
+    const phases: PhaseId[] = this.uniquePhases(project.phases as PhaseId[]);
 
     for (const activityId of Object.keys(project.taskMatrix ?? {}) as ActivityId[]) {
       const byPhase = project.taskMatrix[activityId];

@@ -35,6 +35,16 @@ export interface ActivityDefinition {
   sequence?: number | null;
 }
 
+export interface ProjectHealthItem {
+  healthId: string;
+  shortName: string;
+  longName: string;
+  description: string;
+  status: string;
+  dateCreated: string;
+  dateLastUpdated: string;
+}
+
 
 export type ProjectDetail = {
   id: string;
@@ -52,6 +62,7 @@ export type ProjectDetail = {
     toId: string;
     type?: DependencyType; // 'F2S' | 'F2F' | 'S2S'
   }>;
+  projectHealth?: ProjectHealthItem[];
 };
 
 
@@ -92,6 +103,7 @@ export interface ProjectListItem {
   role: string;
   status: ProjectStatus;
   health: Health;
+  healthName?: string;
   currentPhase: string;
 }
 
@@ -102,6 +114,7 @@ export interface Project {
   role: string;
   status: string;
   health: Health;
+  healthName?: string;
   projectManager: string;
   sponsor: string;
   currentPhase: PhaseId;

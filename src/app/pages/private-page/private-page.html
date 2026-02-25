@@ -61,7 +61,7 @@
                           'health-warning': project.health === 'warning',
                           'health-critical': project.health === 'critical'
                         }"
-                        [title]="getHealthLabel(project.health)"
+                        [title]="project.healthName || getHealthLabel(project.health)"
                       ></span>
                     </td>
                     <td class="text-end" (click)="$event.stopPropagation()">
@@ -147,7 +147,7 @@
                         'health-critical': p.health === 'critical'
                       }"
                     ></span>
-                    {{ getHealthLabel(p.health) }}
+                    {{ p.healthName || getHealthLabel(p.health) }}
                   </span>
                 </div>
               </div>
@@ -159,16 +159,18 @@
                   <thead>
                     <tr>
                       <th class="text-start">Activités</th>
-                      <th *ngFor="let phase of phases">{{ phase }}</th>
+                      <th *ngFor="let phase of getSelectedPhases()">
+                        <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr *ngFor="let activity of activities">
+                    <tr *ngFor="let activity of getSelectedActivities()">
                       <td class="text-start">{{ activity.label }}</td>
-                      <td *ngFor="let phase of phases">
+                      <td *ngFor="let phase of getSelectedPhases()">
                         <span
                           class="status-pill"
-                          [ngClass]="getStatusClass(p.activityMatrix[activity.id][phase])"
+                          [ngClass]="getStatusClass(getSelectedCellStatus(activity.id, phase))"
                         ></span>
                       </td>
                     </tr>

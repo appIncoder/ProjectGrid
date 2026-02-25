@@ -2,7 +2,9 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
-import { Router, RouterModule } from '@angular/router';
+import { NavigationEnd, Router, RouterModule } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { filter } from 'rxjs/operators';
 
 import { ProjectDataService, type ProjectTypeDefaults, type ProjectTypeRef } from '../../services/project-data.service';
 import { AuthService } from '../../services/auth.service';
@@ -44,6 +46,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
   successTitle = '';
   successMessage = '';
   private destroyed = false;
+  private routerEventsSub: Subscription | null = null;
 
   constructor(
     private router: Router,
@@ -54,10 +57,19 @@ export class ProjectsPage implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     void this.loadProjectsFromApi();
+    this.routerEventsSub = this.router.events
+      .pipe(filter((evt): evt is NavigationEnd => evt instanceof NavigationEnd))
+      .subscribe((evt) => {
+        if (evt.urlAfterRedirects.startsWith('/projects')) {
+          void this.loadProjectsFromApi();
+        }
+      });
   }
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.routerEventsSub?.unsubscribe();
+    this.routerEventsSub = null;
   }
 
   async refreshProjects(): Promise<void> {
@@ -65,6 +77,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
   }
 
   private async loadProjectsFromApi(): Promise<void> {
+    if (this.isLoading) return;
     this.isLoading = true;
     this.loadError = null;
 
@@ -92,6 +105,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
 
   private toProjectListItem(detail: ProjectDetail): ProjectListItem {
     const currentPhase = this.computeCurrentPhase(detail);
+    const healthName = this.getActiveHealthShortName(detail) || 'Good';
     return {
       id: detail.id,
       name: detail.name,
@@ -99,6 +113,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
       role: 'Membre',
       status: this.computeStatus(detail),
       health: this.computeHealth(detail),
+      healthName,
       currentPhase: currentPhase.replace('Phase', 'Phase '),
     };
   }
@@ -140,29 +155,17 @@ export class ProjectsPage implements OnInit, OnDestroy {
   }
 
   private computeHealth(detail: ProjectDetail): Health {
-    const matrix: any = detail.taskMatrix ?? {};
-    let total = 0;
-    let bad = 0;
+    const shortName = this.getActiveHealthShortName(detail).toLowerCase();
 
-    for (const actId of Object.keys(matrix)) {
-      const byPhase = matrix[actId];
-      if (!byPhase) continue;
-      for (const ph of Object.keys(byPhase)) {
-        const tasks: any[] = byPhase?.[ph] ?? [];
-        for (const t of tasks) {
-          total++;
-          const s = (t?.status ?? 'todo') as ActivityStatus;
-          if (s === 'notdone') bad += 2;
-          else if (s === 'todo') bad += 1;
-        }
-      }
-    }
-
-    if (total === 0) return 'good';
-    const ratio = bad / (total * 2);
-    if (ratio > 0.45) return 'critical';
-    if (ratio > 0.2) return 'warning';
+    if (shortName === 'average') return 'warning';
+    if (shortName === 'bad' || shortName === 'blocked') return 'critical';
     return 'good';
+  }
+
+  private getActiveHealthShortName(detail: ProjectDetail): string {
+    const rows = Array.isArray((detail as any)?.projectHealth) ? (detail as any).projectHealth : [];
+    const active = rows.find((h: any) => String(h?.status ?? '').toLowerCase() === 'active');
+    return String(active?.shortName ?? '').trim();
   }
 
   private computeStatus(detail: ProjectDetail): ProjectStatus {
@@ -296,6 +299,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
       name,
       description,
       phases: seeded.phases,
+      phaseDefinitions: seeded.phaseDefinitions,
       activities: seeded.activities,
       taskMatrix: seeded.taskMatrix,
       owner,
@@ -421,6 +425,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
 
   private buildProjectSeedFromType(defaults: ProjectTypeDefaults, owner: string): {
     phases: PhaseId[];
+    phaseDefinitions: NonNullable<ProjectDetail['phaseDefinitions']>;
     activities: ProjectDetail['activities'];
     taskMatrix: ProjectDetail['taskMatrix'];
   } | null {
@@ -438,7 +443,19 @@ export class ProjectsPage implements OnInit, OnDestroy {
     if (!phases.length || !activitiesRaw.length) return null;
 
     const activities = {} as ProjectDetail['activities'];
+    const phaseDefinitions = {} as NonNullable<ProjectDetail['phaseDefinitions']>;
     const taskMatrix = {} as ProjectDetail['taskMatrix'];
+
+    for (const p of defaults.phases) {
+      const phaseId = String(p.id ?? '').trim() as PhaseId;
+      if (!phaseId) continue;
+      phaseDefinitions[phaseId] = {
+        id: phaseId,
+        label: String(p.label ?? phaseId).trim() || phaseId,
+        startDate: '',
+        endDate: '',
+      };
+    }
 
     for (const a of activitiesRaw) {
       const aid = a.id as ActivityId;
@@ -471,6 +488,6 @@ export class ProjectsPage implements OnInit, OnDestroy {
       });
     }
 
-    return { phases, activities, taskMatrix };
+    return { phases, phaseDefinitions, activities, taskMatrix };
   }
 }

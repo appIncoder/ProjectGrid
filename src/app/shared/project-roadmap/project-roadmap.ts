@@ -74,6 +74,15 @@ type TaskHoverCard = {
   styleUrls: ['./project-roadmap.scss'],
 })
 export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck {
+  private readonly defaultPhaseLongNames: Record<string, string> = {
+    Phase1: 'Phase 1',
+    Phase2: 'Phase 2',
+    Phase3: 'Phase 3',
+    Phase4: 'Phase 4',
+    Phase5: 'Phase 5',
+    Phase6: 'Phase 6',
+  };
+
   @Input() project: ProjectDetail | null = null;
   @Input() users: UserRef[] = [];
   @Input() isSaving = false;
@@ -253,6 +262,17 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   private getActivityThemeLabel(activityId: ActivityId): string {
     return this.project?.activities?.[activityId]?.label ?? this.fallbackActivityLabels[activityId] ?? activityId;
+  }
+
+  getPhaseLongName(phase: PhaseId | string): string {
+    const defs = (this.project as any)?.phaseDefinitions;
+    const fromDefinitions = String(defs?.[phase]?.label ?? '').trim();
+    if (fromDefinitions) return fromDefinitions;
+    return this.defaultPhaseLongNames[String(phase)] ?? String(phase);
+  }
+
+  private getPhaseToMonthIndexMap(): Record<PhaseId, number> {
+    return this.projectService.getPhaseToMonthIndex(this.project?.phases ?? []);
   }
 
   private columnResizing = false;
@@ -763,7 +783,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     const ov = this.scheduleOverrides[taskId];
     if (ov) return { start: ov.startDayIndex, end: ov.endDayIndex };
 
-    const monthIndex = this.projectService.phaseToMonthIndex[phase] ?? 0;
+    const monthIndex = this.getPhaseToMonthIndexMap()[phase] ?? 0;
     const start = monthIndex * this.projectService.daysPerMonth;
     const end = start + (this.projectService.daysPerMonth - 1);
     return { start, end };
@@ -908,7 +928,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       }
 
       if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
-        const monthIndexes = activityTasks.map(t => this.projectService.phaseToMonthIndex[t.phase] ?? 0);
+        const phaseMap = this.getPhaseToMonthIndexMap();
+        const monthIndexes = activityTasks.map(t => phaseMap[t.phase] ?? 0);
         const minMonthIndex = Math.min(...monthIndexes);
         const maxMonthIndex = Math.max(...monthIndexes);
         minStart = minMonthIndex * this.projectService.daysPerMonth;
@@ -931,7 +952,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       for (const t of activityTasks) {
         rows.push({ activityId, label: '', rowIndex, isHeader: false });
 
-        const monthIndex = this.projectService.phaseToMonthIndex[t.phase] ?? 0;
+        const monthIndex = this.getPhaseToMonthIndexMap()[t.phase] ?? 0;
         const dStart = monthIndex * this.projectService.daysPerMonth;
         const dEnd = dStart + this.projectService.daysPerMonth - 1;
 
@@ -988,7 +1009,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private monthIndexToPhaseId(monthIndex: number): PhaseId {
-    const entries = Object.entries(this.projectService.phaseToMonthIndex) as Array<[PhaseId, number]>;
+    const entries = Object.entries(this.getPhaseToMonthIndexMap()) as Array<[PhaseId, number]>;
     const found = entries.find(([, idx]) => idx === monthIndex);
     return found?.[0] ?? 'Phase1';
   }
@@ -1591,7 +1612,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
         } else {
           // fallback sur phase
           const ph: PhaseId = ((t as any).phase ?? 'Phase1') as PhaseId;
-          const mi = this.projectService.phaseToMonthIndex[ph] ?? 0;
+          const mi = this.getPhaseToMonthIndexMap()[ph] ?? 0;
           start = mi * this.projectService.daysPerMonth;
           end = start + (this.projectService.daysPerMonth - 1);
         }

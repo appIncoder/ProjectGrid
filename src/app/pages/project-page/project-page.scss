@@ -69,6 +69,18 @@
   font-weight: 600;
 }
 
+.project-health-select {
+  border: 0;
+  background-color: transparent;
+  box-shadow: none;
+  padding-right: 1.25rem;
+}
+
+.project-health-select:focus {
+  border: 0;
+  box-shadow: none;
+}
+
 /* ===========================
    Onglets
    =========================== */

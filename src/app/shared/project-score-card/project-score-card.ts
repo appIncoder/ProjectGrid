@@ -31,6 +31,15 @@ import { ProjectService } from '../../services/project.service';
   styleUrls: ['./project-score-card.scss'],
 })
 export class ProjectScorecard implements OnChanges {
+  private readonly defaultPhaseLongNames: Record<string, string> = {
+    Phase1: 'Phase 1',
+    Phase2: 'Phase 2',
+    Phase3: 'Phase 3',
+    Phase4: 'Phase 4',
+    Phase5: 'Phase 5',
+    Phase6: 'Phase 6',
+  };
+
   @Input() project: ProjectDetail | null = null;
   @Input() users: UserRef[] = [];
   @ViewChild('scorecardWrap', { static: false }) scorecardWrapRef?: ElementRef<HTMLElement>;
@@ -296,6 +305,13 @@ export class ProjectScorecard implements OnChanges {
 
   getPhaseLabel(phase: PhaseId): string {
     return phase;
+  }
+
+  getPhaseLongName(phase: PhaseId): string {
+    const defs = (this.project as any)?.phaseDefinitions;
+    const fromDefinitions = String(defs?.[phase]?.label ?? '').trim();
+    if (fromDefinitions) return fromDefinitions;
+    return this.defaultPhaseLongNames[phase] ?? String(phase);
   }
 
   onTaskDragStart(event: DragEvent, activityId: ActivityId, phase: PhaseId, task: Task): void {
