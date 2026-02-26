@@ -14,7 +14,48 @@ import type {
   ActivityStatus,
   Project,
   ProjectDetail,
+  RiskLevel,
+  Task,
 } from '../../models';
+
+type ProgressCell = {
+  phaseId: PhaseId;
+  percent: number;
+  done: number;
+  total: number;
+};
+
+type DashboardProgressRow = {
+  activityId: ActivityId;
+  activityLabel: string;
+  cells: ProgressCell[];
+};
+
+type DashboardRiskRow = {
+  id: string;
+  shortName: string;
+  longName: string;
+  title: string;
+  impact: string;
+  probability: string;
+  level: RiskLevel;
+  status: string;
+  owner: string;
+  dueDate: string;
+};
+
+type RiskDisplayMode = 'table' | 'matrix';
+
+type DashboardDueTaskRow = {
+  taskId: string;
+  taskLabel: string;
+  activityLabel: string;
+  phaseLabel: string;
+  dueDate: string;
+  dueTs: number;
+  daysRemaining: number;
+  status: ActivityStatus;
+};
 
 @Component({
   selector: 'app-private-page',
@@ -36,12 +77,19 @@ export class PrivatePage implements OnInit, OnDestroy {
   myProjects: Project[] = [];
   selectedProject: Project | null = null;
   selectedProjectDetail: ProjectDetail | null = null;
+  progressRows: DashboardProgressRow[] = [];
+  topRiskRows: DashboardRiskRow[] = [];
+  dueTaskRows: DashboardDueTaskRow[] = [];
+  riskDisplayMode: RiskDisplayMode = 'table';
+  readonly riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
+  readonly riskProbabilityLevels: string[] = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
   private projectDetailsById = new Map<string, ProjectDetail>();
 
   isLoading = false;
   loadError: string | null = null;
   private destroyed = false;
   private routerEventsSub: Subscription | null = null;
+  private risksChangedSub: Subscription | null = null;
 
   constructor(
     private router: Router,
@@ -61,12 +109,18 @@ export class PrivatePage implements OnInit, OnDestroy {
           void this.loadProjectsFromApi();
         }
       });
+    this.risksChangedSub = this.projectData.risksChanged$.subscribe((evt) => {
+      if (!evt?.projectId) return;
+      void this.refreshProjectRiskSnapshot(evt.projectId);
+    });
   }
 
   ngOnDestroy(): void {
     this.destroyed = true;
     this.routerEventsSub?.unsubscribe();
     this.routerEventsSub = null;
+    this.risksChangedSub?.unsubscribe();
+    this.risksChangedSub = null;
   }
 
   async refresh(): Promise<void> {
@@ -113,6 +167,7 @@ export class PrivatePage implements OnInit, OnDestroy {
       this.selectedProjectDetail = this.selectedProject
         ? this.projectDetailsById.get(this.selectedProject.id) ?? null
         : null;
+      this.refreshDashboardData();
 
       console.log('[PrivatePage] dashboard projects ready', {
         count: this.myProjects.length,
@@ -124,6 +179,9 @@ export class PrivatePage implements OnInit, OnDestroy {
       this.myProjects = [];
       this.selectedProject = null;
       this.selectedProjectDetail = null;
+      this.progressRows = [];
+      this.topRiskRows = [];
+      this.dueTaskRows = [];
       this.projectDetailsById.clear();
     } finally {
       this.isLoading = false;
@@ -277,6 +335,7 @@ export class PrivatePage implements OnInit, OnDestroy {
   selectProject(project: Project): void {
     this.selectedProject = project;
     this.selectedProjectDetail = this.projectDetailsById.get(project.id) ?? null;
+    this.refreshDashboardData();
   }
 
   getSelectedPhases(): PhaseId[] {
@@ -288,7 +347,7 @@ export class PrivatePage implements OnInit, OnDestroy {
     if (!activities) return [];
 
     return Object.values(activities)
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         const aSeq = Number.isFinite(a.sequence as number) ? Number(a.sequence) : Number.POSITIVE_INFINITY;
         const bSeq = Number.isFinite(b.sequence as number) ? Number(b.sequence) : Number.POSITIVE_INFINITY;
         if (aSeq !== bSeq) return aSeq - bSeq;
@@ -362,5 +421,202 @@ export class PrivatePage implements OnInit, OnDestroy {
   onArchive(project: Project): void {
     this.projectService.archiveProject({ projectId: project.id });
     project.status = 'Archivé';
+  }
+
+  private refreshDashboardData(): void {
+    const detail = this.selectedProjectDetail;
+    if (!detail) {
+      this.progressRows = [];
+      this.topRiskRows = [];
+      this.dueTaskRows = [];
+      return;
+    }
+
+    this.progressRows = this.buildProgressRows(detail);
+    this.topRiskRows = this.readTopRisks(detail);
+    this.dueTaskRows = this.buildDueTasksRows(detail);
+  }
+
+  private async refreshProjectRiskSnapshot(projectId: string): Promise<void> {
+    const id = String(projectId ?? '').trim();
+    if (!id) return;
+
+    const detail = await this.projectData.getProjectById(id).catch(() => null);
+    if (!detail) return;
+
+    this.projectDetailsById.set(id, detail);
+
+    const idx = this.myProjects.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      this.myProjects[idx] = this.toDashboardProject(detail);
+    }
+
+    if (this.selectedProject?.id === id) {
+      this.selectedProjectDetail = detail;
+      this.selectedProject = this.myProjects.find((p) => p.id === id) ?? this.selectedProject;
+      this.refreshDashboardData();
+      if (!this.destroyed) this.cdr.detectChanges();
+    }
+  }
+
+  private buildProgressRows(detail: ProjectDetail): DashboardProgressRow[] {
+    const phases = this.getSelectedPhases();
+    const activities = this.getSelectedActivities();
+    const rows: DashboardProgressRow[] = [];
+
+    for (const activity of activities) {
+      const cells: ProgressCell[] = phases.map((phaseId) => {
+        const tasks = detail.taskMatrix?.[activity.id]?.[phaseId] ?? [];
+        const total = tasks.length;
+        const done = tasks.filter((t) => t.status === 'done' || t.status === 'notapplicable').length;
+        const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+        return { phaseId, percent, done, total };
+      });
+      rows.push({
+        activityId: activity.id,
+        activityLabel: activity.label,
+        cells,
+      });
+    }
+
+    return rows;
+  }
+
+  private readTopRisks(detail: ProjectDetail): DashboardRiskRow[] {
+    const rows = Array.isArray((detail as any).projectRisks) ? (detail as any).projectRisks : [];
+    const levelRank: Record<RiskLevel, number> = {
+      critical: 4,
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
+
+    return rows
+      .filter((r: any) => !!r && !!String(r.title ?? '').trim())
+      .sort((a: any, b: any) => {
+        const aRank = levelRank[this.mapCriticityToRiskLevel(String(a.criticity ?? ''))] ?? 0;
+        const bRank = levelRank[this.mapCriticityToRiskLevel(String(b.criticity ?? ''))] ?? 0;
+        if (aRank !== bRank) return bRank - aRank;
+
+        const aResolved = String(a.status ?? '').toLowerCase() === 'closed' ? 1 : 0;
+        const bResolved = String(b.status ?? '').toLowerCase() === 'closed' ? 1 : 0;
+        if (aResolved !== bResolved) return aResolved - bResolved;
+
+        const aDue = Date.parse(a.dateLastUpdated ?? a.dateCreated ?? '') || Number.POSITIVE_INFINITY;
+        const bDue = Date.parse(b.dateLastUpdated ?? b.dateCreated ?? '') || Number.POSITIVE_INFINITY;
+        return aDue - bDue;
+      })
+      .map((r: any) => ({
+        id: String(r.riskId ?? ''),
+        shortName: String(r.shortName ?? '').trim(),
+        longName: String(r.longName ?? r.title ?? '').trim(),
+        title: String(r.longName ?? r.title ?? '').trim(),
+        impact: this.mapCriticityToImpactLabel(String(r.criticity ?? '')),
+        probability: this.normalizeRiskProbabilityLabel(String(r.probability ?? '')),
+        level: this.mapCriticityToRiskLevel(String(r.criticity ?? '')),
+        status: String(r.status ?? 'Open'),
+        owner: '—',
+        dueDate: String(r.dateLastUpdated ?? r.dateCreated ?? ''),
+      }));
+  }
+
+  private mapCriticityToRiskLevel(criticity: string): RiskLevel {
+    const norm = criticity.trim().toLowerCase();
+    if (norm === 'critical' || norm === 'critique') return 'critical';
+    if (norm === 'high' || norm === 'élevée' || norm === 'elevee') return 'high';
+    if (norm === 'medium' || norm === 'moyenne' || norm === 'modéré' || norm === 'modere') return 'medium';
+    return 'low';
+  }
+
+  private mapCriticityToImpactLabel(criticity: string): string {
+    const level = this.mapCriticityToRiskLevel(criticity);
+    if (level === 'critical') return 'Critique';
+    if (level === 'high') return 'Majeur';
+    if (level === 'medium') return 'Modéré';
+    return 'Faible';
+  }
+
+  private normalizeRiskProbabilityLabel(probability: string): string {
+    const norm = String(probability ?? '').trim().toLowerCase();
+    const matched = this.riskProbabilityLevels.find((p) => p.toLowerCase() === norm);
+    return matched ?? this.riskProbabilityLevels[2];
+  }
+
+  setRiskDisplayMode(mode: RiskDisplayMode): void {
+    this.riskDisplayMode = mode;
+  }
+
+  getRiskMatrixDots(impact: string, probability: string): DashboardRiskRow[] {
+    return this.topRiskRows.filter((risk) => risk.impact === impact && risk.probability === probability);
+  }
+
+  private buildDueTasksRows(detail: ProjectDetail): DashboardDueTaskRow[] {
+    const rows: DashboardDueTaskRow[] = [];
+    const phases = detail.phases ?? [];
+    const phaseLabels = phases.reduce<Record<string, string>>((acc, phaseId) => {
+      acc[phaseId] = this.getPhaseLongName(phaseId);
+      return acc;
+    }, {});
+    const activityLabels = this.getSelectedActivities().reduce<Record<string, string>>((acc, a) => {
+      acc[a.id] = a.label;
+      return acc;
+    }, {});
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+    for (const activityId of Object.keys(detail.taskMatrix ?? {}) as ActivityId[]) {
+      const phaseMap = detail.taskMatrix[activityId];
+      for (const phaseId of Object.keys(phaseMap ?? {}) as PhaseId[]) {
+        const tasks = phaseMap[phaseId] ?? [];
+        for (const task of tasks as Task[]) {
+          const dueRaw = String(task?.endDate ?? '').trim();
+          if (!dueRaw) continue;
+          const dueTs = Date.parse(dueRaw);
+          if (Number.isNaN(dueTs)) continue;
+
+          const diff = dueTs - todayStart;
+          const daysRemaining = Math.floor(diff / 86400000);
+
+          rows.push({
+            taskId: String(task.id ?? ''),
+            taskLabel: String(task.label ?? ''),
+            activityLabel: activityLabels[activityId] ?? String(activityId),
+            phaseLabel: phaseLabels[phaseId] ?? String(phaseId),
+            dueDate: dueRaw,
+            dueTs,
+            daysRemaining,
+            status: (task.status ?? 'todo') as ActivityStatus,
+          });
+        }
+      }
+    }
+
+    return rows.sort((a, b) => a.dueTs - b.dueTs).slice(0, 5);
+  }
+
+  getProgressBarClass(percent: number): string {
+    if (percent >= 80) return 'progress-good';
+    if (percent >= 50) return 'progress-warning';
+    return 'progress-critical';
+  }
+
+  getRiskLevelLabel(level: RiskLevel): string {
+    if (level === 'critical') return 'Critique';
+    if (level === 'high') return 'Élevé';
+    if (level === 'medium') return 'Moyen';
+    return 'Faible';
+  }
+
+  getRiskLevelClass(level: RiskLevel): string {
+    if (level === 'critical') return 'risk-critical';
+    if (level === 'high') return 'risk-high';
+    if (level === 'medium') return 'risk-medium';
+    return 'risk-low';
+  }
+
+  getTaskDueClass(daysRemaining: number): string {
+    if (daysRemaining < 0) return 'due-overdue';
+    if (daysRemaining <= 3) return 'due-soon';
+    return 'due-normal';
   }
 }

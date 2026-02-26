@@ -2,11 +2,6 @@
   display: block;
 }
 
-.roadmap-card-body {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  border-radius: 0.85rem;
-}
-
 .roadmap-toolbar {
   border: 1px solid #dde5f1;
   border-radius: 0.8rem;
@@ -18,41 +13,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
-}
-
-.roadmap-kpi {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid #d7e0ef;
-  border-radius: 999px;
-  padding: 0.12rem 0.5rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: #45556d;
-  background: #f8fbff;
-}
-
-.roadmap-add-task-hint {
-  margin-top: 0.28rem;
-  font-size: 0.7rem;
-  color: #4f5f76;
-}
-
-.roadmap-add-task-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid #56a47f;
-  border-radius: 999px;
-  background: #e9f7ef;
-  color: #198754;
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 0.34rem 0.95rem;
-}
-
-.roadmap-add-task-btn:hover {
-  background: #dff3e8;
 }
 
 .roadmap-add-task-btn__plus {

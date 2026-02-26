@@ -1,0 +1,86 @@
+.risk-matrix-shell {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.project-risks-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #56a47f;
+  border-radius: 999px;
+  background: #e9f7ef;
+  color: #198754;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.34rem 0.95rem;
+}
+
+.project-risks-add-btn:hover {
+  background: #dff3e8;
+}
+
+.impact-axis-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4f5f76;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.risk-matrix-main {
+  min-width: 0;
+}
+
+.prob-axis-label {
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #4f5f76;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.risk-header-col {
+  min-width: 128px;
+}
+
+.risk-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 31, 46, 0.35);
+  z-index: 1800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.risk-modal {
+  width: min(560px, 100%);
+}
+
+.top-risks-table {
+  th,
+  td {
+    border-color: transparent !important;
+  }
+
+  .form-control,
+  .form-control:focus,
+  .form-select,
+  .form-select:focus {
+    border: 0;
+    box-shadow: none;
+    background-color: transparent;
+  }
+}

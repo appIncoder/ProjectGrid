@@ -94,7 +94,9 @@
         <app-project-score-card *ngIf="activeTab === 'scorecard'" [project]="p" [users]="users"></app-project-score-card>
 
         <!-- Onglet 2 : Gestion des risques -->
-        <app-project-risks *ngIf="activeTab === 'risks'" [projectId]="p.id"></app-project-risks>
+        <div [hidden]="activeTab !== 'risks'">
+          <app-project-risks [projectId]="p.id"></app-project-risks>
+        </div>
 
         <!-- Onglet 3 : Gestion du budget -->
         <app-project-budget *ngIf="activeTab === 'budget'"></app-project-budget>

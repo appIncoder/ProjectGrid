@@ -263,9 +263,15 @@ CREATE TABLE IF NOT EXISTS `risks` (
 
 CREATE TABLE IF NOT EXISTS `project_risks` (
   `projectId` uuid NOT NULL,
-  `riskId` uuid NOT NULL,
+  `riskId` uuid NOT NULL DEFAULT uuid(),
+  `short_name` varchar(16) DEFAULT NULL,
+  `long_name` varchar(255) DEFAULT NULL,
+  `status` varchar(16) NOT NULL DEFAULT 'Open',
+  `criticity` varchar(32) DEFAULT NULL,
+  `probability` varchar(32) DEFAULT NULL,
   `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
-  `status` varchar(16) NOT NULL DEFAULT 'active',
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `remaining_risk` uuid DEFAULT NULL,
   PRIMARY KEY (`projectId`, `riskId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -500,8 +506,18 @@ CREATE INDEX IF NOT EXISTS `idx_project_health_status` ON `project_health` (`sta
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_risks_name` ON `risks` (`name`);
 CREATE INDEX IF NOT EXISTS `idx_risks_name` ON `risks` (`name`);
 CREATE INDEX IF NOT EXISTS `idx_risks_probability` ON `risks` (`probability`);
+ALTER TABLE `project_risks`
+  ADD COLUMN IF NOT EXISTS `short_name` varchar(16) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `long_name` varchar(255) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `status` varchar(16) NOT NULL DEFAULT 'Open',
+  ADD COLUMN IF NOT EXISTS `criticity` varchar(32) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `probability` varchar(32) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  ADD COLUMN IF NOT EXISTS `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  ADD COLUMN IF NOT EXISTS `remaining_risk` uuid DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS `idx_project_risks_status` ON `project_risks` (`status`);
 CREATE INDEX IF NOT EXISTS `idx_project_risks_risk` ON `project_risks` (`riskId`);
+CREATE INDEX IF NOT EXISTS `idx_project_risks_remaining` ON `project_risks` (`remaining_risk`);
 CREATE INDEX IF NOT EXISTS `idx_project_changes_project_created` ON `project_changes` (`project_id`, `created_at`);
 
 -- Correction précoce de FK legacy: fk_pta_project peut pointer vers `projects_`
@@ -671,20 +687,28 @@ INSERT IGNORE INTO `risks` (`uuid`, `name`, `description`, `probability`, `criti
 ('10000000-0000-0000-0000-000000000004', 'Turn-over dans l''équipe projet', 'Turn-over équipe', 'Moyenne', 'medium', NOW()),
 ('10000000-0000-0000-0000-000000000005', 'Risque de faille de sécurité', 'Faille de sécurité majeure', 'Faible', 'critical', NOW());
 
-INSERT IGNORE INTO `project_risks` (`projectId`, `riskId`, `date_created`, `status`) VALUES
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000001', NOW(), 'active'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000002', NOW(), 'active'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000003', NOW(), 'active'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000004', NOW(), 'active'),
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000005', NOW(), 'active');
+INSERT IGNORE INTO `project_risks`
+(`projectId`, `riskId`, `short_name`, `long_name`, `status`, `criticity`, `probability`, `date_created`, `date_last_updated`, `remaining_risk`) VALUES
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000001', 'IDS', 'Indisponibilité d''un sponsor métier', 'Open', 'high', 'Moyenne', NOW(), NOW(), NULL),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000002', 'RLI', 'Retard de livraison IT critique', 'Open', 'critical', 'Élevée', NOW(), NOW(), NULL),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000003', 'SDC', 'Sous-estimation des charges projet', 'Open', 'high', 'Élevée', NOW(), NOW(), NULL),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000004', 'TDE', 'Turn-over dans l''équipe projet', 'Open', 'medium', 'Moyenne', NOW(), NOW(), NULL),
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', '10000000-0000-0000-0000-000000000005', 'RDF', 'Risque de faille de sécurité', 'Open', 'critical', 'Faible', NOW(), NOW(), NULL);
 
 -- Lien automatique du projet existant avec tous les risks existants
-INSERT IGNORE INTO `project_risks` (`projectId`, `riskId`, `date_created`, `status`)
+INSERT IGNORE INTO `project_risks`
+(`projectId`, `riskId`, `short_name`, `long_name`, `status`, `criticity`, `probability`, `date_created`, `date_last_updated`, `remaining_risk`)
 SELECT
   p.`id` AS `projectId`,
   r.`uuid` AS `riskId`,
+  UPPER(LEFT(REPLACE(REPLACE(r.`name`, ' ', ''), '-', ''), 3)) AS `short_name`,
+  r.`name` AS `long_name`,
+  'Open' AS `status`,
+  r.`criticity` AS `criticity`,
+  r.`probability` AS `probability`,
   NOW() AS `date_created`,
-  'active' AS `status`
+  NOW() AS `date_last_updated`,
+  NULL AS `remaining_risk`
 FROM `projects` p
 JOIN `risks` r
 WHERE p.`id` = '6c4a8c7c-95ca-4b5d-8667-7e8242f73596';
@@ -1033,6 +1057,20 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 UPDATE `projects` SET `status` = COALESCE(NULLIF(`status`, ''), 'active');
 UPDATE `roles` SET `status` = COALESCE(NULLIF(`status`, ''), 'active');
 UPDATE `users_roles_projects` SET `status` = COALESCE(NULLIF(`status`, ''), 'active');
+UPDATE `project_risks`
+SET `status` = CASE
+  WHEN LOWER(TRIM(COALESCE(`status`, ''))) IN ('open', 'active') THEN 'Open'
+  WHEN LOWER(TRIM(COALESCE(`status`, ''))) IN ('in progress', 'in_progress', 'inprogress') THEN 'In Progress'
+  WHEN LOWER(TRIM(COALESCE(`status`, ''))) IN ('closed', 'resolved') THEN 'Closed'
+  ELSE 'Open'
+END;
+UPDATE `project_risks` pr
+LEFT JOIN `risks` r ON r.`uuid` = pr.`riskId`
+SET
+  pr.`probability` = COALESCE(NULLIF(pr.`probability`, ''), r.`probability`),
+  pr.`criticity` = COALESCE(NULLIF(pr.`criticity`, ''), r.`criticity`),
+  pr.`long_name` = COALESCE(NULLIF(pr.`long_name`, ''), r.`name`),
+  pr.`short_name` = COALESCE(NULLIF(pr.`short_name`, ''), UPPER(LEFT(REPLACE(REPLACE(COALESCE(NULLIF(pr.`long_name`, ''), r.`name`), ' ', ''), '-', ''), 3)));
 UPDATE `users` SET `password_hash` = COALESCE(NULLIF(`password_hash`, ''), '0192023a7bbd73250516f069df18b500');
 SET @has_users_id := (
   SELECT COUNT(*) FROM information_schema.COLUMNS

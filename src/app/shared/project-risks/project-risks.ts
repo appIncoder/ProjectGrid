@@ -1,9 +1,11 @@
-import { Component, HostListener, Input, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, Input, OnChanges, OnDestroy, OnInit, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 
 import { RiskCellItem, RiskLevel, RiskStatus, TopRiskExtended } from '../../models';
+import { ProjectDataService } from '../../services/project-data.service';
 
 export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   OPEN: 'Ouvert',
@@ -13,24 +15,14 @@ export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   CLOSED: 'Fermé',
 };
 
-type RiskStatePayload = {
-  riskMatrix: Record<string, RiskCellItem[]>;
-  topRisks: TopRiskExtended[];
-};
-
-const DEFAULT_RISK_MATRIX: Record<string, RiskCellItem[]> = {
-};
-
-const DEFAULT_TOP_RISKS: TopRiskExtended[] = [
-];
-
 @Component({
   selector: 'app-project-risks',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './project-risks.html',
+  styleUrls: ['./project-risks.scss'],
 })
-export class ProjectRisks implements OnInit {
+export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
   @Input() projectId: string | null = null;
 
   riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
@@ -39,9 +31,9 @@ export class ProjectRisks implements OnInit {
   RISK_STATUS_LABEL = RISK_STATUS_LABEL;
 
   // clé = `${impact}|${prob}`
-  riskMatrix: Record<string, RiskCellItem[]> = this.clone(DEFAULT_RISK_MATRIX);
+  riskMatrix: Record<string, RiskCellItem[]> = {};
 
-  topRisks: TopRiskExtended[] = this.clone(DEFAULT_TOP_RISKS);
+  topRisks: TopRiskExtended[] = [];
 
   draggedRisk: { item: RiskCellItem; fromImpact: string; fromProbability: string } | null = null;
 
@@ -53,47 +45,40 @@ export class ProjectRisks implements OnInit {
     riskId: '' as string,
   };
 
+  isAddRiskModalOpen = false;
+  isCreatingRisk = false;
+  savingRiskIds = new Set<string>();
+  createRiskError: string | null = null;
+  newRiskForm = {
+    title: '',
+    description: '',
+    probability: 'Moyenne',
+    frequency: 'medium',
+  };
+  private readonly subs = new Subscription();
+
+  constructor(
+    private data: ProjectDataService,
+    private cdr: ChangeDetectorRef
+  ) {}
+
   ngOnInit(): void {
-    this.restoreState();
+    this.subs.add(this.data.risksChanged$.subscribe((evt) => {
+      const currentProjectId = (this.projectId ?? '').trim();
+      if (!currentProjectId || evt.projectId !== currentProjectId) return;
+      void this.loadRisksFromDb();
+    }));
+    void this.loadRisksFromDb();
   }
 
-  private storageKey(): string {
-    const key = (this.projectId ?? '').trim() || 'global';
-    return `project-risks:${key}`;
-  }
-
-  private clone<T>(value: T): T {
-    return JSON.parse(JSON.stringify(value)) as T;
-  }
-
-  private persistState(): void {
-    const payload: RiskStatePayload = {
-      riskMatrix: this.riskMatrix,
-      topRisks: this.topRisks,
-    };
-    try {
-      localStorage.setItem(this.storageKey(), JSON.stringify(payload));
-    } catch {
-      // Storage inaccessible (private mode/quota): ignore without blocking UX.
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['projectId']) {
+      void this.loadRisksFromDb();
     }
   }
 
-  private restoreState(): void {
-    try {
-      const raw = localStorage.getItem(this.storageKey());
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<RiskStatePayload>;
-      if (parsed && typeof parsed === 'object') {
-        if (parsed.riskMatrix && typeof parsed.riskMatrix === 'object') {
-          this.riskMatrix = parsed.riskMatrix;
-        }
-        if (Array.isArray(parsed.topRisks)) {
-          this.topRisks = parsed.topRisks;
-        }
-      }
-    } catch {
-      // Corrupt JSON / storage inaccessible: keep defaults.
-    }
+  ngOnDestroy(): void {
+    this.subs.unsubscribe();
   }
 
   get probabilityOptions(): string[] {
@@ -213,7 +198,9 @@ export class ProjectRisks implements OnInit {
 
     this.upsertItemInCell(updatedItem, targetImpact, targetProbability);
     this.draggedRisk = null;
-    this.persistState();
+    if (top) {
+      void this.persistRiskUpdate(top);
+    }
   }
 
   // ====== Synchronisation depuis le tableau TopRisks ======
@@ -229,23 +216,40 @@ export class ProjectRisks implements OnInit {
     const item: RiskCellItem = {
       id: risk.id,
       label: existingItem?.label ?? risk.title ?? risk.id,
+      shortName: existingItem?.shortName ?? risk.shortName,
+      longName: existingItem?.longName ?? risk.longName ?? risk.title,
       level: risk.level,
     };
 
     this.removeItemEverywhere(risk.id);
     this.upsertItemInCell(item, risk.impact, risk.probability);
-    this.persistState();
+    void this.persistRiskUpdate(risk);
   }
 
   onTopRiskLevelChange(risk: TopRiskExtended): void {
     // Quand criticité changée dans le tableau => juste changer le style de la pastille (pas son emplacement)
     this.updateCellItemLevel(risk.id, risk.level);
-    this.persistState();
+    void this.persistRiskUpdate(risk);
   }
 
-  onTopRiskStatusChange(_risk: TopRiskExtended): void {
+  onTopRiskStatusChange(risk: TopRiskExtended): void {
     // Rien à faire côté matrice (statut affiché dans tableau / menu)
-    this.persistState();
+    void this.persistRiskUpdate(risk);
+  }
+
+  onTopRiskLongNameChange(risk: TopRiskExtended): void {
+    risk.longName = (risk.longName ?? '').trim();
+    if (!risk.longName) {
+      void this.loadRisksFromDb();
+      return;
+    }
+    risk.title = risk.longName;
+    const existing = this.getCellItemById(risk.id);
+    if (existing) {
+      existing.longName = risk.longName;
+      existing.label = risk.longName;
+    }
+    void this.persistRiskUpdate(risk);
   }
 
   private getCellItemById(id: string): RiskCellItem | undefined {
@@ -331,5 +335,214 @@ export class ProjectRisks implements OnInit {
     risk.status = status;
     this.onTopRiskStatusChange(risk);
     this.closeContextMenu();
+  }
+
+  openAddRiskModal(): void {
+    this.createRiskError = null;
+    this.newRiskForm = {
+      title: '',
+      description: '',
+      probability: 'Moyenne',
+      frequency: 'medium',
+    };
+    this.isAddRiskModalOpen = true;
+  }
+
+  closeAddRiskModal(refresh = true): void {
+    const wasOpen = this.isAddRiskModalOpen;
+    this.isAddRiskModalOpen = false;
+    this.isCreatingRisk = false;
+    this.createRiskError = null;
+    this.newRiskForm = {
+      title: '',
+      description: '',
+      probability: 'Moyenne',
+      frequency: 'medium',
+    };
+    if (refresh && wasOpen) {
+      void this.loadRisksFromDb();
+    }
+  }
+
+  private mapApiStatusToRiskStatus(status: string): RiskStatus {
+    const norm = (status ?? '').trim().toLowerCase();
+    if (norm === 'in progress' || norm === 'in_progress' || norm === 'inprogress') return 'IN_PROGRESS';
+    if (norm === 'on hold' || norm === 'on_hold') return 'ON_HOLD';
+    if (norm === 'resolved') return 'RESOLVED';
+    if (norm === 'closed') return 'CLOSED';
+    return 'OPEN';
+  }
+
+  private mapRiskStatusToApi(status: RiskStatus | undefined): string {
+    if (status === 'IN_PROGRESS') return 'In Progress';
+    if (status === 'ON_HOLD') return 'On Hold';
+    if (status === 'RESOLVED') return 'Resolved';
+    if (status === 'CLOSED') return 'Closed';
+    return 'Open';
+  }
+
+  private mapRiskLevelToCriticity(level: RiskLevel): string {
+    if (level === 'critical') return 'critical';
+    if (level === 'high') return 'high';
+    if (level === 'medium') return 'medium';
+    return 'low';
+  }
+
+  private mapCriticityToLevel(criticity: string): RiskLevel {
+    const norm = (criticity ?? '').trim().toLowerCase();
+    if (norm === 'critical' || norm === 'critique' || norm === 'very_high') return 'critical';
+    if (norm === 'high' || norm === 'elevee' || norm === 'élevée') return 'high';
+    if (norm === 'medium' || norm === 'moyenne' || norm === 'modere' || norm === 'modéré') return 'medium';
+    return 'low';
+  }
+
+  private mapCriticityToImpactLabel(criticity: string): string {
+    const level = this.mapCriticityToLevel(criticity);
+    if (level === 'critical') return 'Critique';
+    if (level === 'high') return 'Majeur';
+    if (level === 'medium') return 'Modéré';
+    return 'Faible';
+  }
+
+  private normalizeProbabilityLabel(probability: string): string {
+    const norm = (probability ?? '').trim().toLowerCase();
+    const matched = this.riskProbabilityLevels.find((p) => p.toLowerCase() === norm);
+    return matched ?? this.riskProbabilityLevels[2];
+  }
+
+  private isSavingRisk(riskId: string): boolean {
+    return this.savingRiskIds.has(riskId);
+  }
+
+  private async persistRiskUpdate(risk: TopRiskExtended): Promise<void> {
+    const projectId = (this.projectId ?? '').trim();
+    if (!projectId || !risk?.id || this.isSavingRisk(risk.id)) return;
+
+    const longName = String(risk.longName ?? risk.title ?? '').trim();
+    if (!longName) return;
+
+    this.savingRiskIds.add(risk.id);
+    try {
+      const updated = await this.data.updateProjectRisk(projectId, risk.id, {
+        longName,
+        probability: String(risk.probability ?? '').trim(),
+        criticity: this.mapRiskLevelToCriticity(risk.level),
+        status: this.mapRiskStatusToApi(risk.status),
+        remainingRiskId: risk.residualRiskId ?? null,
+      });
+
+      const impact = this.mapCriticityToImpactLabel(updated.criticity);
+      const probability = this.normalizeProbabilityLabel(updated.probability);
+      const computedLevel = this.mapCriticityToLevel(updated.criticity);
+      risk.shortName = updated.shortName || risk.shortName;
+      risk.longName = updated.longName || longName;
+      risk.title = risk.longName;
+      risk.impact = impact;
+      risk.probability = probability;
+      risk.level = computedLevel;
+      risk.status = this.mapApiStatusToRiskStatus(updated.status);
+      risk.dueDate = updated.dateLastUpdated || updated.dateCreated || risk.dueDate;
+      risk.residualRiskId = updated.remainingRiskId || null;
+
+      const item: RiskCellItem = {
+        id: risk.id,
+        label: risk.longName,
+        shortName: risk.shortName,
+        longName: risk.longName,
+        level: risk.level,
+      };
+      this.removeItemEverywhere(risk.id);
+      this.upsertItemInCell(item, risk.impact, risk.probability);
+    } catch {
+      await this.loadRisksFromDb();
+    } finally {
+      this.savingRiskIds.delete(risk.id);
+    }
+  }
+
+  private async loadRisksFromDb(): Promise<void> {
+    const projectId = (this.projectId ?? '').trim();
+    if (!projectId) {
+      this.topRisks = [];
+      this.riskMatrix = {};
+      return;
+    }
+
+    const rows = await this.data.listProjectRisks(projectId).catch(() => []);
+    this.topRisks = rows.slice(0, 10).map((r) => {
+      const impact = this.mapCriticityToImpactLabel(r.criticity);
+      const probability = this.normalizeProbabilityLabel(r.probability);
+      const longName = r.longName || r.title || r.riskId;
+      const shortName = r.shortName || longName.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 3) || 'RSK';
+      return {
+        id: r.riskId,
+        shortName,
+        longName,
+        title: longName,
+        impact,
+        probability,
+        level: this.mapCriticityToLevel(r.criticity),
+        owner: '—',
+        dueDate: r.dateLastUpdated || r.dateCreated || '',
+        status: this.mapApiStatusToRiskStatus(r.status),
+        residualRiskId: r.remainingRiskId || null,
+      } as TopRiskExtended;
+    });
+
+    this.riskMatrix = {};
+    for (const risk of this.topRisks) {
+      this.upsertItemInCell(
+        { id: risk.id, label: risk.title, shortName: risk.shortName, longName: risk.longName, level: risk.level },
+        risk.impact,
+        risk.probability
+      );
+    }
+  }
+
+  onCancelAddRisk(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.closeAddRiskModal();
+  }
+
+  async confirmAddRisk(event?: Event): Promise<void> {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    const projectId = (this.projectId ?? '').trim();
+    if (!projectId) {
+      this.createRiskError = 'Projet introuvable.';
+      return;
+    }
+
+    const title = this.newRiskForm.title.trim();
+    if (!title) {
+      this.createRiskError = 'L’intitulé du risque est obligatoire.';
+      return;
+    }
+
+    this.isCreatingRisk = true;
+    this.createRiskError = null;
+    try {
+      await this.data.createProjectRisk(projectId, {
+        title,
+        description: this.newRiskForm.description.trim(),
+        probability: this.newRiskForm.probability,
+        criticity: this.newRiskForm.frequency,
+        status: 'Open',
+      });
+      // Ferme la popup immédiatement après succès pour un feedback clair.
+      this.closeAddRiskModal(false);
+      this.cdr.detectChanges();
+      // Puis recharge la liste + matrice locales.
+      await this.loadRisksFromDb();
+      this.cdr.detectChanges();
+    } catch (e: any) {
+      this.createRiskError = String(e?.error?.error ?? e?.message ?? "Impossible d'ajouter le risque.");
+      this.cdr.detectChanges();
+    } finally {
+      this.isCreatingRisk = false;
+      this.cdr.detectChanges();
+    }
   }
 }

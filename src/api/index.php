@@ -20,9 +20,12 @@ $routesHint = [
   'GET /project-types/{id}/defaults',
   'POST /auth/login',
   'POST /projects/{id}/health',
+  'POST /projects/{id}/risks',
+  'PUT /projects/{id}/risks/{riskId}',
   'POST /projects/{id}/procedure',
   'POST /projects/{id}/rebuild-payload',
   'GET /projects',
+  'GET /projects/{id}/risks',
   'GET /projects/{id}',
   'DELETE /projects/{id}',
   'POST /projects',
@@ -375,6 +378,482 @@ function fetch_project_health(PDO $pdo, string $projectId): array {
   }, $stmt->fetchAll());
 }
 
+function generate_uuid_v4(): string {
+  $bytes = random_bytes(16);
+  $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+  $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+  $hex = bin2hex($bytes);
+  return sprintf(
+    '%s-%s-%s-%s-%s',
+    substr($hex, 0, 8),
+    substr($hex, 8, 4),
+    substr($hex, 12, 4),
+    substr($hex, 16, 4),
+    substr($hex, 20, 12)
+  );
+}
+
+function normalize_project_risk_status(string $raw): string {
+  $norm = strtoupper(trim($raw));
+  if ($norm === 'OPEN') return 'Open';
+  if ($norm === 'IN_PROGRESS' || $norm === 'IN PROGRESS') return 'In Progress';
+  if ($norm === 'ON_HOLD' || $norm === 'ON HOLD') return 'On Hold';
+  if ($norm === 'RESOLVED') return 'Resolved';
+  if ($norm === 'CLOSED') return 'Closed';
+  return 'Open';
+}
+
+function project_risk_short_name(string $longName): string {
+  $clean = trim(preg_replace('/[^[:alnum:]\s]+/u', ' ', $longName) ?? '');
+  if ($clean === '') return 'RSK';
+
+  $parts = preg_split('/\s+/u', $clean, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+  $short = '';
+  foreach ($parts as $part) {
+    $short .= strtoupper(substr($part, 0, 1));
+    if (strlen($short) >= 3) break;
+  }
+
+  if (strlen($short) < 3) {
+    $fallback = strtoupper(preg_replace('/[^[:alnum:]]+/u', '', $clean) ?? '');
+    $need = 3 - strlen($short);
+    $short .= substr($fallback, 0, $need);
+  }
+
+  if (strlen($short) < 3) {
+    $short = str_pad($short, 3, 'X');
+  }
+
+  return substr($short, 0, 3);
+}
+
+function ensure_project_risks_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `project_risks` (
+      `projectId` uuid NOT NULL,
+      `riskId` uuid NOT NULL DEFAULT uuid(),
+      `short_name` varchar(16) DEFAULT NULL,
+      `long_name` varchar(255) DEFAULT NULL,
+      `status` varchar(16) NOT NULL DEFAULT 'Open',
+      `criticity` varchar(32) DEFAULT NULL,
+      `probability` varchar(32) DEFAULT NULL,
+      `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+      `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      `remaining_risk` uuid DEFAULT NULL,
+      PRIMARY KEY (`projectId`, `riskId`),
+      KEY `idx_project_risks_status` (`status`),
+      KEY `idx_project_risks_risk` (`riskId`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  $pdo->exec("
+    ALTER TABLE `project_risks`
+      ADD COLUMN IF NOT EXISTS `short_name` varchar(16) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS `long_name` varchar(255) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS `status` varchar(16) NOT NULL DEFAULT 'Open',
+      ADD COLUMN IF NOT EXISTS `criticity` varchar(32) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS `probability` varchar(32) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+      ADD COLUMN IF NOT EXISTS `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      ADD COLUMN IF NOT EXISTS `remaining_risk` uuid DEFAULT NULL
+  ");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS `idx_project_risks_status` ON `project_risks` (`status`)");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS `idx_project_risks_risk` ON `project_risks` (`riskId`)");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS `idx_project_risks_remaining` ON `project_risks` (`remaining_risk`)");
+
+  $pdo->exec("
+    UPDATE `project_risks` pr
+    LEFT JOIN `risks` r ON r.`uuid` = pr.`riskId`
+    SET
+      pr.`status` = CASE
+        WHEN LOWER(TRIM(COALESCE(pr.`status`, ''))) IN ('open', 'active') THEN 'Open'
+        WHEN LOWER(TRIM(COALESCE(pr.`status`, ''))) IN ('in progress', 'in_progress', 'inprogress') THEN 'In Progress'
+        WHEN LOWER(TRIM(COALESCE(pr.`status`, ''))) IN ('closed', 'resolved') THEN 'Closed'
+        ELSE 'Open'
+      END,
+      pr.`probability` = COALESCE(NULLIF(pr.`probability`, ''), r.`probability`),
+      pr.`criticity` = COALESCE(NULLIF(pr.`criticity`, ''), r.`criticity`),
+      pr.`long_name` = COALESCE(NULLIF(pr.`long_name`, ''), r.`name`),
+      pr.`short_name` = COALESCE(
+        NULLIF(pr.`short_name`, ''),
+        UPPER(LEFT(REPLACE(REPLACE(COALESCE(NULLIF(pr.`long_name`, ''), r.`name`), ' ', ''), '-', ''), 3))
+      )
+  ");
+
+  // Correction FK legacy: fk_project_risks_project peut pointer vers `projects_`.
+  $fkProjectExistsStmt = $pdo->query("
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'project_risks'
+      AND CONSTRAINT_NAME = 'fk_project_risks_project'
+  ");
+  $fkProjectExists = (int)$fkProjectExistsStmt->fetchColumn();
+
+  if ($fkProjectExists > 0) {
+    $fkProjectRefStmt = $pdo->query("
+      SELECT kcu.REFERENCED_TABLE_NAME
+      FROM information_schema.KEY_COLUMN_USAGE kcu
+      WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+        AND kcu.TABLE_NAME = 'project_risks'
+        AND kcu.CONSTRAINT_NAME = 'fk_project_risks_project'
+      LIMIT 1
+    ");
+    $fkProjectRefTable = trim((string)$fkProjectRefStmt->fetchColumn());
+    if ($fkProjectRefTable !== '' && $fkProjectRefTable !== 'projects') {
+      $pdo->exec("ALTER TABLE `project_risks` DROP FOREIGN KEY `fk_project_risks_project`");
+      $fkProjectExists = 0;
+    }
+  }
+
+  if ($fkProjectExists === 0) {
+    $fkProjectColMatchStmt = $pdo->query("
+      SELECT COUNT(*)
+      FROM information_schema.COLUMNS c1
+      JOIN information_schema.COLUMNS c2
+        ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+      WHERE c1.TABLE_SCHEMA = DATABASE()
+        AND c1.TABLE_NAME = 'project_risks'
+        AND c1.COLUMN_NAME = 'projectId'
+        AND c2.TABLE_NAME = 'projects'
+        AND c2.COLUMN_NAME = 'id'
+        AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+    ");
+    $fkProjectColMatch = (int)$fkProjectColMatchStmt->fetchColumn();
+    if ($fkProjectColMatch > 0) {
+      $pdo->exec("
+        ALTER TABLE `project_risks`
+        ADD CONSTRAINT `fk_project_risks_project`
+        FOREIGN KEY (`projectId`) REFERENCES `projects` (`id`)
+      ");
+    }
+  }
+
+  // Correction FK legacy: fk_project_risks_risk peut pointer vers une mauvaise table/colonne.
+  $fkRiskExistsStmt = $pdo->query("
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'project_risks'
+      AND CONSTRAINT_NAME = 'fk_project_risks_risk'
+  ");
+  $fkRiskExists = (int)$fkRiskExistsStmt->fetchColumn();
+
+  if ($fkRiskExists > 0) {
+    $fkRiskRefStmt = $pdo->query("
+      SELECT kcu.REFERENCED_TABLE_NAME
+      FROM information_schema.KEY_COLUMN_USAGE kcu
+      WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+        AND kcu.TABLE_NAME = 'project_risks'
+        AND kcu.CONSTRAINT_NAME = 'fk_project_risks_risk'
+      LIMIT 1
+    ");
+    $fkRiskRefTable = trim((string)$fkRiskRefStmt->fetchColumn());
+    if ($fkRiskRefTable !== '' && $fkRiskRefTable !== 'risks') {
+      $pdo->exec("ALTER TABLE `project_risks` DROP FOREIGN KEY `fk_project_risks_risk`");
+      $fkRiskExists = 0;
+    }
+  }
+
+  if ($fkRiskExists === 0) {
+    $fkRiskColMatchStmt = $pdo->query("
+      SELECT COUNT(*)
+      FROM information_schema.COLUMNS c1
+      JOIN information_schema.COLUMNS c2
+        ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+      WHERE c1.TABLE_SCHEMA = DATABASE()
+        AND c1.TABLE_NAME = 'project_risks'
+        AND c1.COLUMN_NAME = 'riskId'
+        AND c2.TABLE_NAME = 'risks'
+        AND c2.COLUMN_NAME = 'uuid'
+        AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+    ");
+    $fkRiskColMatch = (int)$fkRiskColMatchStmt->fetchColumn();
+    if ($fkRiskColMatch > 0) {
+      $pdo->exec("
+        ALTER TABLE `project_risks`
+        ADD CONSTRAINT `fk_project_risks_risk`
+        FOREIGN KEY (`riskId`) REFERENCES `risks` (`uuid`)
+      ");
+    }
+  }
+
+  $ready = true;
+}
+
+function create_project_risk(PDO $pdo, string $projectId, array $body): array {
+  ensure_project_risks_table($pdo);
+
+  $projectId = trim($projectId);
+  if ($projectId === '') throw new InvalidArgumentException('Missing project id');
+  $existsStmt = $pdo->prepare('SELECT COUNT(*) FROM `projects` WHERE `id` = :id');
+  $existsStmt->execute([':id' => $projectId]);
+  if ((int)$existsStmt->fetchColumn() === 0) {
+    throw new InvalidArgumentException('Project not found');
+  }
+
+  $title = trim((string)($body['title'] ?? $body['name'] ?? ''));
+  $description = trim((string)($body['description'] ?? ''));
+  $probability = trim((string)($body['probability'] ?? ''));
+  $criticity = trim((string)($body['criticity'] ?? $body['frequency'] ?? ''));
+  $status = normalize_project_risk_status((string)($body['status'] ?? 'Open'));
+  $remainingRisk = normalize_id((string)($body['remainingRiskId'] ?? ''));
+  if ($remainingRisk === '') $remainingRisk = null;
+  $longName = $title;
+  $shortName = project_risk_short_name($longName);
+
+  if ($title === '') throw new InvalidArgumentException('Missing risk title');
+  if ($probability === '') throw new InvalidArgumentException('Missing risk probability');
+  if ($criticity === '') throw new InvalidArgumentException('Missing risk criticity');
+
+  $riskId = generate_uuid_v4();
+  $ownsTransaction = !$pdo->inTransaction();
+  if ($ownsTransaction) $pdo->beginTransaction();
+  try {
+    $insertRisk = $pdo->prepare("
+      INSERT INTO `risks` (`uuid`, `name`, `description`, `probability`, `criticity`, `date_created`)
+      VALUES (:uuid, :name, :description, :probability, :criticity, CURRENT_TIMESTAMP)
+    ");
+    $insertRisk->execute([
+      ':uuid' => $riskId,
+      ':name' => $title,
+      ':description' => $description !== '' ? $description : null,
+      ':probability' => $probability,
+      ':criticity' => $criticity,
+    ]);
+
+    $insertProjectRisk = $pdo->prepare("
+      INSERT INTO `project_risks`
+      (`projectId`, `riskId`, `short_name`, `long_name`, `status`, `criticity`, `probability`, `remaining_risk`, `date_created`, `date_last_updated`)
+      VALUES (:projectId, :riskId, :shortName, :longName, :status, :criticity, :probability, :remainingRisk, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ");
+    $insertProjectRisk->execute([
+      ':projectId' => $projectId,
+      ':riskId' => $riskId,
+      ':shortName' => $shortName,
+      ':longName' => $longName,
+      ':status' => $status,
+      ':criticity' => $criticity,
+      ':probability' => $probability,
+      ':remainingRisk' => $remainingRisk,
+    ]);
+
+    if ($ownsTransaction) $pdo->commit();
+  } catch (Throwable $inner) {
+    if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+    throw $inner;
+  }
+
+  return [
+    'projectId' => $projectId,
+    'riskId' => $riskId,
+    'shortName' => $shortName,
+    'longName' => $longName,
+    'title' => $title,
+    'description' => $description,
+    'probability' => $probability,
+    'criticity' => $criticity,
+    'status' => $status,
+    'dateCreated' => date('Y-m-d H:i:s'),
+    'dateLastUpdated' => date('Y-m-d H:i:s'),
+    'remainingRiskId' => $remainingRisk ?? '',
+  ];
+}
+
+function update_project_risk(PDO $pdo, string $projectId, string $riskId, array $body): array {
+  ensure_project_risks_table($pdo);
+
+  $projectId = trim($projectId);
+  $riskId = trim($riskId);
+  if ($projectId === '') throw new InvalidArgumentException('Missing project id');
+  if ($riskId === '') throw new InvalidArgumentException('Missing risk id');
+
+  $currentStmt = $pdo->prepare("
+    SELECT
+      pr.`projectId` AS `projectId`,
+      pr.`riskId` AS `riskId`,
+      pr.`short_name` AS `short_name`,
+      pr.`long_name` AS `long_name`,
+      pr.`status` AS `status`,
+      pr.`probability` AS `probability`,
+      pr.`criticity` AS `criticity`,
+      pr.`remaining_risk` AS `remaining_risk`,
+      r.`name` AS `risk_name`,
+      r.`description` AS `risk_description`
+    FROM `project_risks` pr
+    LEFT JOIN `risks` r
+      ON r.`uuid` = pr.`riskId`
+    WHERE pr.`projectId` = :projectId
+      AND pr.`riskId` = :riskId
+    LIMIT 1
+  ");
+  $currentStmt->execute([
+    ':projectId' => $projectId,
+    ':riskId' => $riskId,
+  ]);
+  $current = $currentStmt->fetch();
+  if (!$current) {
+    throw new InvalidArgumentException('Project risk not found');
+  }
+
+  $hasLongName = array_key_exists('longName', $body) || array_key_exists('title', $body);
+  $hasDescription = array_key_exists('description', $body);
+  $hasProbability = array_key_exists('probability', $body);
+  $hasCriticity = array_key_exists('criticity', $body) || array_key_exists('frequency', $body);
+  $hasStatus = array_key_exists('status', $body);
+  $hasRemainingRisk = array_key_exists('remainingRiskId', $body);
+
+  $longName = trim((string)($current['long_name'] ?? $current['risk_name'] ?? ''));
+  if ($hasLongName) {
+    $longName = trim((string)($body['longName'] ?? $body['title'] ?? ''));
+  }
+  if ($longName === '') {
+    throw new InvalidArgumentException('Missing longName');
+  }
+
+  $description = trim((string)($current['risk_description'] ?? ''));
+  if ($hasDescription) {
+    $description = trim((string)($body['description'] ?? ''));
+  }
+
+  $probability = trim((string)($current['probability'] ?? ''));
+  if ($hasProbability) {
+    $probability = trim((string)($body['probability'] ?? ''));
+  }
+  if ($probability === '') {
+    throw new InvalidArgumentException('Missing risk probability');
+  }
+
+  $criticity = trim((string)($current['criticity'] ?? ''));
+  if ($hasCriticity) {
+    $criticity = trim((string)($body['criticity'] ?? $body['frequency'] ?? ''));
+  }
+  if ($criticity === '') {
+    throw new InvalidArgumentException('Missing risk criticity');
+  }
+
+  $status = trim((string)($current['status'] ?? 'Open'));
+  if ($hasStatus) {
+    $status = normalize_project_risk_status((string)($body['status'] ?? 'Open'));
+  } else {
+    $status = normalize_project_risk_status($status);
+  }
+
+  $remainingRisk = normalize_id((string)($current['remaining_risk'] ?? ''));
+  if ($hasRemainingRisk) {
+    $remainingRisk = normalize_id((string)($body['remainingRiskId'] ?? ''));
+  }
+  if ($remainingRisk === '') $remainingRisk = null;
+
+  $shortName = project_risk_short_name($longName);
+
+  $ownsTransaction = !$pdo->inTransaction();
+  if ($ownsTransaction) $pdo->beginTransaction();
+  try {
+    $updateRisk = $pdo->prepare("
+      UPDATE `risks`
+      SET
+        `name` = :name,
+        `description` = :description,
+        `probability` = :probability,
+        `criticity` = :criticity
+      WHERE `uuid` = :riskId
+    ");
+    $updateRisk->execute([
+      ':name' => $longName,
+      ':description' => $description !== '' ? $description : null,
+      ':probability' => $probability,
+      ':criticity' => $criticity,
+      ':riskId' => $riskId,
+    ]);
+
+    $updateProjectRisk = $pdo->prepare("
+      UPDATE `project_risks`
+      SET
+        `short_name` = :shortName,
+        `long_name` = :longName,
+        `status` = :status,
+        `criticity` = :criticity,
+        `probability` = :probability,
+        `remaining_risk` = :remainingRisk,
+        `date_last_updated` = CURRENT_TIMESTAMP
+      WHERE `projectId` = :projectId
+        AND `riskId` = :riskId
+    ");
+    $updateProjectRisk->execute([
+      ':shortName' => $shortName,
+      ':longName' => $longName,
+      ':status' => $status,
+      ':criticity' => $criticity,
+      ':probability' => $probability,
+      ':remainingRisk' => $remainingRisk,
+      ':projectId' => $projectId,
+      ':riskId' => $riskId,
+    ]);
+
+    if ($ownsTransaction) $pdo->commit();
+  } catch (Throwable $inner) {
+    if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+    throw $inner;
+  }
+
+  $rows = fetch_project_risks($pdo, $projectId);
+  foreach ($rows as $row) {
+    if (trim((string)($row['riskId'] ?? '')) !== $riskId) continue;
+    return $row;
+  }
+
+  throw new InvalidArgumentException('Project risk not found');
+}
+
+function fetch_project_risks(PDO $pdo, string $projectId): array {
+  ensure_project_risks_table($pdo);
+
+  $stmt = $pdo->prepare("
+    SELECT
+      pr.`projectId` AS `projectId`,
+      pr.`riskId` AS `riskId`,
+      pr.`short_name` AS `short_name`,
+      pr.`long_name` AS `long_name`,
+      r.`name` AS `title`,
+      r.`description` AS `description`,
+      pr.`probability` AS `probability`,
+      pr.`criticity` AS `criticity`,
+      pr.`status` AS `status`,
+      pr.`date_created` AS `date_created`,
+      pr.`date_last_updated` AS `date_last_updated`,
+      pr.`remaining_risk` AS `remaining_risk`
+    FROM `project_risks` pr
+    LEFT JOIN `risks` r
+      ON r.`uuid` = pr.`riskId`
+    WHERE pr.`projectId` = :projectId
+    ORDER BY
+      FIELD(LOWER(COALESCE(pr.`criticity`, '')), 'critical', 'high', 'medium', 'low') ASC,
+      pr.`date_created` DESC
+  ");
+  $stmt->execute([':projectId' => $projectId]);
+
+  return array_map(static function (array $r): array {
+    return [
+      'projectId' => trim((string)($r['projectId'] ?? '')),
+      'riskId' => trim((string)($r['riskId'] ?? '')),
+      'shortName' => trim((string)($r['short_name'] ?? '')),
+      'longName' => trim((string)($r['long_name'] ?? $r['title'] ?? '')),
+      'title' => trim((string)($r['long_name'] ?? $r['title'] ?? '')),
+      'description' => trim((string)($r['description'] ?? '')),
+      'probability' => trim((string)($r['probability'] ?? '')),
+      'criticity' => trim((string)($r['criticity'] ?? '')),
+      'status' => trim((string)($r['status'] ?? 'Open')),
+      'dateCreated' => trim((string)($r['date_created'] ?? '')),
+      'dateLastUpdated' => trim((string)($r['date_last_updated'] ?? '')),
+      'remainingRiskId' => trim((string)($r['remaining_risk'] ?? '')),
+    ];
+  }, $stmt->fetchAll());
+}
+
 function fetch_project_dependencies(PDO $pdo, string $projectId): array {
   ensure_project_task_links_table($pdo);
 
@@ -418,6 +897,7 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     'activities' => [],
     'taskMatrix' => [],
     'projectHealth' => [],
+    'projectRisks' => [],
   ];
 
   $phaseSchema = resolve_project_phases_schema($pdo);
@@ -569,6 +1049,7 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
 
   $detail['ganttDependencies'] = fetch_project_dependencies($pdo, $projectId);
   $detail['projectHealth'] = fetch_project_health($pdo, $projectId);
+  $detail['projectRisks'] = fetch_project_risks($pdo, $projectId);
 
   return $detail;
 }
@@ -1237,6 +1718,68 @@ try {
   }
 
   // -----------------------------
+  // POST /projects/{id}/risks
+  // PUT /projects/{id}/risks/{riskId}
+  // Body: { title|longName, description?, probability, criticity|frequency, status?, remainingRiskId? }
+  // -----------------------------
+  if (!in_array($method, ['GET', 'POST'], true) && preg_match('#^/projects/([^/]+)/risks$#', $path)) {
+    send_json([
+      'error' => 'Method not allowed',
+      'uri' => $path,
+      'method' => $method,
+      'allowed' => ['GET', 'POST'],
+    ], 405);
+  }
+
+  if (!in_array($method, ['PUT', 'PATCH'], true) && preg_match('#^/projects/([^/]+)/risks/([^/]+)$#', $path)) {
+    send_json([
+      'error' => 'Method not allowed',
+      'uri' => $path,
+      'method' => $method,
+      'allowed' => ['PUT', 'PATCH'],
+    ], 405);
+  }
+
+  if ($method === 'POST' && preg_match('#^/projects/([^/]+)/risks$#', $path, $m)) {
+    $projectId = normalize_id(urldecode($m[1]));
+    if ($projectId === '') send_json(['error' => 'Missing project id in route'], 400);
+
+    $body = read_json_body();
+    $pdo = db();
+    try {
+      $risk = create_project_risk($pdo, $projectId, $body);
+      send_json([
+        'ok' => true,
+        'id' => $projectId,
+        'risk' => $risk,
+      ]);
+    } catch (InvalidArgumentException $e) {
+      send_json(['error' => $e->getMessage()], 400);
+    }
+  }
+
+  if (in_array($method, ['PUT', 'PATCH'], true) && preg_match('#^/projects/([^/]+)/risks/([^/]+)$#', $path, $m)) {
+    $projectId = normalize_id(urldecode($m[1]));
+    $riskId = normalize_id(urldecode($m[2]));
+    if ($projectId === '') send_json(['error' => 'Missing project id in route'], 400);
+    if ($riskId === '') send_json(['error' => 'Missing risk id in route'], 400);
+
+    $body = read_json_body();
+    $pdo = db();
+    try {
+      $risk = update_project_risk($pdo, $projectId, $riskId, $body);
+      send_json([
+        'ok' => true,
+        'id' => $projectId,
+        'risk' => $risk,
+      ]);
+    } catch (InvalidArgumentException $e) {
+      $status = $e->getMessage() === 'Project risk not found' ? 404 : 400;
+      send_json(['error' => $e->getMessage()], $status);
+    }
+  }
+
+  // -----------------------------
   // POST /projects/{id}/procedure
   // Body: { procedure: "save_project", payload: { project: ProjectDetail } }
   // -----------------------------
@@ -1308,6 +1851,18 @@ try {
     $pdo = db();
     $stmt = $pdo->query('SELECT id, name FROM projects ORDER BY updated_at DESC, name ASC');
     $rows = $stmt->fetchAll();
+    send_json($rows);
+  }
+
+  // -----------------------------
+  // GET /projects/{id}/risks
+  // -----------------------------
+  if ($method === 'GET' && preg_match('#^/projects/([^/]+)/risks$#', $path, $m)) {
+    $id = normalize_id(urldecode($m[1]));
+    if ($id === '') send_json(['error' => 'Missing id'], 400);
+
+    $pdo = db();
+    $rows = fetch_project_risks($pdo, $id);
     send_json($rows);
   }
 

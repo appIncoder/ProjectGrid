@@ -45,6 +45,21 @@ export interface ProjectHealthItem {
   dateLastUpdated: string;
 }
 
+export interface ProjectRiskItem {
+  projectId: string;
+  riskId: string;
+  shortName: string;
+  longName: string;
+  title: string;
+  description: string;
+  probability: string;
+  criticity: string;
+  status: string;
+  dateCreated: string;
+  dateLastUpdated: string;
+  remainingRiskId: string;
+}
+
 
 export type ProjectDetail = {
   id: string;
@@ -63,6 +78,7 @@ export type ProjectDetail = {
     type?: DependencyType; // 'F2S' | 'F2F' | 'S2S'
   }>;
   projectHealth?: ProjectHealthItem[];
+  projectRisks?: ProjectRiskItem[];
 };
 
 
@@ -72,11 +88,15 @@ export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export interface RiskCellItem {
   id: string;
   label: string;
+  shortName?: string;
+  longName?: string;
   level: RiskLevel;
 }
 
 export interface TopRisk {
   id: string;
+  shortName: string;
+  longName: string;
   title: string;
   impact: string;
   probability: string;

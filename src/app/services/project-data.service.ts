@@ -2,6 +2,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, UserRef } from '../models';
 import { environment } from '../environments/environment';
 
@@ -27,10 +28,45 @@ export interface ProjectHealthDefaultRef {
   dateLastUpdated: string;
 }
 
+export interface CreateProjectRiskPayload {
+  title: string;
+  description?: string;
+  probability: string;
+  criticity: string;
+  status?: string;
+  remainingRiskId?: string | null;
+}
+
+export interface UpdateProjectRiskPayload {
+  longName?: string;
+  title?: string;
+  description?: string;
+  probability?: string;
+  criticity?: string;
+  status?: string;
+  remainingRiskId?: string | null;
+}
+
+export interface ProjectRiskRef {
+  projectId: string;
+  riskId: string;
+  shortName: string;
+  longName: string;
+  title: string;
+  description: string;
+  probability: string;
+  criticity: string;
+  status: string;
+  dateCreated: string;
+  dateLastUpdated: string;
+  remainingRiskId: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectDataService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly projectsCache = new Map<string, ProjectDetail>();
+  private readonly risksChangedSubject = new Subject<{ projectId: string; reason: string }>();
   private static readonly DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
   private static readonly DEFAULT_ACTIVITIES: Record<ActivityId, ActivityDefinition> = {
     projet: { id: 'projet', label: 'Gestion du projet', owner: '—', sequence: 1 },
@@ -40,6 +76,16 @@ export class ProjectDataService {
   };
 
   constructor(private http: HttpClient) {}
+
+  get risksChanged$(): Observable<{ projectId: string; reason: string }> {
+    return this.risksChangedSubject.asObservable();
+  }
+
+  notifyRisksChanged(projectId: string, reason = 'manual'): void {
+    const id = String(projectId ?? '').trim();
+    if (!id) return;
+    this.risksChangedSubject.next({ projectId: id, reason });
+  }
 
   private withNoCache(url: string): string {
     const sep = url.includes('?') ? '&' : '?';
@@ -126,6 +172,87 @@ export class ProjectDataService {
 
     const res = await firstValueFrom(this.http.post<any>(url, payload));
     return Array.isArray(res?.projectHealth) ? res.projectHealth : [];
+  }
+
+  async createProjectRisk(projectId: string, payload: CreateProjectRiskPayload): Promise<ProjectRiskRef> {
+    const id = String(projectId ?? '').trim();
+    if (!id) {
+      throw new Error('Missing projectId');
+    }
+
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}/risks`;
+    const res = await firstValueFrom(this.http.post<any>(url, payload));
+    const risk = res?.risk ?? res;
+
+    const created = {
+      projectId: String(risk?.projectId ?? id).trim(),
+      riskId: String(risk?.riskId ?? '').trim(),
+      shortName: String(risk?.shortName ?? '').trim(),
+      longName: String(risk?.longName ?? risk?.title ?? '').trim(),
+      title: String(risk?.longName ?? risk?.title ?? '').trim(),
+      description: String(risk?.description ?? '').trim(),
+      probability: String(risk?.probability ?? '').trim(),
+      criticity: String(risk?.criticity ?? '').trim(),
+      status: String(risk?.status ?? 'Open').trim(),
+      dateCreated: String(risk?.dateCreated ?? '').trim(),
+      dateLastUpdated: String(risk?.dateLastUpdated ?? '').trim(),
+      remainingRiskId: String(risk?.remainingRiskId ?? '').trim(),
+    };
+
+    this.notifyRisksChanged(id, 'create');
+    return created;
+  }
+
+  async updateProjectRisk(projectId: string, riskId: string, payload: UpdateProjectRiskPayload): Promise<ProjectRiskRef> {
+    const id = String(projectId ?? '').trim();
+    const rid = String(riskId ?? '').trim();
+    if (!id || !rid) {
+      throw new Error('Missing projectId or riskId');
+    }
+
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(id)}/risks/${encodeURIComponent(rid)}`;
+    const res = await firstValueFrom(this.http.put<any>(url, payload ?? {}));
+    const risk = res?.risk ?? res;
+
+    const updated = {
+      projectId: String(risk?.projectId ?? id).trim(),
+      riskId: String(risk?.riskId ?? rid).trim(),
+      shortName: String(risk?.shortName ?? '').trim(),
+      longName: String(risk?.longName ?? risk?.title ?? '').trim(),
+      title: String(risk?.longName ?? risk?.title ?? '').trim(),
+      description: String(risk?.description ?? '').trim(),
+      probability: String(risk?.probability ?? '').trim(),
+      criticity: String(risk?.criticity ?? '').trim(),
+      status: String(risk?.status ?? 'Open').trim(),
+      dateCreated: String(risk?.dateCreated ?? '').trim(),
+      dateLastUpdated: String(risk?.dateLastUpdated ?? '').trim(),
+      remainingRiskId: String(risk?.remainingRiskId ?? '').trim(),
+    };
+
+    this.notifyRisksChanged(id, 'update');
+    return updated;
+  }
+
+  async listProjectRisks(projectId: string): Promise<ProjectRiskRef[]> {
+    const id = String(projectId ?? '').trim();
+    if (!id) return [];
+
+    const url = this.withNoCache(`${this.baseUrl}/projects/${encodeURIComponent(id)}/risks`);
+    const rows = await firstValueFrom(this.http.get<any[]>(url));
+    return (Array.isArray(rows) ? rows : []).map((risk) => ({
+      projectId: String(risk?.projectId ?? id).trim(),
+      riskId: String(risk?.riskId ?? '').trim(),
+      shortName: String(risk?.shortName ?? '').trim(),
+      longName: String(risk?.longName ?? risk?.title ?? '').trim(),
+      title: String(risk?.longName ?? risk?.title ?? '').trim(),
+      description: String(risk?.description ?? '').trim(),
+      probability: String(risk?.probability ?? '').trim(),
+      criticity: String(risk?.criticity ?? '').trim(),
+      status: String(risk?.status ?? 'Open').trim(),
+      dateCreated: String(risk?.dateCreated ?? '').trim(),
+      dateLastUpdated: String(risk?.dateLastUpdated ?? '').trim(),
+      remainingRiskId: String(risk?.remainingRiskId ?? '').trim(),
+    }));
   }
 
   async getProjectTypeDefaults(projectTypeId: string): Promise<ProjectTypeDefaults | null> {
@@ -310,6 +437,20 @@ export class ProjectDataService {
             status: String(h?.status ?? 'active').trim(),
             dateCreated: String(h?.dateCreated ?? '').trim(),
             dateLastUpdated: String(h?.dateLastUpdated ?? '').trim(),
+          }))
+        : [],
+      projectRisks: Array.isArray(raw?.projectRisks)
+        ? raw.projectRisks.map((r: any) => ({
+            projectId: String(r?.projectId ?? String(raw?.id ?? fallbackId)).trim(),
+            riskId: String(r?.riskId ?? '').trim(),
+            title: String(r?.title ?? '').trim(),
+            description: String(r?.description ?? '').trim(),
+            probability: String(r?.probability ?? '').trim(),
+            criticity: String(r?.criticity ?? '').trim(),
+            status: String(r?.status ?? 'Open').trim(),
+            dateCreated: String(r?.dateCreated ?? '').trim(),
+            dateLastUpdated: String(r?.dateLastUpdated ?? '').trim(),
+            remainingRiskId: String(r?.remainingRiskId ?? '').trim(),
           }))
         : [],
       phases,

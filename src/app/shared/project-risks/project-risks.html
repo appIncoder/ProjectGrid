@@ -1,53 +1,66 @@
 <div class="card flex-fill">
   <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3 class="h6 mb-0">Gestion des risques</h3>
+      <button type="button" class="project-risks-add-btn" (click)="openAddRiskModal()">
+        Ajouter un risque
+      </button>
+    </div>
 
     <!-- Matrice des risques -->
     <div class="card mb-3">
       <div class="card-body">
         <h3 class="h6 mb-3">Matrice des risques</h3>
 
-        <div class="table-responsive">
-          <table class="table table-bordered table-sm risk-matrix text-center align-middle mb-0">
-            <thead>
-              <tr>
-                <th class="text-start risk-header-col">Impact \ Probabilité</th>
-                <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let impact of riskImpactLevels">
-                <td class="text-start"><strong>{{ impact }}</strong></td>
+        <div class="risk-matrix-shell">
+          <div class="impact-axis-label">Impact</div>
 
-                <td *ngFor="let prob of riskProbabilityLevels">
-                  <div
-                    class="risk-cell"
-                    (dragover)="onRiskDragOver($event)"
-                    (drop)="onRiskDrop($event, impact, prob)">
+          <div class="risk-matrix-main">
+            <div class="prob-axis-label">Probabilité</div>
 
-                    <div
-                      *ngFor="let item of getRiskCellItems(impact, prob)"
-                      class="risk-pill"
-                      [ngClass]="getRiskLevelClass(item.level)"
-                      [attr.title]="item.label"
-                      draggable="true"
-                      (dragstart)="onRiskDragStart($event, item, impact, prob)"
-                      (contextmenu)="onRiskContextMenu($event, item)">
-                      {{ item.id }}
-                    </div>
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm risk-matrix text-center align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th class="text-start risk-header-col"></th>
+                    <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let impact of riskImpactLevels">
+                    <td class="text-start"><strong>{{ impact }}</strong></td>
 
-                  </div>
-                </td>
+                    <td *ngFor="let prob of riskProbabilityLevels">
+                      <div
+                        class="risk-cell"
+                        (dragover)="onRiskDragOver($event)"
+                        (drop)="onRiskDrop($event, impact, prob)">
 
-              </tr>
-            </tbody>
-          </table>
+                        <div
+                          *ngFor="let item of getRiskCellItems(impact, prob)"
+                          class="risk-pill"
+                          [ngClass]="getRiskLevelClass(item.level)"
+                          [attr.title]="item.longName || item.label"
+                          draggable="true"
+                          (dragstart)="onRiskDragStart($event, item, impact, prob)"
+                          (contextmenu)="onRiskContextMenu($event, item)">
+                          {{ item.shortName || item.label }}
+                        </div>
+
+                      </div>
+                    </td>
+
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
       </div>
     </div>
 
-    <!-- Top 5 risques -->
-    <h4 class="h6 mb-2">Top 5 des risques</h4>
+    <h4 class="h6 mb-2">Risques prioritaires</h4>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0 top-risks-table">
         <thead>
@@ -66,8 +79,14 @@
 
         <tbody>
           <tr *ngFor="let risk of topRisks">
-            <td [attr.title]="risk.title">{{ risk.id }}</td>
-            <td>{{ risk.title }}</td>
+            <td [attr.title]="risk.longName">{{ risk.shortName }}</td>
+            <td>
+              <input
+                class="form-control form-control-sm"
+                [(ngModel)]="risk.longName"
+                (change)="onTopRiskLongNameChange(risk)"
+                [title]="risk.longName" />
+            </td>
 
             <!-- Impact editable => repositionne pastille -->
             <td>
@@ -165,6 +184,55 @@
                   (change)="changeRiskStatus(($any($event.target)).value)">
             <option *ngFor="let s of statusOptions" [value]="s">{{ RISK_STATUS_LABEL[s] }}</option>
           </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup ajout de risque -->
+    <div *ngIf="isAddRiskModalOpen" class="risk-modal-backdrop" (click)="closeAddRiskModal()">
+      <div class="risk-modal card shadow" (click)="$event.stopPropagation()">
+        <div class="card-body">
+          <h4 class="h6 mb-3">Ajouter un risque</h4>
+
+          <div class="mb-2">
+            <label class="form-label small mb-1">Intitulé du risque</label>
+            <input class="form-control form-control-sm" [(ngModel)]="newRiskForm.title" />
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small mb-1">Description</label>
+            <textarea class="form-control form-control-sm" rows="3" [(ngModel)]="newRiskForm.description"></textarea>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small mb-1">Probabilité</label>
+            <select class="form-select form-select-sm" [(ngModel)]="newRiskForm.probability">
+              <option *ngFor="let p of probabilityOptions" [ngValue]="p">{{ p }}</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label small mb-1">Fréquence</label>
+            <select class="form-select form-select-sm" [(ngModel)]="newRiskForm.frequency">
+              <option value="low">Faible</option>
+              <option value="medium">Moyenne</option>
+              <option value="high">Élevée</option>
+              <option value="critical">Critique</option>
+            </select>
+          </div>
+
+          <div *ngIf="createRiskError" class="alert alert-danger py-2 small mb-2">
+            {{ createRiskError }}
+          </div>
+
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onCancelAddRisk($event)" [disabled]="isCreatingRisk">
+              Annuler
+            </button>
+            <button type="button" class="btn btn-sm btn-primary" (click)="confirmAddRisk($event)" [disabled]="isCreatingRisk">
+              Confirmer
+            </button>
+          </div>
         </div>
       </div>
     </div>
