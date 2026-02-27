@@ -10,7 +10,7 @@
             {{ st.label }}: {{ getTicketCountByStatus(st.id) }}
           </span>
         </div>
-        <div class="board-add-task-hint">Hint: nom, phase, activite, debut et fin sont obligatoires.</div>
+        <div class="board-add-task-hint">Info: nom, phase, type d'activité, début et fin sont obligatoires.</div>
         <div class="text-muted small" *ngIf="sprint.goal">
           <strong>Goal :</strong> {{ sprint.goal }}
         </div>
@@ -19,7 +19,7 @@
       <div class="board-header-actions">
         <button type="button" class="btn board-add-task-btn" (click)="openCreateTaskModal(taskEditModal)">
           <span class="board-add-task-btn__plus">+</span>
-          <span>Add new task</span>
+          <span>Ajouter une activité</span>
         </button>
       </div>
     </div>

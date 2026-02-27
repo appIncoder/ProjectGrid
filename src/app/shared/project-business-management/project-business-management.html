@@ -1,0 +1,42 @@
+<div class="card bm-detail-card">
+  <div class="card-body">
+    <div class="bm-head">
+      <h3>Suivi détaillé - Gestion du métier</h3>
+      <span class="bm-kpi">{{ progress }}% de maturité</span>
+    </div>
+
+    <p class="bm-subtitle">
+      Cadre de suivi combiné ArchiMate (vue métier) + Business Analysis (requirements & value).
+    </p>
+
+    <div class="bm-progress">
+      <div class="bm-progress-bar" [style.width.%]="progress"></div>
+    </div>
+
+    <div class="bm-stats">
+      <span><strong>{{ done }}</strong> validées</span>
+      <span><strong>{{ inProgress }}</strong> en cours</span>
+      <span><strong>{{ total }}</strong> total</span>
+    </div>
+
+    <div class="bm-lenses">
+      <article class="bm-lens" *ngFor="let lens of lenses">
+        <h4>{{ lens.title }}</h4>
+        <p>{{ lens.subtitle }}</p>
+        <span>{{ lens.count }} activités</span>
+      </article>
+    </div>
+
+    <div class="bm-focus">
+      <h4>Backlog métier prioritaire</h4>
+      <div class="text-muted small" *ngIf="!focusList.length">Aucune activité métier en attente.</div>
+      <ul *ngIf="focusList.length">
+        <li *ngFor="let item of focusList">
+          <span class="bm-phase">{{ item.phase }}</span>
+          <span class="bm-label">{{ item.label }}</span>
+          <span class="bm-status">{{ item.status }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

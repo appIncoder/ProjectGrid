@@ -15,6 +15,10 @@ import { ProjectBudget } from '../../shared/project-budget/project-budget';
 import { ProjectRoadmap } from '../../shared/project-roadmap/project-roadmap';
 import { ProjectBoard } from '../../shared/project-board/project-board';
 import { ProjectRessources } from '../../shared/project-ressources/project-ressources';
+import { ProjectChangeManagement } from '../../shared/project-change-management/project-change-management';
+import { ProjectProjectManagement } from '../../shared/project-project-management/project-project-management';
+import { ProjectBusinessManagement } from '../../shared/project-business-management/project-business-management';
+import { ProjectTechnologyManagement } from '../../shared/project-technology-management/project-technology-management';
 
 @Component({
   selector: 'app-project-page',
@@ -29,6 +33,10 @@ import { ProjectRessources } from '../../shared/project-ressources/project-resso
     ProjectRoadmap,
     ProjectBoard,
     ProjectRessources,
+    ProjectChangeManagement,
+    ProjectProjectManagement,
+    ProjectBusinessManagement,
+    ProjectTechnologyManagement,
   ],
   templateUrl: './project-page.html',
   styleUrls: ['./project-page.scss'],
@@ -117,7 +125,7 @@ export class ProjectPage implements OnInit, OnDestroy {
         name: this.project.name,
         phases: this.project.phases?.length ?? 0,
         activities: Object.keys((this.project as any).activities ?? {}).length,
-        taskMatrixRows: Object.keys((this.project as any).taskMatrix ?? {}).length,
+        taskMatrixRows: Object.keys(((this.project as any).activityMatrix ?? (this.project as any).taskMatrix) ?? {}).length,
       });
     } catch (e) {
       console.error('[ProjectPage] loadProject error', e);
@@ -234,9 +242,12 @@ export class ProjectPage implements OnInit, OnDestroy {
           technologie: { id: 'technologie', label: 'Gestion de la technologie', owner: '—', sequence: 4 },
         };
 
-    const taskMatrix = ((p as any)?.taskMatrix && typeof (p as any).taskMatrix === 'object')
-      ? { ...(p as any).taskMatrix }
-      : {};
+    const matrix = (((p as any)?.activityMatrix && typeof (p as any).activityMatrix === 'object')
+      ? (p as any).activityMatrix
+      : (((p as any)?.taskMatrix && typeof (p as any).taskMatrix === 'object')
+          ? (p as any).taskMatrix
+          : {}));
+    const taskMatrix = { ...matrix };
 
     for (const activityId of Object.keys(activities)) {
       if (!taskMatrix[activityId] || typeof taskMatrix[activityId] !== 'object') {
@@ -256,6 +267,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       description: String((p as any)?.description ?? ''),
       phases,
       activities,
+      activityMatrix: taskMatrix,
       taskMatrix,
     } as ProjectDetail;
   }

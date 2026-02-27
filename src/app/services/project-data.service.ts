@@ -16,6 +16,7 @@ export interface ProjectTypeDefaults {
   projectType: ProjectTypeRef;
   phases: Array<{ id: string; label: string; sequence?: number | null }>;
   activities: Array<{ id: string; label: string; sequence?: number | null }>;
+  activitiesDefault: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
   tasks: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
 }
 
@@ -262,6 +263,10 @@ export class ProjectDataService {
     const raw = await firstValueFrom(this.http.get<any>(url));
     if (!raw || !raw.projectType) return null;
 
+    const defaultsRows = Array.isArray(raw?.activitiesDefault)
+      ? raw.activitiesDefault
+      : (Array.isArray(raw?.tasks) ? raw.tasks : []);
+
     return {
       projectType: {
         id: String(raw?.projectType?.id ?? '').trim(),
@@ -282,15 +287,20 @@ export class ProjectDataService {
             sequence: Number.isFinite(Number(a?.sequence)) ? Number(a.sequence) : null,
           }))
         : [],
-      tasks: Array.isArray(raw?.tasks)
-        ? raw.tasks.map((t: any) => ({
+      activitiesDefault: defaultsRows.map((t: any) => ({
+        id: String(t?.id ?? '').trim(),
+        label: String(t?.label ?? t?.id ?? '').trim(),
+        phaseId: String(t?.phaseId ?? '').trim(),
+        activityId: String(t?.activityId ?? '').trim(),
+        sequence: Number.isFinite(Number(t?.sequence)) ? Number(t.sequence) : null,
+      })),
+      tasks: defaultsRows.map((t: any) => ({
             id: String(t?.id ?? '').trim(),
             label: String(t?.label ?? t?.id ?? '').trim(),
             phaseId: String(t?.phaseId ?? '').trim(),
             activityId: String(t?.activityId ?? '').trim(),
             sequence: Number.isFinite(Number(t?.sequence)) ? Number(t.sequence) : null,
-          }))
-        : [],
+          })),
     };
   }
 
@@ -309,7 +319,9 @@ export class ProjectDataService {
 
       console.log('[ProjectDataService] raw response', { url, res });
 
-      if (!res?.activities || !res?.taskMatrix) {
+      const hasActivities = !!res?.activities;
+      const hasMatrix = !!res?.activityMatrix || !!res?.taskMatrix;
+      if (!hasActivities || !hasMatrix) {
         console.warn('[ProjectDataService] unexpected response shape (tables required)', res);
         return null;
       }
@@ -337,19 +349,29 @@ export class ProjectDataService {
 
   async saveProject(project: ProjectDetail): Promise<void> {
     const url = `${this.baseUrl}/projects`;
+    const matrix = ((project as any)?.activityMatrix && typeof (project as any).activityMatrix === 'object')
+      ? (project as any).activityMatrix
+      : ((project as any)?.taskMatrix && typeof (project as any).taskMatrix === 'object'
+          ? (project as any).taskMatrix
+          : {});
+    const payload = {
+      ...project,
+      activityMatrix: matrix,
+      taskMatrix: matrix,
+    };
 
     const snapshot =
       typeof structuredClone === 'function'
-        ? structuredClone(project)
-        : JSON.parse(JSON.stringify(project));
+        ? structuredClone(payload)
+        : JSON.parse(JSON.stringify(payload));
 
     console.log('[ProjectDataService] saveProject() POST', { url, payload: snapshot });
 
     // POST upsert
-    await firstValueFrom(this.http.post<ProjectDetail>(url, project));
-    this.cacheProject(project);
+    await firstValueFrom(this.http.post<ProjectDetail>(url, payload));
+    this.cacheProject(payload as ProjectDetail);
 
-    console.log('[ProjectDataService] saveProject() OK', { url, projectId: project?.id });
+    console.log('[ProjectDataService] saveProject() OK', { url, projectId: payload?.id });
   }
 
   async deleteProject(projectId: string): Promise<void> {
@@ -367,8 +389,20 @@ export class ProjectDataService {
     payload: { project: ProjectDetail }
   ): Promise<void> {
     const url = `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/procedure`;
+    const matrix = ((payload?.project as any)?.activityMatrix && typeof (payload?.project as any).activityMatrix === 'object')
+      ? (payload.project as any).activityMatrix
+      : ((payload?.project as any)?.taskMatrix && typeof (payload?.project as any).taskMatrix === 'object'
+          ? (payload.project as any).taskMatrix
+          : {});
+    const normalizedPayload = {
+      project: {
+        ...payload.project,
+        activityMatrix: matrix,
+        taskMatrix: matrix,
+      },
+    };
     try {
-      await firstValueFrom(this.http.post(url, { procedure, payload }));
+      await firstValueFrom(this.http.post(url, { procedure, payload: normalizedPayload }));
     } catch (err) {
       console.error('[ProjectDataService] runProjectProcedure failed', {
         url,
@@ -380,7 +414,7 @@ export class ProjectDataService {
 
       // Fallback compat: certaines instances backend peuvent échouer sur /procedure
       // mais accepter encore l'endpoint historique /projects.
-      await this.saveProject(payload.project);
+      await this.saveProject(normalizedPayload.project);
     }
   }
 
@@ -393,9 +427,13 @@ export class ProjectDataService {
       ? (raw.activities as Record<ActivityId, ActivityDefinition>)
       : ProjectDataService.DEFAULT_ACTIVITIES;
 
-    const taskMatrix = (raw?.taskMatrix && typeof raw.taskMatrix === 'object')
-      ? (raw.taskMatrix as Record<ActivityId, Record<PhaseId, any[]>>)
-      : {} as Record<ActivityId, Record<PhaseId, any[]>>;
+    const matrix = (raw?.activityMatrix && typeof raw.activityMatrix === 'object')
+      ? (raw.activityMatrix as Record<ActivityId, Record<PhaseId, any[]>>)
+      : ((raw?.taskMatrix && typeof raw.taskMatrix === 'object')
+          ? (raw.taskMatrix as Record<ActivityId, Record<PhaseId, any[]>>)
+          : {} as Record<ActivityId, Record<PhaseId, any[]>>);
+    const taskMatrix = matrix;
+    const activityMatrix = matrix;
     const phaseDefinitionsRaw = (raw?.phaseDefinitions && typeof raw.phaseDefinitions === 'object')
       ? raw.phaseDefinitions
       : {};
@@ -456,6 +494,7 @@ export class ProjectDataService {
       phases,
       phaseDefinitions: phaseDefinitions as any,
       activities,
+      activityMatrix,
       taskMatrix,
     } as ProjectDetail;
   }

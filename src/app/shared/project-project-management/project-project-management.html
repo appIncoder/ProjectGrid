@@ -1,0 +1,38 @@
+<div class="card pm-detail-card">
+  <div class="card-body">
+    <div class="pm-head">
+      <h3>Suivi détaillé - Gestion de projet</h3>
+      <span class="pm-kpi">{{ globalProgress }}% global</span>
+    </div>
+
+    <div class="pm-progress">
+      <div class="pm-progress-bar" [style.width.%]="globalProgress"></div>
+    </div>
+
+    <div class="pm-phases">
+      <article class="pm-phase-card" *ngFor="let p of phaseProgress">
+        <h4>{{ p.phase }}</h4>
+        <div class="pm-phase-kpis">
+          <span><strong>{{ p.done }}</strong> faits</span>
+          <span><strong>{{ p.inProgress }}</strong> en cours</span>
+          <span><strong>{{ p.total }}</strong> total</span>
+        </div>
+        <div class="pm-mini-progress">
+          <div class="pm-mini-progress-bar" [style.width.%]="p.progress"></div>
+        </div>
+      </article>
+    </div>
+
+    <div class="pm-actions">
+      <h4>Actions prioritaires</h4>
+      <div class="text-muted small" *ngIf="!nextActions.length">Aucune action en attente.</div>
+      <ul *ngIf="nextActions.length">
+        <li *ngFor="let a of nextActions">
+          <span class="pm-action-phase">{{ a.phase }}</span>
+          <span class="pm-action-label">{{ a.label }}</span>
+          <span class="pm-action-status">{{ a.status }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

@@ -32,29 +32,39 @@ $routesHint = [
 ];
 
 function normalize_project_payload(array $payload): array {
-  if (!isset($payload['taskMatrix']) || !is_array($payload['taskMatrix'])) {
+  $matrix = $payload['activityMatrix'] ?? null;
+  if (!is_array($matrix)) {
+    $legacy = $payload['taskMatrix'] ?? null;
+    if (is_array($legacy)) {
+      $matrix = $legacy;
+    }
+  }
+  if (!is_array($matrix)) {
     return $payload;
   }
 
-  foreach ($payload['taskMatrix'] as $activityId => $phaseMap) {
+  foreach ($matrix as $activityId => $phaseMap) {
     if (!is_array($phaseMap)) continue;
-    foreach ($phaseMap as $phaseId => $tasks) {
-      if (!is_array($tasks)) continue;
-      foreach ($tasks as $idx => $task) {
-        if (!is_array($task)) continue;
+    foreach ($phaseMap as $phaseId => $activities) {
+      if (!is_array($activities)) continue;
+      foreach ($activities as $idx => $activity) {
+        if (!is_array($activity)) continue;
         foreach (['reporterId', 'accountantId', 'responsibleId'] as $k) {
-          if (!array_key_exists($k, $task)) continue;
-          $v = trim((string)($task[$k] ?? ''));
+          if (!array_key_exists($k, $activity)) continue;
+          $v = trim((string)($activity[$k] ?? ''));
           if ($v === '') {
-            unset($task[$k]);
+            unset($activity[$k]);
           } else {
-            $task[$k] = $v;
+            $activity[$k] = $v;
           }
         }
-        $payload['taskMatrix'][$activityId][$phaseId][$idx] = $task;
+        $matrix[$activityId][$phaseId][$idx] = $activity;
       }
     }
   }
+
+  $payload['activityMatrix'] = $matrix;
+  unset($payload['taskMatrix']);
 
   return $payload;
 }
@@ -72,9 +82,9 @@ function project_default_activities(): array {
   ];
 } 
 
-function build_payload_task_lookup(array $payload): array {
+function build_payload_activity_lookup(array $payload): array {
   $lookup = [];
-  $tm = $payload['taskMatrix'] ?? null;
+  $tm = $payload['activityMatrix'] ?? ($payload['taskMatrix'] ?? null);
   if (!is_array($tm)) return $lookup;
 
   foreach ($tm as $activityId => $phaseMap) {
@@ -152,25 +162,98 @@ function dependency_type_from_db(string $type): string {
   return 'F2S';
 }
 
-function ensure_project_task_links_table(PDO $pdo): void {
+function table_exists(PDO $pdo, string $table): bool {
+  $stmt = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = :table
+  ");
+  $stmt->execute([':table' => $table]);
+  return (int)$stmt->fetchColumn() > 0;
+}
+
+function table_columns(PDO $pdo, string $table): array {
+  $stmt = $pdo->query("SHOW COLUMNS FROM `{$table}`");
+  return array_map(
+    static fn(array $row): string => trim((string)($row['Field'] ?? '')),
+    $stmt->fetchAll()
+  );
+}
+
+function resolve_project_data_schema(PDO $pdo): array {
+  static $schema = null;
+  if (is_array($schema)) return $schema;
+
+  $activityTypesTable = table_exists($pdo, 'project_activitie_types') ? 'project_activitie_types' : 'project_activities';
+  $activitiesTable = table_exists($pdo, 'project_activities') ? 'project_activities' : 'project_tasks';
+  $assignmentsTable = table_exists($pdo, 'project_activities_assignments') ? 'project_activities_assignments' : 'project_task_assignments';
+  $linksTable = table_exists($pdo, 'project_activities_links') ? 'project_activities_links' : 'project_tasks_links';
+
+  $activityTypesCols = table_columns($pdo, $activityTypesTable);
+  $activitiesCols = table_columns($pdo, $activitiesTable);
+  $assignmentsCols = table_columns($pdo, $assignmentsTable);
+  $linksCols = table_columns($pdo, $linksTable);
+
+  $projectTypeActivityTypesDefaultTable = table_exists($pdo, 'project_type_activities_type_default')
+    ? 'project_type_activities_type_default'
+    : 'project_type_activities_default';
+  $projectTypeActivitiesDefaultTable = table_exists($pdo, 'project_type_activities_default')
+    ? 'project_type_activities_default'
+    : 'project_type_tasks_default';
+  $projectTypeActivitiesDefaultCols = table_columns($pdo, $projectTypeActivitiesDefaultTable);
+
+  $schema = [
+    'activityTypesTable' => $activityTypesTable,
+    'activitiesTable' => $activitiesTable,
+    'assignmentsTable' => $assignmentsTable,
+    'linksTable' => $linksTable,
+    'projectTypeActivityTypesDefaultTable' => $projectTypeActivityTypesDefaultTable,
+    'projectTypeActivitiesDefaultTable' => $projectTypeActivitiesDefaultTable,
+    'activityTypeIdCol' => in_array('activity_type_id', $activityTypesCols, true) ? 'activity_type_id' : 'activity_id',
+    'activityItemTypeIdCol' => in_array('activity_type_id', $activitiesCols, true) ? 'activity_type_id' : 'activity_id',
+    'activityItemIdCol' => in_array('activity_id', $activitiesCols, true) ? 'activity_id' : 'task_id',
+    'assignTypeIdCol' => in_array('activity_type_id', $assignmentsCols, true) ? 'activity_type_id' : 'activity_id',
+    'assignItemIdCol' => in_array('activity_id', $assignmentsCols, true) ? 'activity_id' : 'task_id',
+    'depFromCol' => in_array('IdActivityFrom', $linksCols, true) ? 'IdActivityFrom' : 'idTasksFrom',
+    'depToCol' => in_array('IdActivityTo', $linksCols, true) ? 'IdActivityTo' : 'idTaskTo',
+    'ptadPhaseCol' => in_array('phaseId', $projectTypeActivitiesDefaultCols, true) ? 'phaseId' : 'phase_id',
+    'ptadTypeCol' => in_array('activity_type_id', $projectTypeActivitiesDefaultCols, true)
+      ? 'activity_type_id'
+      : (in_array('activitiesId', $projectTypeActivitiesDefaultCols, true) ? 'activitiesId' : 'activity_id'),
+    'ptadItemCol' => in_array('activity_id', $projectTypeActivitiesDefaultCols, true)
+      ? 'activity_id'
+      : (in_array('shortname', $projectTypeActivitiesDefaultCols, true) ? 'shortname' : 'task_id'),
+    'ptadLabelCol' => in_array('longname', $projectTypeActivitiesDefaultCols, true) ? 'longname' : 'label',
+  ];
+
+  return $schema;
+}
+
+function ensure_project_activity_links_table(PDO $pdo): void {
   static $ready = false;
   if ($ready) return;
 
   $pdo->exec("
-    CREATE TABLE IF NOT EXISTS `project_tasks_links` (
+    CREATE TABLE IF NOT EXISTS `project_activities_links` (
       `project_id` uuid NOT NULL,
-      `idTasksFrom` varchar(128) NOT NULL,
-      `idTaskTo` varchar(128) NOT NULL,
+      `IdActivityFrom` varchar(128) NOT NULL,
+      `IdActivityTo` varchar(128) NOT NULL,
       `dependency_type` varchar(32) NOT NULL DEFAULT 'finish-to-start',
       `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
       `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-      PRIMARY KEY (`project_id`, `idTasksFrom`, `idTaskTo`),
-      KEY `idx_project_tasks_links_to` (`project_id`, `idTaskTo`),
-      KEY `idx_project_tasks_links_type` (`dependency_type`)
+      PRIMARY KEY (`project_id`, `IdActivityFrom`, `IdActivityTo`),
+      KEY `idx_project_activities_links_to` (`project_id`, `IdActivityTo`),
+      KEY `idx_project_activities_links_type` (`dependency_type`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   ");
 
   $ready = true;
+}
+
+function ensure_project_task_links_table(PDO $pdo): void {
+  // Compat interne temporaire
+  ensure_project_activity_links_table($pdo);
 }
 
 function ensure_project_health_default_table(PDO $pdo): void {
@@ -855,20 +938,24 @@ function fetch_project_risks(PDO $pdo, string $projectId): array {
 }
 
 function fetch_project_dependencies(PDO $pdo, string $projectId): array {
-  ensure_project_task_links_table($pdo);
+  ensure_project_activity_links_table($pdo);
+  $schema = resolve_project_data_schema($pdo);
+  $linksTable = $schema['linksTable'];
+  $depFromCol = $schema['depFromCol'];
+  $depToCol = $schema['depToCol'];
 
-  $stmt = $pdo->prepare('
-    SELECT idTasksFrom, idTaskTo, dependency_type
-    FROM project_tasks_links
+  $stmt = $pdo->prepare("
+    SELECT `{$depFromCol}` AS dep_from, `{$depToCol}` AS dep_to, dependency_type
+    FROM `{$linksTable}`
     WHERE project_id = :id
-    ORDER BY idTasksFrom ASC, idTaskTo ASC
-  ');
+    ORDER BY `{$depFromCol}` ASC, `{$depToCol}` ASC
+  ");
   $stmt->execute([':id' => $projectId]);
 
   return array_map(static function (array $r): array {
     return [
-      'fromId' => trim((string)($r['idTasksFrom'] ?? '')),
-      'toId' => trim((string)($r['idTaskTo'] ?? '')),
+      'fromId' => trim((string)($r['dep_from'] ?? '')),
+      'toId' => trim((string)($r['dep_to'] ?? '')),
       'type' => dependency_type_from_db((string)($r['dependency_type'] ?? 'finish-to-start')),
     ];
   }, $stmt->fetchAll());
@@ -886,7 +973,16 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     $decoded = json_decode($payloadRaw, true);
     if (is_array($decoded)) $payloadData = $decoded;
   }
-  $payloadTaskLookup = build_payload_task_lookup($payloadData);
+  $payloadTaskLookup = build_payload_activity_lookup($payloadData);
+  $schema = resolve_project_data_schema($pdo);
+  $activityTypesTable = $schema['activityTypesTable'];
+  $activitiesTable = $schema['activitiesTable'];
+  $assignmentsTable = $schema['assignmentsTable'];
+  $activityTypeIdCol = $schema['activityTypeIdCol'];
+  $activityItemTypeIdCol = $schema['activityItemTypeIdCol'];
+  $activityItemIdCol = $schema['activityItemIdCol'];
+  $assignTypeIdCol = $schema['assignTypeIdCol'];
+  $assignItemIdCol = $schema['assignItemIdCol'];
 
   $detail = [
     'id' => (string)$row['id'],
@@ -895,7 +991,7 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     'phases' => [],
     'phaseDefinitions' => [],
     'activities' => [],
-    'taskMatrix' => [],
+    'activityMatrix' => [],
     'projectHealth' => [],
     'projectRisks' => [],
   ];
@@ -931,15 +1027,15 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     }
   }
 
-  $actStmt = $pdo->prepare('
-    SELECT activity_id, label, owner_name, sequence
-    FROM project_activities
+  $actStmt = $pdo->prepare("
+    SELECT `{$activityTypeIdCol}` AS activity_type_id, label, owner_name, sequence
+    FROM `{$activityTypesTable}`
     WHERE project_id = :id
-    ORDER BY (sequence IS NULL) ASC, sequence ASC, activity_id ASC
-  ');
+    ORDER BY (sequence IS NULL) ASC, sequence ASC, `{$activityTypeIdCol}` ASC
+  ");
   $actStmt->execute([':id' => $projectId]);
   foreach ($actStmt->fetchAll() as $a) {
-    $activityId = trim((string)($a['activity_id'] ?? ''));
+    $activityId = trim((string)($a['activity_type_id'] ?? ''));
     if ($activityId === '') continue;
     $sequenceRaw = $a['sequence'] ?? null;
     $sequence = is_numeric($sequenceRaw) ? (int)$sequenceRaw : null;
@@ -955,37 +1051,40 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
   }
 
   foreach ($detail['activities'] as $activityId => $_a) {
-    $detail['taskMatrix'][$activityId] = [];
+    $detail['activityMatrix'][$activityId] = [];
     foreach ($detail['phases'] as $phaseId) {
-      $detail['taskMatrix'][$activityId][$phaseId] = [];
+      $detail['activityMatrix'][$activityId][$phaseId] = [];
     }
   }
 
-  $taskSql = '
+  $taskSql = "
     SELECT
-      t.activity_id, t.phase_id, t.task_id, t.label, t.startdate, t.enddate, t.status,
+      t.`{$activityItemTypeIdCol}` AS activity_type_id,
+      t.phase_id,
+      t.`{$activityItemIdCol}` AS activity_id,
+      t.label, t.startdate, t.enddate, t.status,
       a.reporter_id, a.accountant_id, a.responsible_id
-    FROM project_tasks t
-    LEFT JOIN project_task_assignments a
+    FROM `{$activitiesTable}` t
+    LEFT JOIN `{$assignmentsTable}` a
       ON a.project_id = t.project_id
-     AND a.activity_id = t.activity_id
+     AND a.`{$assignTypeIdCol}` = t.`{$activityItemTypeIdCol}`
      AND a.phase_id = t.phase_id
-     AND a.task_id = t.task_id
+     AND a.`{$assignItemIdCol}` = t.`{$activityItemIdCol}`
     WHERE t.project_id = :id
-    ORDER BY t.activity_id ASC, t.phase_id ASC, t.task_id ASC
-  ';
+    ORDER BY t.`{$activityItemTypeIdCol}` ASC, t.phase_id ASC, t.`{$activityItemIdCol}` ASC
+  ";
   $taskStmt = $pdo->prepare($taskSql);
   $taskStmt->execute([':id' => $projectId]);
 
   foreach ($taskStmt->fetchAll() as $t) {
-    $activityId = trim((string)($t['activity_id'] ?? ''));
+    $activityId = trim((string)($t['activity_type_id'] ?? ''));
     $phaseId = trim((string)($t['phase_id'] ?? ''));
-    $taskId = trim((string)($t['task_id'] ?? ''));
+    $taskId = trim((string)($t['activity_id'] ?? ''));
     if ($activityId === '' || $phaseId === '' || $taskId === '') continue;
 
     if (!isset($detail['activities'][$activityId])) {
       $detail['activities'][$activityId] = ['id' => $activityId, 'label' => $activityId, 'owner' => '—', 'sequence' => null];
-      $detail['taskMatrix'][$activityId] = [];
+      $detail['activityMatrix'][$activityId] = [];
     }
     if (!in_array($phaseId, $detail['phases'], true)) {
       $detail['phases'][] = $phaseId;
@@ -996,8 +1095,8 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
         'label' => default_phase_long_name($phaseId),
       ];
     }
-    if (!isset($detail['taskMatrix'][$activityId][$phaseId])) {
-      $detail['taskMatrix'][$activityId][$phaseId] = [];
+    if (!isset($detail['activityMatrix'][$activityId][$phaseId])) {
+      $detail['activityMatrix'][$activityId][$phaseId] = [];
     }
 
     $task = [
@@ -1035,14 +1134,14 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
       }
     }
 
-    $detail['taskMatrix'][$activityId][$phaseId][] = $task;
+    $detail['activityMatrix'][$activityId][$phaseId][] = $task;
   }
 
   foreach (array_keys($detail['activities']) as $activityId) {
-    if (!isset($detail['taskMatrix'][$activityId])) $detail['taskMatrix'][$activityId] = [];
+    if (!isset($detail['activityMatrix'][$activityId])) $detail['activityMatrix'][$activityId] = [];
     foreach ($detail['phases'] as $phaseId) {
-      if (!isset($detail['taskMatrix'][$activityId][$phaseId])) {
-        $detail['taskMatrix'][$activityId][$phaseId] = [];
+      if (!isset($detail['activityMatrix'][$activityId][$phaseId])) {
+        $detail['activityMatrix'][$activityId][$phaseId] = [];
       }
     }
   }
@@ -1051,6 +1150,8 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
   $detail['projectHealth'] = fetch_project_health($pdo, $projectId);
   $detail['projectRisks'] = fetch_project_risks($pdo, $projectId);
 
+  // Compat legacy consumers
+  $detail['taskMatrix'] = $detail['activityMatrix'];
   return $detail;
 }
 
@@ -1082,16 +1183,30 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
   }
   if (!$activities) $activities = project_default_activities();
 
-  $taskMatrix = (isset($body['taskMatrix']) && is_array($body['taskMatrix'])) ? $body['taskMatrix'] : [];
+  $activityMatrix = (isset($body['activityMatrix']) && is_array($body['activityMatrix']))
+    ? $body['activityMatrix']
+    : ((isset($body['taskMatrix']) && is_array($body['taskMatrix'])) ? $body['taskMatrix'] : []);
   $rawDependencies = (isset($body['ganttDependencies']) && is_array($body['ganttDependencies']))
     ? $body['ganttDependencies']
     : [];
+  $schema = resolve_project_data_schema($pdo);
+  $activityTypesTable = $schema['activityTypesTable'];
+  $activitiesTable = $schema['activitiesTable'];
+  $assignmentsTable = $schema['assignmentsTable'];
+  $linksTable = $schema['linksTable'];
+  $activityTypeIdCol = $schema['activityTypeIdCol'];
+  $activityItemTypeIdCol = $schema['activityItemTypeIdCol'];
+  $activityItemIdCol = $schema['activityItemIdCol'];
+  $assignTypeIdCol = $schema['assignTypeIdCol'];
+  $assignItemIdCol = $schema['assignItemIdCol'];
+  $depFromCol = $schema['depFromCol'];
+  $depToCol = $schema['depToCol'];
 
-  ensure_project_task_links_table($pdo);
-  $pdo->prepare('DELETE FROM project_tasks_links WHERE project_id = :id')->execute([':id' => $projectId]);
-  $pdo->prepare('DELETE FROM project_task_assignments WHERE project_id = :id')->execute([':id' => $projectId]);
-  $pdo->prepare('DELETE FROM project_tasks WHERE project_id = :id')->execute([':id' => $projectId]);
-  $pdo->prepare('DELETE FROM project_activities WHERE project_id = :id')->execute([':id' => $projectId]);
+  ensure_project_activity_links_table($pdo);
+  $pdo->prepare("DELETE FROM `{$linksTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+  $pdo->prepare("DELETE FROM `{$assignmentsTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+  $pdo->prepare("DELETE FROM `{$activitiesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+  $pdo->prepare("DELETE FROM `{$activityTypesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
   $pdo->prepare('DELETE FROM project_phases WHERE project_id = :id')->execute([':id' => $projectId]);
 
   $phaseSchema = resolve_project_phases_schema($pdo);
@@ -1114,39 +1229,39 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
     $phaseInsert->execute($params);
   }
 
-  $activityInsert = $pdo->prepare('
-    INSERT INTO project_activities (project_id, activity_id, label, owner_name, sequence)
-    VALUES (:project_id, :activity_id, :label, :owner, :sequence)
-  ');
+  $activityInsert = $pdo->prepare("
+    INSERT INTO `{$activityTypesTable}` (project_id, `{$activityTypeIdCol}`, label, owner_name, sequence)
+    VALUES (:project_id, :activity_type_id, :label, :owner, :sequence)
+  ");
   foreach ($activities as $activity) {
     $activityInsert->execute([
       ':project_id' => $projectId,
-      ':activity_id' => $activity['id'],
+      ':activity_type_id' => $activity['id'],
       ':label' => $activity['label'],
       ':owner' => $activity['owner'],
       ':sequence' => $activity['sequence'] ?? null,
     ]);
   }
 
-  $taskInsert = $pdo->prepare('
-    INSERT INTO project_tasks (project_id, activity_id, phase_id, task_id, label, startdate, enddate, status)
-    VALUES (:project_id, :activity_id, :phase_id, :task_id, :label, COALESCE(:startdate, CURRENT_TIMESTAMP), COALESCE(:enddate, CURRENT_TIMESTAMP + INTERVAL 5 DAY), :status)
-  ');
-  $assignInsert = $pdo->prepare('
-    INSERT INTO project_task_assignments (project_id, activity_id, phase_id, task_id, reporter_id, accountant_id, responsible_id)
-    VALUES (:project_id, :activity_id, :phase_id, :task_id, :reporter_id, :accountant_id, :responsible_id)
-  ');
-  $linkInsert = $pdo->prepare('
-    INSERT INTO project_tasks_links (project_id, idTasksFrom, idTaskTo, dependency_type)
+  $taskInsert = $pdo->prepare("
+    INSERT INTO `{$activitiesTable}` (project_id, `{$activityItemTypeIdCol}`, phase_id, `{$activityItemIdCol}`, label, startdate, enddate, status)
+    VALUES (:project_id, :activity_type_id, :phase_id, :activity_id, :label, COALESCE(:startdate, CURRENT_TIMESTAMP), COALESCE(:enddate, CURRENT_TIMESTAMP + INTERVAL 5 DAY), :status)
+  ");
+  $assignInsert = $pdo->prepare("
+    INSERT INTO `{$assignmentsTable}` (project_id, `{$assignTypeIdCol}`, phase_id, `{$assignItemIdCol}`, reporter_id, accountant_id, responsible_id)
+    VALUES (:project_id, :activity_type_id, :phase_id, :activity_id, :reporter_id, :accountant_id, :responsible_id)
+  ");
+  $linkInsert = $pdo->prepare("
+    INSERT INTO `{$linksTable}` (project_id, `{$depFromCol}`, `{$depToCol}`, dependency_type)
     VALUES (:project_id, :from_id, :to_id, :dependency_type)
     ON DUPLICATE KEY UPDATE
       dependency_type = VALUES(dependency_type),
       updated_at = CURRENT_TIMESTAMP
-  ');
+  ");
 
   $existingTaskIds = [];
 
-  foreach ($taskMatrix as $activityId => $phaseMap) {
+  foreach ($activityMatrix as $activityId => $phaseMap) {
     $aid = trim((string)$activityId);
     if ($aid === '' || !is_array($phaseMap)) continue;
 
@@ -1161,9 +1276,9 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
 
         $taskInsert->execute([
           ':project_id' => $projectId,
-          ':activity_id' => $aid,
+          ':activity_type_id' => $aid,
           ':phase_id' => $pid,
-          ':task_id' => $taskId,
+          ':activity_id' => $taskId,
           ':label' => trim((string)($task['label'] ?? $taskId)),
           ':startdate' => task_date_to_db_value(isset($task['startDate']) ? (string)$task['startDate'] : null, false),
           ':enddate' => task_date_to_db_value(isset($task['endDate']) ? (string)$task['endDate'] : null, true),
@@ -1177,9 +1292,9 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
         if ($reporter !== '' || $accountant !== '' || $responsible !== '') {
           $assignInsert->execute([
             ':project_id' => $projectId,
-            ':activity_id' => $aid,
+            ':activity_type_id' => $aid,
             ':phase_id' => $pid,
-            ':task_id' => $taskId,
+            ':activity_id' => $taskId,
             ':reporter_id' => $reporter !== '' ? $reporter : null,
             ':accountant_id' => $accountant !== '' ? $accountant : null,
             ':responsible_id' => $responsible !== '' ? $responsible : null,
@@ -1242,7 +1357,7 @@ function save_project_detail(PDO $pdo, string $projectId, array $project, string
   // IMPORTANT: ne pas exécuter de DDL pendant une transaction MariaDB,
   // sinon commit implicite et "There is no active transaction".
   ensure_project_changes_table($pdo);
-  ensure_project_task_links_table($pdo);
+  ensure_project_activity_links_table($pdo);
   ensure_project_health_infra($pdo);
 
   $project['id'] = $projectId;
@@ -1328,6 +1443,11 @@ function rebuild_project_payload(PDO $pdo, string $projectId): array {
 
 function delete_project_everywhere(PDO $pdo, string $projectId): bool {
   ensure_project_health_infra($pdo);
+  $schema = resolve_project_data_schema($pdo);
+  $activityTypesTable = $schema['activityTypesTable'];
+  $activitiesTable = $schema['activitiesTable'];
+  $assignmentsTable = $schema['assignmentsTable'];
+  $linksTable = $schema['linksTable'];
 
   $existsStmt = $pdo->prepare('SELECT COUNT(*) FROM projects WHERE id = :id');
   $existsStmt->execute([':id' => $projectId]);
@@ -1337,10 +1457,10 @@ function delete_project_everywhere(PDO $pdo, string $projectId): bool {
   $pdo->beginTransaction();
   try {
     // Enfants -> parent pour respecter les FKs éventuelles.
-    $pdo->prepare('DELETE FROM project_tasks_links WHERE project_id = :id')->execute([':id' => $projectId]);
-    $pdo->prepare('DELETE FROM project_task_assignments WHERE project_id = :id')->execute([':id' => $projectId]);
-    $pdo->prepare('DELETE FROM project_tasks WHERE project_id = :id')->execute([':id' => $projectId]);
-    $pdo->prepare('DELETE FROM project_activities WHERE project_id = :id')->execute([':id' => $projectId]);
+    $pdo->prepare("DELETE FROM `{$linksTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+    $pdo->prepare("DELETE FROM `{$assignmentsTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+    $pdo->prepare("DELETE FROM `{$activitiesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+    $pdo->prepare("DELETE FROM `{$activityTypesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
     $pdo->prepare('DELETE FROM project_phases WHERE project_id = :id')->execute([':id' => $projectId]);
     $pdo->prepare('DELETE FROM users_roles_projects WHERE project_id = :id')->execute([':id' => $projectId]);
     $pdo->prepare('DELETE FROM project_risks WHERE projectId = :id')->execute([':id' => $projectId]);
@@ -1424,6 +1544,14 @@ function fetch_project_types(PDO $pdo): array {
 }
 
 function fetch_project_type_defaults(PDO $pdo, string $projectTypeId): ?array {
+  $schema = resolve_project_data_schema($pdo);
+  $projectTypeActivityTypesDefaultTable = $schema['projectTypeActivityTypesDefaultTable'];
+  $projectTypeActivitiesDefaultTable = $schema['projectTypeActivitiesDefaultTable'];
+  $ptadPhaseCol = $schema['ptadPhaseCol'];
+  $ptadTypeCol = $schema['ptadTypeCol'];
+  $ptadItemCol = $schema['ptadItemCol'];
+  $ptadLabelCol = $schema['ptadLabelCol'];
+
   $typeStmt = $pdo->prepare('
     SELECT uuid, name, description
     FROM project_type
@@ -1449,12 +1577,12 @@ function fetch_project_type_defaults(PDO $pdo, string $projectTypeId): ?array {
     ];
   }, $phasesStmt->fetchAll());
 
-  $activitiesStmt = $pdo->prepare('
+  $activitiesStmt = $pdo->prepare("
     SELECT sequence, shortname, longname
-    FROM project_type_activities_default
-    WHERE project_type_id = :id AND status = "Active"
+    FROM `{$projectTypeActivityTypesDefaultTable}`
+    WHERE project_type_id = :id AND status = 'Active'
     ORDER BY sequence ASC, shortname ASC
-  ');
+  ");
   $activitiesStmt->execute([':id' => $projectTypeId]);
   $activities = array_map(static function (array $r): array {
     return [
@@ -1464,22 +1592,27 @@ function fetch_project_type_defaults(PDO $pdo, string $projectTypeId): ?array {
     ];
   }, $activitiesStmt->fetchAll());
 
-  $tasksStmt = $pdo->prepare('
-    SELECT sequence, shortname, longname, phaseId, activitiesId
-    FROM project_type_tasks_default
-    WHERE project_type_id = :id AND status = "Active"
-    ORDER BY sequence ASC, shortname ASC
-  ');
-  $tasksStmt->execute([':id' => $projectTypeId]);
-  $tasks = array_map(static function (array $r): array {
+  $activitiesDefaultStmt = $pdo->prepare("
+    SELECT
+      sequence,
+      `{$ptadItemCol}` AS activity_id,
+      `{$ptadLabelCol}` AS activity_label,
+      `{$ptadPhaseCol}` AS phase_id,
+      `{$ptadTypeCol}` AS activity_type_id
+    FROM `{$projectTypeActivitiesDefaultTable}`
+    WHERE project_type_id = :id AND status = 'Active'
+    ORDER BY sequence ASC, `{$ptadItemCol}` ASC
+  ");
+  $activitiesDefaultStmt->execute([':id' => $projectTypeId]);
+  $activitiesDefault = array_map(static function (array $r): array {
     return [
-      'id' => trim((string)($r['shortname'] ?? '')),
-      'label' => trim((string)($r['longname'] ?? $r['shortname'] ?? '')),
-      'phaseId' => trim((string)($r['phaseId'] ?? '')),
-      'activityId' => trim((string)($r['activitiesId'] ?? '')),
+      'id' => trim((string)($r['activity_id'] ?? '')),
+      'label' => trim((string)($r['activity_label'] ?? $r['activity_id'] ?? '')),
+      'phaseId' => trim((string)($r['phase_id'] ?? '')),
+      'activityId' => trim((string)($r['activity_type_id'] ?? '')),
       'sequence' => is_numeric($r['sequence'] ?? null) ? (int)$r['sequence'] : null,
     ];
-  }, $tasksStmt->fetchAll());
+  }, $activitiesDefaultStmt->fetchAll());
 
   return [
     'projectType' => [
@@ -1489,7 +1622,8 @@ function fetch_project_type_defaults(PDO $pdo, string $projectTypeId): ?array {
     ],
     'phases' => $phases,
     'activities' => $activities,
-    'tasks' => $tasks,
+    'activitiesDefault' => $activitiesDefault,
+    'tasks' => $activitiesDefault,
   ];
 }
 

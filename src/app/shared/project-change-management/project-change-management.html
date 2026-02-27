@@ -1,0 +1,54 @@
+<div class="card project-change-management">
+  <div class="card-body">
+    <div class="pcm-head">
+      <div>
+        <h3 class="pcm-title">Conduite du changement</h3>
+        <p class="pcm-subtitle">Référentiel ADKAR inspiré Prosci</p>
+      </div>
+      <div class="pcm-progress-pill">{{ globalProgress }}% global</div>
+    </div>
+
+    <div class="pcm-global-progress">
+      <div class="pcm-global-progress-bar" [style.width.%]="globalProgress"></div>
+    </div>
+
+    <div class="pcm-stages">
+      <article class="pcm-stage-card" *ngFor="let stage of stages; trackBy: trackByStage">
+        <div class="pcm-stage-header">
+          <div class="pcm-stage-code">{{ stage.code }}</div>
+          <div>
+            <h4 class="pcm-stage-title">{{ stage.label }}</h4>
+            <p class="pcm-stage-desc">{{ stage.description }}</p>
+          </div>
+        </div>
+
+        <div class="pcm-stage-progress">
+          <div class="pcm-stage-progress-bar" [style.width.%]="stage.progress"></div>
+        </div>
+        <div class="pcm-stage-progress-label">{{ stage.progress }}%</div>
+
+        <div class="pcm-stage-kpis">
+          <span><strong>{{ stage.done }}</strong> fait</span>
+          <span><strong>{{ stage.inProgress }}</strong> en cours</span>
+          <span><strong>{{ stage.todo }}</strong> à faire</span>
+        </div>
+      </article>
+    </div>
+
+    <div class="pcm-actions">
+      <h4 class="pcm-actions-title">Actions changement prioritaires</h4>
+
+      <div class="pcm-empty" *ngIf="!upcomingActions.length">
+        Aucune action de changement en attente.
+      </div>
+
+      <ul class="pcm-actions-list" *ngIf="upcomingActions.length">
+        <li *ngFor="let action of upcomingActions; trackBy: trackByTask">
+          <span class="pcm-action-phase">{{ action.phase }}</span>
+          <span class="pcm-action-label">{{ action.label }}</span>
+          <span class="pcm-action-status">{{ action.status }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

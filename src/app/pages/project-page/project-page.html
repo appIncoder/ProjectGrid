@@ -86,6 +86,23 @@
               Ressources
             </button>
           </li>
+          <li class="nav-item ms-auto detailed-tab-group">
+            <span class="detailed-tab-group-title">Gestion détaillée</span>
+            <div class="detailed-tab-buttons">
+              <button class="nav-link detailed-tab-button" [class.active]="activeTab === 'detail_project'" type="button" (click)="setTab('detail_project')">
+                Projet
+              </button>
+              <button class="nav-link detailed-tab-button" [class.active]="activeTab === 'detail_business'" type="button" (click)="setTab('detail_business')">
+                Métier
+              </button>
+              <button class="nav-link detailed-tab-button" [class.active]="activeTab === 'change'" type="button" (click)="setTab('change')">
+                Changement
+              </button>
+              <button class="nav-link detailed-tab-button" [class.active]="activeTab === 'detail_technology'" type="button" (click)="setTab('detail_technology')">
+                Technologie
+              </button>
+            </div>
+          </li>
         </ul>
       </div>
 
@@ -98,10 +115,31 @@
           <app-project-risks [projectId]="p.id"></app-project-risks>
         </div>
 
-        <!-- Onglet 3 : Gestion du budget -->
+        <!-- Onglet 3 : Conduite du changement (ADKAR) -->
+        <app-project-project-management
+          *ngIf="activeTab === 'detail_project'"
+          [project]="p"
+        ></app-project-project-management>
+
+        <app-project-business-management
+          *ngIf="activeTab === 'detail_business'"
+          [project]="p"
+        ></app-project-business-management>
+
+        <app-project-change-management
+          *ngIf="activeTab === 'change'"
+          [project]="p"
+        ></app-project-change-management>
+
+        <app-project-technology-management
+          *ngIf="activeTab === 'detail_technology'"
+          [project]="p"
+        ></app-project-technology-management>
+
+        <!-- Onglet 4 : Gestion du budget -->
         <app-project-budget *ngIf="activeTab === 'budget'"></app-project-budget>
 
-        <!-- Onglet 4 : Roadmap / Gantt -->
+        <!-- Onglet 5 : Roadmap / Gantt -->
         <app-project-roadmap
           *ngIf="activeTab === 'roadmap'"
           [project]="p"
@@ -110,10 +148,10 @@
           [saveError]="saveError"
         ></app-project-roadmap>
 
-        <!-- Onglet 5 : Board -->
+        <!-- Onglet 6 : Board -->
         <app-project-board *ngIf="activeTab === 'board'" [project]="p" [users]="users"></app-project-board>
 
-        <!-- Onglet 6 : Ressources -->
+        <!-- Onglet 7 : Ressources -->
         <app-project-ressources *ngIf="activeTab === 'ressources'" [project]="p"></app-project-ressources>
       </div>
     </div>

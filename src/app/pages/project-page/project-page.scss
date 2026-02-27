@@ -124,6 +124,35 @@
   color: #fff;
 }
 
+.project-tabs .detailed-tab-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.48rem;
+  border: 1px solid #d7deea;
+  border-radius: 999px;
+  background: #f4f7fc;
+  padding: 0.18rem 0.22rem 0.18rem 0.62rem;
+}
+
+.project-tabs .detailed-tab-group-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #4b607e;
+  white-space: nowrap;
+}
+
+.project-tabs .detailed-tab-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+}
+
+.project-tabs .detailed-tab-button {
+  margin: 0;
+  padding-inline: 0.68rem;
+}
+
 .project-tab-panel {
   width: 100%;
   margin-inline: auto;

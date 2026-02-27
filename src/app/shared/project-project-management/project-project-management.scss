@@ -1,0 +1,118 @@
+.pm-detail-card {
+  border: 1px solid #d8e0ea;
+}
+
+.pm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.7rem;
+}
+
+.pm-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.pm-kpi {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #275f8e;
+}
+
+.pm-progress,
+.pm-mini-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #edf2f7;
+  overflow: hidden;
+}
+
+.pm-progress {
+  margin-bottom: 0.85rem;
+}
+
+.pm-progress-bar,
+.pm-mini-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #2e88d1 0%, #6cb6ef 100%);
+}
+
+.pm-phases {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.pm-phase-card {
+  border: 1px solid #e1e8f1;
+  border-radius: 0.65rem;
+  background: #fbfcff;
+  padding: 0.55rem;
+}
+
+.pm-phase-card h4 {
+  margin: 0 0 0.32rem;
+  font-size: 0.8rem;
+}
+
+.pm-phase-kpis {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  color: #4d6076;
+  margin-bottom: 0.42rem;
+}
+
+.pm-actions {
+  margin-top: 0.9rem;
+  border-top: 1px dashed #dbe4ee;
+  padding-top: 0.65rem;
+}
+
+.pm-actions h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+}
+
+.pm-actions ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pm-actions li {
+  display: grid;
+  grid-template-columns: 72px 1fr 92px;
+  gap: 0.5rem;
+  border: 1px solid #e5ecf4;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.pm-action-phase {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2e5f88;
+}
+
+.pm-action-label {
+  font-size: 0.77rem;
+}
+
+.pm-action-status {
+  justify-self: end;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #5f7083;
+}
+
+@media (max-width: 992px) {
+  .pm-phases {
+    grid-template-columns: 1fr;
+  }
+}

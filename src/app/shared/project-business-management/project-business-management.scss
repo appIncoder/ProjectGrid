@@ -1,0 +1,136 @@
+.bm-detail-card {
+  border: 1px solid #dfdde8;
+}
+
+.bm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bm-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.bm-kpi {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6a2e8e;
+}
+
+.bm-subtitle {
+  margin: 0.32rem 0 0.7rem;
+  color: #615872;
+  font-size: 0.8rem;
+}
+
+.bm-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #f1ecf7;
+  overflow: hidden;
+}
+
+.bm-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #8a3eb7 0%, #c07ee6 100%);
+}
+
+.bm-stats {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  color: #5d5a69;
+}
+
+.bm-lenses {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.bm-lens {
+  border: 1px solid #e8e1f1;
+  background: #fcfbff;
+  border-radius: 0.62rem;
+  padding: 0.52rem;
+}
+
+.bm-lens h4 {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.bm-lens p {
+  margin: 0.2rem 0;
+  font-size: 0.72rem;
+  color: #6a6078;
+}
+
+.bm-lens span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #7a44a1;
+}
+
+.bm-focus {
+  margin-top: 0.9rem;
+  border-top: 1px dashed #eadff3;
+  padding-top: 0.6rem;
+}
+
+.bm-focus h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+}
+
+.bm-focus ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.bm-focus li {
+  display: grid;
+  grid-template-columns: 72px 1fr 92px;
+  gap: 0.5rem;
+  border: 1px solid #ece3f5;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.bm-phase {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #704291;
+}
+
+.bm-label {
+  font-size: 0.77rem;
+}
+
+.bm-status {
+  justify-self: end;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6e6280;
+}
+
+@media (max-width: 1200px) {
+  .bm-lenses {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .bm-lenses {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,17 +7,17 @@
       <div>
         <h3 class="h6 mb-1">Roadmap – Diagramme de Gantt ({{ getPeriodLabel() }})</h3>
         <div class="roadmap-kpis">
-          <span class="roadmap-kpi">Tasks: {{ getTotalLeafTaskCount() }}</span>
-          <span class="roadmap-kpi">Groups: {{ getActivityGroupCount() }}</span>
-          <span class="roadmap-kpi">Collapsed: {{ getCollapsedGroupCount() }}</span>
+          <span class="roadmap-kpi">Activités: {{ getTotalLeafTaskCount() }}</span>
+          <span class="roadmap-kpi">Types d'activité: {{ getActivityGroupCount() }}</span>
+          <span class="roadmap-kpi">Types repliés: {{ getCollapsedGroupCount() }}</span>
         </div>
-        <div class="roadmap-add-task-hint">Hint: nom, phase, activite, date debut et date fin sont obligatoires.</div>
+        <div class="roadmap-add-task-hint">Info: nom, phase, type d'activité, date de début et date de fin sont obligatoires.</div>
       </div>
 
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <button class="btn roadmap-add-task-btn" (click)="openCreateTaskModal()">
           <span class="roadmap-add-task-btn__plus">+</span>
-          <span>Add new task</span>
+          <span>Ajouter une activité</span>
         </button>
 
         <!-- Modes d’affichage (Split supprimé) -->
@@ -131,7 +131,7 @@
 
             <!-- ROW 2 : titres -->
             <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 220px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Tâches
+              Activités
               <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'task')"></span>
             </div>
             <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 120px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">

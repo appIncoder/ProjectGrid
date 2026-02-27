@@ -1,0 +1,136 @@
+.tm-detail-card {
+  border: 1px solid #d6e3e1;
+}
+
+.tm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.tm-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.tm-kpi {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1f7a68;
+}
+
+.tm-subtitle {
+  margin: 0.32rem 0 0.7rem;
+  color: #56766f;
+  font-size: 0.8rem;
+}
+
+.tm-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #eaf3f1;
+  overflow: hidden;
+}
+
+.tm-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #259d87 0%, #78d0c1 100%);
+}
+
+.tm-stats {
+  margin-top: 0.55rem;
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  color: #4b645f;
+}
+
+.tm-areas {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.tm-area {
+  border: 1px solid #dbeae7;
+  background: #fafdfe;
+  border-radius: 0.62rem;
+  padding: 0.52rem;
+}
+
+.tm-area h4 {
+  margin: 0;
+  font-size: 0.78rem;
+}
+
+.tm-area p {
+  margin: 0.2rem 0;
+  font-size: 0.72rem;
+  color: #5f7872;
+}
+
+.tm-area span {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #2a8574;
+}
+
+.tm-watch {
+  margin-top: 0.9rem;
+  border-top: 1px dashed #d9ebe7;
+  padding-top: 0.6rem;
+}
+
+.tm-watch h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+}
+
+.tm-watch ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.tm-watch li {
+  display: grid;
+  grid-template-columns: 72px 1fr 92px;
+  gap: 0.5rem;
+  border: 1px solid #deece9;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.tm-phase {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2a7468;
+}
+
+.tm-label {
+  font-size: 0.77rem;
+}
+
+.tm-status {
+  justify-self: end;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #5b736d;
+}
+
+@media (max-width: 1200px) {
+  .tm-areas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .tm-areas {
+    grid-template-columns: 1fr;
+  }
+}

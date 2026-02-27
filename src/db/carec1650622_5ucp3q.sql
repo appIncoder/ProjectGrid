@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS `projects` (
 --
 
 INSERT IGNORE INTO `projects` (`id`, `name`, `description`, `payload`, `updated_at`, `created_at`, `status`) VALUES
-('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Projet A – Plateforme opérationnelle', 'Mise en place d’une nouvelle plateforme de suivi opérationnel pour les équipes métiers et IT.', '{\r\n   \"id\":\"6c4a8c7c-95ca-4b5d-8667-7e8242f73596\",\r\n   \"name\":\"Projet A – Plateforme opérationnelle\",\r\n   \"description\":\"Mise en place d’une nouvelle plateforme de suivi opérationnel pour les équipes métiers et IT.\",\r\n   \"phases\":[\r\n      \"Phase1\",\r\n      \"Phase2\",\r\n      \"Phase3\",\r\n      \"Phase4\",\r\n      \"Phase5\",\r\n      \"Phase6\"\r\n   ],\r\n   \"activities\":{\r\n      \"projet\":{\r\n         \"id\":\"projet\",\r\n         \"label\":\"Gestion du projet\",\r\n         \"owner\":\"Alice Dupont\"\r\n      },\r\n      \"metier\":{\r\n         \"id\":\"metier\",\r\n         \"label\":\"Gestion du métier\",\r\n         \"owner\":\"Claire Leroy\"\r\n      },\r\n      \"changement\":{\r\n         \"id\":\"changement\",\r\n         \"label\":\"Gestion du changement\",\r\n         \"owner\":\"Bruno Martin\"\r\n      },\r\n      \"technologie\":{\r\n         \"id\":\"technologie\",\r\n         \"label\":\"Gestion de la technologie\",\r\n         \"owner\":\"David Lambert\"\r\n      }\r\n   },\r\n   \"taskMatrix\":{\r\n      \"projet\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"p1-1\",\r\n               \"label\":\"Charte projet\",\r\n               \"status\":\"done\"\r\n            },\r\n            {\r\n               \"id\":\"p1-2\",\r\n               \"label\":\"Nomination gouvernance\",\r\n               \"status\":\"done\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"p2-1\",\r\n               \"label\":\"Plan de projet détaillé\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"p2-2\",\r\n               \"label\":\"Plan de communication\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"p3-1\",\r\n               \"label\":\"Suivi risques\",\r\n               \"status\":\"inprogress\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"p4-1\",\r\n               \"label\":\"Comités de pilotage\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"p5-1\",\r\n               \"label\":\"Préparation clôture\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"p6-1\",\r\n               \"label\":\"Clôture administrative\",\r\n               \"status\":\"notdone\"\r\n            }\r\n         ]\r\n      },\r\n      \"metier\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"m1-1\",\r\n               \"label\":\"Clarification besoins\",\r\n               \"status\":\"done\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"m2-1\",\r\n               \"label\":\"Priorisation fonctionnalités\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"m2-2\",\r\n               \"label\":\"Scénarios métier\",\r\n               \"status\":\"todo\"\r\n            },\r\n            {\r\n               \"id\":\"m2-3\",\r\n               \"label\":\"Priorisation fonctionnalités\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"m2-4\",\r\n               \"label\":\"Scénarios métier\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"m3-1\",\r\n               \"label\":\"Validation maquettes\",\r\n               \"status\":\"inprogress\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"m4-1\",\r\n               \"label\":\"Recette métier\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"m5-1\",\r\n               \"label\":\"Validation Go / No-Go\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"m6-1\",\r\n               \"label\":\"Retour d’expérience métier\",\r\n               \"status\":\"notdone\"\r\n            }\r\n         ]\r\n      },\r\n      \"changement\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"c1-1\",\r\n               \"label\":\"Analyse des impacts\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"c2-1\",\r\n               \"label\":\"Plan de formation\",\r\n               \"status\":\"todo\"\r\n            },\r\n            {\r\n               \"id\":\"c2-2\",\r\n               \"label\":\"Carte des parties prenantes\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"c3-1\",\r\n               \"label\":\"Sessions d’info\",\r\n               \"status\":\"inprogress\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"c4-1\",\r\n               \"label\":\"Accompagnement terrain\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"c5-1\",\r\n               \"label\":\"Mesure de l’adoption\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"c6-1\",\r\n               \"label\":\"Stabilisation\",\r\n               \"status\":\"notdone\"\r\n            }\r\n         ]\r\n      },\r\n      \"technologie\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"t1-1\",\r\n               \"label\":\"Architecture cible\",\r\n               \"status\":\"done\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"t2-1\",\r\n               \"label\":\"Spécifications techniques\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"t2-2\",\r\n               \"label\":\"Plan d’intégration\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"t3-1\",\r\n               \"label\":\"Développement\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"t3-2\",\r\n               \"label\":\"Tests techniques\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"t4-1\",\r\n               \"label\":\"Tests de performance\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"t5-1\",\r\n               \"label\":\"Déploiement\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"t6-1\",\r\n               \"label\":\"Support post-déploiement\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ]\r\n      }\r\n   }\r\n}', '2026-02-11 19:36:22', '2026-01-04 02:50:16', '');
+('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Projet A – Plateforme opérationnelle', 'Mise en place d’une nouvelle plateforme de suivi opérationnel pour les équipes métiers et IT.', '{\r\n   \"id\":\"6c4a8c7c-95ca-4b5d-8667-7e8242f73596\",\r\n   \"name\":\"Projet A – Plateforme opérationnelle\",\r\n   \"description\":\"Mise en place d’une nouvelle plateforme de suivi opérationnel pour les équipes métiers et IT.\",\r\n   \"phases\":[\r\n      \"Phase1\",\r\n      \"Phase2\",\r\n      \"Phase3\",\r\n      \"Phase4\",\r\n      \"Phase5\",\r\n      \"Phase6\"\r\n   ],\r\n   \"activities\":{\r\n      \"projet\":{\r\n         \"id\":\"projet\",\r\n         \"label\":\"Gestion du projet\",\r\n         \"owner\":\"Alice Dupont\"\r\n      },\r\n      \"metier\":{\r\n         \"id\":\"metier\",\r\n         \"label\":\"Gestion du métier\",\r\n         \"owner\":\"Claire Leroy\"\r\n      },\r\n      \"changement\":{\r\n         \"id\":\"changement\",\r\n         \"label\":\"Gestion du changement\",\r\n         \"owner\":\"Bruno Martin\"\r\n      },\r\n      \"technologie\":{\r\n         \"id\":\"technologie\",\r\n         \"label\":\"Gestion de la technologie\",\r\n         \"owner\":\"David Lambert\"\r\n      }\r\n   },\r\n   \"activityMatrix\":{\r\n      \"projet\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"p1-1\",\r\n               \"label\":\"Charte projet\",\r\n               \"status\":\"done\"\r\n            },\r\n            {\r\n               \"id\":\"p1-2\",\r\n               \"label\":\"Nomination gouvernance\",\r\n               \"status\":\"done\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"p2-1\",\r\n               \"label\":\"Plan de projet détaillé\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"p2-2\",\r\n               \"label\":\"Plan de communication\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"p3-1\",\r\n               \"label\":\"Suivi risques\",\r\n               \"status\":\"inprogress\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"p4-1\",\r\n               \"label\":\"Comités de pilotage\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"p5-1\",\r\n               \"label\":\"Préparation clôture\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"p6-1\",\r\n               \"label\":\"Clôture administrative\",\r\n               \"status\":\"notdone\"\r\n            }\r\n         ]\r\n      },\r\n      \"metier\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"m1-1\",\r\n               \"label\":\"Clarification besoins\",\r\n               \"status\":\"done\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"m2-1\",\r\n               \"label\":\"Priorisation fonctionnalités\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"m2-2\",\r\n               \"label\":\"Scénarios métier\",\r\n               \"status\":\"todo\"\r\n            },\r\n            {\r\n               \"id\":\"m2-3\",\r\n               \"label\":\"Priorisation fonctionnalités\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"m2-4\",\r\n               \"label\":\"Scénarios métier\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"m3-1\",\r\n               \"label\":\"Validation maquettes\",\r\n               \"status\":\"inprogress\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"m4-1\",\r\n               \"label\":\"Recette métier\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"m5-1\",\r\n               \"label\":\"Validation Go / No-Go\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"m6-1\",\r\n               \"label\":\"Retour d’expérience métier\",\r\n               \"status\":\"notdone\"\r\n            }\r\n         ]\r\n      },\r\n      \"changement\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"c1-1\",\r\n               \"label\":\"Analyse des impacts\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"c2-1\",\r\n               \"label\":\"Plan de formation\",\r\n               \"status\":\"todo\"\r\n            },\r\n            {\r\n               \"id\":\"c2-2\",\r\n               \"label\":\"Carte des parties prenantes\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"c3-1\",\r\n               \"label\":\"Sessions d’info\",\r\n               \"status\":\"inprogress\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"c4-1\",\r\n               \"label\":\"Accompagnement terrain\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"c5-1\",\r\n               \"label\":\"Mesure de l’adoption\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"c6-1\",\r\n               \"label\":\"Stabilisation\",\r\n               \"status\":\"notdone\"\r\n            }\r\n         ]\r\n      },\r\n      \"technologie\":{\r\n         \"Phase1\":[\r\n            {\r\n               \"id\":\"t1-1\",\r\n               \"label\":\"Architecture cible\",\r\n               \"status\":\"done\"\r\n            }\r\n         ],\r\n         \"Phase2\":[\r\n            {\r\n               \"id\":\"t2-1\",\r\n               \"label\":\"Spécifications techniques\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"t2-2\",\r\n               \"label\":\"Plan d’intégration\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase3\":[\r\n            {\r\n               \"id\":\"t3-1\",\r\n               \"label\":\"Développement\",\r\n               \"status\":\"inprogress\"\r\n            },\r\n            {\r\n               \"id\":\"t3-2\",\r\n               \"label\":\"Tests techniques\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase4\":[\r\n            {\r\n               \"id\":\"t4-1\",\r\n               \"label\":\"Tests de performance\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase5\":[\r\n            {\r\n               \"id\":\"t5-1\",\r\n               \"label\":\"Déploiement\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ],\r\n         \"Phase6\":[\r\n            {\r\n               \"id\":\"t6-1\",\r\n               \"label\":\"Support post-déploiement\",\r\n               \"status\":\"todo\"\r\n            }\r\n         ]\r\n      }\r\n   }\r\n}', '2026-02-11 19:36:22', '2026-01-04 02:50:16', '');
 
 -- --------------------------------------------------------
 
@@ -98,19 +98,19 @@ CREATE TABLE IF NOT EXISTS `users_roles_projects` (
 -- --------------------------------------------------------
 
 --
--- Structure de la table `project_task_assignments`
+-- Structure de la table `project_activities_assignments`
 --
 
-CREATE TABLE IF NOT EXISTS `project_task_assignments` (
+CREATE TABLE IF NOT EXISTS `project_activities_assignments` (
   `project_id` uuid NOT NULL,
-  `activity_id` varchar(64) NOT NULL,
+  `activity_type_id` varchar(64) NOT NULL,
   `phase_id` varchar(32) NOT NULL,
-  `task_id` varchar(128) NOT NULL,
+  `activity_id` varchar(128) NOT NULL,
   `reporter_id` uuid DEFAULT NULL,
   `accountant_id` uuid DEFAULT NULL,
   `responsible_id` uuid DEFAULT NULL,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`project_id`,`activity_id`,`phase_id`,`task_id`)
+  PRIMARY KEY (`project_id`,`activity_type_id`,`phase_id`,`activity_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -126,32 +126,32 @@ CREATE TABLE IF NOT EXISTS `project_phases` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Structure de la table `project_activities`
+-- Structure de la table `project_activitie_types`
+--
+
+CREATE TABLE IF NOT EXISTS `project_activitie_types` (
+  `project_id` uuid NOT NULL,
+  `activity_type_id` varchar(64) NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `owner_name` varchar(180) DEFAULT NULL,
+  `sequence` int DEFAULT NULL,
+  PRIMARY KEY (`project_id`,`activity_type_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Structure de la table `project_activitie_types`
 --
 
 CREATE TABLE IF NOT EXISTS `project_activities` (
   `project_id` uuid NOT NULL,
-  `activity_id` varchar(64) NOT NULL,
-  `label` varchar(255) NOT NULL,
-  `owner_name` varchar(180) DEFAULT NULL,
-  `sequence` int DEFAULT NULL,
-  PRIMARY KEY (`project_id`,`activity_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Structure de la table `project_tasks`
---
-
-CREATE TABLE IF NOT EXISTS `project_tasks` (
-  `project_id` uuid NOT NULL,
-  `activity_id` varchar(64) NOT NULL,
+  `activity_type_id` varchar(64) NOT NULL,
   `phase_id` varchar(32) NOT NULL,
-  `task_id` varchar(128) NOT NULL,
+  `activity_id` varchar(128) NOT NULL,
   `label` varchar(255) NOT NULL,
   `startdate` timestamp NOT NULL DEFAULT current_timestamp(),
   `enddate` timestamp NOT NULL DEFAULT (current_timestamp() + interval 5 day),
   `status` varchar(32) NOT NULL,
-  PRIMARY KEY (`project_id`,`activity_id`,`phase_id`,`task_id`)
+  PRIMARY KEY (`project_id`,`activity_type_id`,`phase_id`,`activity_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -196,32 +196,32 @@ CREATE TABLE IF NOT EXISTS `project_type_phases_default` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Structure de la table `project_type_activities_type_default`
+--
+
+CREATE TABLE IF NOT EXISTS `project_type_activities_type_default` (
+  `uuid` uuid NOT NULL DEFAULT uuid(),
+  `project_type_id` uuid NOT NULL,
+  `sequence` int NOT NULL,
+  `shortname` varchar(64) NOT NULL,
+  `longname` varchar(255) NOT NULL,
+  `status` varchar(32) NOT NULL DEFAULT 'Active',
+  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
+  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`uuid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
 -- Structure de la table `project_type_activities_default`
 --
 
 CREATE TABLE IF NOT EXISTS `project_type_activities_default` (
   `uuid` uuid NOT NULL DEFAULT uuid(),
   `project_type_id` uuid NOT NULL,
-  `sequence` int NOT NULL,
-  `shortname` varchar(64) NOT NULL,
-  `longname` varchar(255) NOT NULL,
-  `status` varchar(32) NOT NULL DEFAULT 'Active',
-  `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
-  `date_last_updated` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`uuid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Structure de la table `project_type_tasks_default`
---
-
-CREATE TABLE IF NOT EXISTS `project_type_tasks_default` (
-  `uuid` uuid NOT NULL DEFAULT uuid(),
-  `project_type_id` uuid NOT NULL,
   `phaseId` varchar(64) NOT NULL,
-  `activitiesId` varchar(64) NOT NULL,
+  `activity_type_id` varchar(64) NOT NULL,
   `sequence` int NOT NULL,
-  `shortname` varchar(64) NOT NULL,
+  `activity_id` varchar(64) NOT NULL,
   `longname` varchar(255) NOT NULL,
   `status` varchar(32) NOT NULL DEFAULT 'Active',
   `date_created` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -230,17 +230,17 @@ CREATE TABLE IF NOT EXISTS `project_type_tasks_default` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Structure de la table `project_tasks_links`
+-- Structure de la table `project_activities_links`
 --
 
-CREATE TABLE IF NOT EXISTS `project_tasks_links` (
+CREATE TABLE IF NOT EXISTS `project_activities_links` (
   `project_id` uuid NOT NULL,
-  `idTasksFrom` varchar(128) NOT NULL,
-  `idTaskTo` varchar(128) NOT NULL,
+  `IdActivityFrom` varchar(128) NOT NULL,
+  `IdActivityTo` varchar(128) NOT NULL,
   `dependency_type` varchar(32) NOT NULL DEFAULT 'finish-to-start',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`project_id`,`idTasksFrom`,`idTaskTo`)
+  PRIMARY KEY (`project_id`,`IdActivityFrom`,`IdActivityTo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -406,31 +406,64 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_urp_user_role_project` ON `users_roles_projects` (`user_id`, `role_id`, `project_id`);
 
 --
--- Index pour la table `project_task_assignments`
+-- Index pour la table `project_activities_assignments`
 --
-ALTER TABLE `project_task_assignments`
+ALTER TABLE `project_activities_assignments`
   ADD COLUMN IF NOT EXISTS `reporter_id` uuid DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `accountant_id` uuid DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `responsible_id` uuid DEFAULT NULL,
   ADD COLUMN IF NOT EXISTS `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp();
-ALTER TABLE `project_tasks`
+ALTER TABLE `project_activities`
+  ADD COLUMN IF NOT EXISTS `status` varchar(32) NOT NULL DEFAULT 'todo',
   ADD COLUMN IF NOT EXISTS `startdate` timestamp NOT NULL DEFAULT current_timestamp(),
   ADD COLUMN IF NOT EXISTS `enddate` timestamp NOT NULL DEFAULT (current_timestamp() + interval 5 day);
-ALTER TABLE `project_type_tasks_default`
+
+-- Nettoyage des doublons de labels dans project_activities
+-- (même projet / type d'activité / phase / label), on conserve la 1ère occurrence.
+SET @has_pa_dedup_col := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities' AND COLUMN_NAME = '__dedup_row'
+);
+SET @sql := IF(@has_pa_dedup_col = 0,
+  'ALTER TABLE `project_activities` ADD COLUMN `__dedup_row` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+DELETE pa1 FROM `project_activities` pa1
+JOIN `project_activities` pa2
+  ON pa1.`project_id` <=> pa2.`project_id`
+ AND pa1.`activity_type_id` <=> pa2.`activity_type_id`
+ AND pa1.`phase_id` <=> pa2.`phase_id`
+ AND TRIM(COALESCE(pa1.`label`, '')) = TRIM(COALESCE(pa2.`label`, ''))
+ AND pa1.`__dedup_row` > pa2.`__dedup_row`;
+
+SET @has_pa_dedup_col := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities' AND COLUMN_NAME = '__dedup_row'
+);
+SET @sql := IF(@has_pa_dedup_col > 0,
+  'ALTER TABLE `project_activities` DROP COLUMN `__dedup_row`',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+ALTER TABLE `project_type_activities_default`
   ADD COLUMN IF NOT EXISTS `phaseId` varchar(64) DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `activitiesId` varchar(64) DEFAULT NULL;
+  ADD COLUMN IF NOT EXISTS `activity_type_id` varchar(64) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `activity_id` varchar(64) DEFAULT NULL;
 ALTER TABLE `project_health`
   ADD COLUMN IF NOT EXISTS `description` text DEFAULT NULL;
-ALTER TABLE `project_tasks_links`
+ALTER TABLE `project_activities_links`
   ADD COLUMN IF NOT EXISTS `project_id` uuid NOT NULL,
-  ADD COLUMN IF NOT EXISTS `idTasksFrom` varchar(128) NOT NULL,
-  ADD COLUMN IF NOT EXISTS `idTaskTo` varchar(128) NOT NULL,
+  ADD COLUMN IF NOT EXISTS `IdActivityFrom` varchar(128) NOT NULL,
+  ADD COLUMN IF NOT EXISTS `IdActivityTo` varchar(128) NOT NULL,
   ADD COLUMN IF NOT EXISTS `dependency_type` varchar(32) NOT NULL DEFAULT 'finish-to-start',
   ADD COLUMN IF NOT EXISTS `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   ADD COLUMN IF NOT EXISTS `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp();
-CREATE INDEX IF NOT EXISTS `idx_pta_reporter` ON `project_task_assignments` (`reporter_id`);
-CREATE INDEX IF NOT EXISTS `idx_pta_accountant` ON `project_task_assignments` (`accountant_id`);
-CREATE INDEX IF NOT EXISTS `idx_pta_responsible` ON `project_task_assignments` (`responsible_id`);
+CREATE INDEX IF NOT EXISTS `idx_pta_reporter` ON `project_activities_assignments` (`reporter_id`);
+CREATE INDEX IF NOT EXISTS `idx_pta_accountant` ON `project_activities_assignments` (`accountant_id`);
+CREATE INDEX IF NOT EXISTS `idx_pta_responsible` ON `project_activities_assignments` (`responsible_id`);
 CREATE INDEX IF NOT EXISTS `idx_project_phases_order` ON `project_phases` (`project_id`,`phase_order`);
 ALTER TABLE `project_phases`
   ADD COLUMN IF NOT EXISTS `shortname` varchar(32) DEFAULT NULL,
@@ -488,17 +521,17 @@ LEFT JOIN (
   ON d.`shortname` = p.`shortname`
 SET p.`longName` = COALESCE(NULLIF(p.`longName`, ''), d.`longname`, p.`shortname`)
 WHERE p.`shortname` IS NOT NULL;
-CREATE INDEX IF NOT EXISTS `idx_project_activities_owner` ON `project_activities` (`owner_name`);
-CREATE INDEX IF NOT EXISTS `idx_project_tasks_status` ON `project_tasks` (`status`);
-CREATE INDEX IF NOT EXISTS `idx_project_type_tasks_default_phase` ON `project_type_tasks_default` (`project_type_id`, `phaseId`);
-CREATE INDEX IF NOT EXISTS `idx_project_type_tasks_default_activity` ON `project_type_tasks_default` (`project_type_id`, `activitiesId`);
-CREATE INDEX IF NOT EXISTS `idx_project_tasks_links_to` ON `project_tasks_links` (`project_id`, `idTaskTo`);
-CREATE INDEX IF NOT EXISTS `idx_project_tasks_links_type` ON `project_tasks_links` (`dependency_type`);
+CREATE INDEX IF NOT EXISTS `idx_project_activities_owner` ON `project_activitie_types` (`owner_name`);
+CREATE INDEX IF NOT EXISTS `idx_project_activities_status` ON `project_activities` (`status`);
+CREATE INDEX IF NOT EXISTS `idx_project_type_activities_default_phase` ON `project_type_activities_default` (`project_type_id`, `phaseId`);
+CREATE INDEX IF NOT EXISTS `idx_project_type_activities_default_activity_type` ON `project_type_activities_default` (`project_type_id`, `activity_type_id`);
+CREATE INDEX IF NOT EXISTS `idx_project_activities_links_to` ON `project_activities_links` (`project_id`, `IdActivityTo`);
+CREATE INDEX IF NOT EXISTS `idx_project_activities_links_type` ON `project_activities_links` (`dependency_type`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_name` ON `project_type` (`name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_activities_type_short` ON `activities` (`id_project_type`, `short_name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_phases_default_type_short` ON `project_type_phases_default` (`project_type_id`, `shortname`);
-CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_short` ON `project_type_activities_default` (`project_type_id`, `shortname`);
-CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_tasks_default_type_short` ON `project_type_tasks_default` (`project_type_id`, `shortname`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_short` ON `project_type_activities_type_default` (`project_type_id`, `shortname`);
+CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_activity` ON `project_type_activities_default` (`project_type_id`, `activity_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_health_default_short_name` ON `project_health_default` (`health_short_name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_health_project_short` ON `project_health` (`project_id`, `health_short_name`);
 CREATE INDEX IF NOT EXISTS `idx_project_health_project` ON `project_health` (`project_id`);
@@ -520,35 +553,35 @@ CREATE INDEX IF NOT EXISTS `idx_project_risks_risk` ON `project_risks` (`riskId`
 CREATE INDEX IF NOT EXISTS `idx_project_risks_remaining` ON `project_risks` (`remaining_risk`);
 CREATE INDEX IF NOT EXISTS `idx_project_changes_project_created` ON `project_changes` (`project_id`, `created_at`);
 
--- Correction précoce de FK legacy: fk_pta_project peut pointer vers `projects_`
--- et faire échouer les INSERT de project_task_assignments.
-SET @fk_pta_exists := (
+-- Correction précoce de FK legacy: fk_paa_project peut pointer vers `projects_`
+-- et faire échouer les INSERT de project_activities_assignments.
+SET @fk_paa_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_task_assignments'
-    AND CONSTRAINT_NAME = 'fk_pta_project'
+    AND TABLE_NAME = 'project_activities_assignments'
+    AND CONSTRAINT_NAME = 'fk_paa_project'
 );
-SET @fk_pta_ref_table := (
+SET @fk_paa_ref_table := (
   SELECT kcu.REFERENCED_TABLE_NAME
   FROM information_schema.KEY_COLUMN_USAGE kcu
   WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
-    AND kcu.TABLE_NAME = 'project_task_assignments'
-    AND kcu.CONSTRAINT_NAME = 'fk_pta_project'
+    AND kcu.TABLE_NAME = 'project_activities_assignments'
+    AND kcu.CONSTRAINT_NAME = 'fk_paa_project'
   LIMIT 1
 );
-SET @sql := IF(@fk_pta_exists > 0 AND @fk_pta_ref_table <> 'projects',
-  'ALTER TABLE `project_task_assignments` DROP FOREIGN KEY `fk_pta_project`',
+SET @sql := IF(@fk_paa_exists > 0 AND @fk_paa_ref_table <> 'projects',
+  'ALTER TABLE `project_activities_assignments` DROP FOREIGN KEY `fk_paa_project`',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @fk_pta_exists := (
+SET @fk_paa_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_task_assignments'
-    AND CONSTRAINT_NAME = 'fk_pta_project'
+    AND TABLE_NAME = 'project_activities_assignments'
+    AND CONSTRAINT_NAME = 'fk_paa_project'
 );
-SET @sql := IF(@fk_pta_exists = 0,
-  'ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)',
+SET @sql := IF(@fk_paa_exists = 0,
+  'ALTER TABLE `project_activities_assignments` ADD CONSTRAINT `fk_paa_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)',
   'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -560,10 +593,10 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- Purge complète des enregistrements avant réinjection des données de référence
 -- (évite toute redondance lors des ré-exécutions du script)
 SET FOREIGN_KEY_CHECKS = 0;
-DELETE FROM `project_task_assignments`;
-DELETE FROM `project_tasks`;
-DELETE FROM `project_tasks_links`;
-DELETE FROM `project_activities`;
+DELETE FROM `project_activities_assignments`;
+DELETE FROM `project_activitie_types`;
+DELETE FROM `project_activities_links`;
+DELETE FROM `project_activitie_types`;
 DELETE FROM `project_phases`;
 DELETE FROM `users_roles_projects`;
 DELETE FROM `project_risks`;
@@ -573,8 +606,8 @@ DELETE FROM `risks`;
 DELETE FROM `project_health_default`;
 DELETE FROM `activities`;
 DELETE FROM `project_type_phases_default`;
+DELETE FROM `project_type_activities_type_default`;
 DELETE FROM `project_type_activities_default`;
-DELETE FROM `project_type_tasks_default`;
 DELETE FROM `project_type`;
 DELETE FROM `users`;
 DELETE FROM `roles`;
@@ -582,7 +615,7 @@ DELETE FROM `projects`;
 SET FOREIGN_KEY_CHECKS = 1;
 DROP TABLE IF EXISTS `phases`;
 
--- Réinjection explicite du projet de référence (requis avant tasks/assignments/risks)
+-- Réinjection explicite du projet de référence (requis avant activities/assignments/risks)
 INSERT INTO `projects` (`id`, `name`, `description`, `payload`, `status`)
 VALUES (
   '6c4a8c7c-95ca-4b5d-8667-7e8242f73596',
@@ -646,7 +679,7 @@ INSERT IGNORE INTO `activities` (`sequence`, `short_name`, `long_name`, `id_proj
 (4, 'technologie', 'Gestion de la technologie', @id_project_type_prince2, NOW());
 
 -- Données par défaut: activités et phases d'un projet type
-INSERT IGNORE INTO `project_type_activities_default`
+INSERT IGNORE INTO `project_type_activities_type_default`
 (`project_type_id`, `sequence`, `shortname`, `longname`, `status`, `date_created`)
 SELECT
   a.`id_project_type`,
@@ -794,13 +827,13 @@ INSERT IGNORE INTO `project_phases` (`project_id`, `shortname`, `longName`, `pha
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase5', 'Phase 5', 5),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase6', 'Phase 6', 6);
 
-INSERT IGNORE INTO `project_activities` (`project_id`, `activity_id`, `label`, `owner_name`, `sequence`) VALUES
+INSERT IGNORE INTO `project_activitie_types` (`project_id`, `activity_type_id`, `label`, `owner_name`, `sequence`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Gestion du projet', 'Alice Dupont', 1),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Gestion du métier', 'Claire Leroy', 2),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Gestion du changement', 'Bruno Martin', 3),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Gestion de la technologie', 'David Lambert', 4);
 
-INSERT INTO `project_tasks` (`project_id`, `activity_id`, `phase_id`, `task_id`, `label`, `status`) VALUES
+INSERT INTO `project_activities` (`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `label`, `status`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'Charte projet', 'done'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-2', 'Nomination gouvernance', 'done'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase2', 'p2-1', 'Plan de projet détaillé', 'inprogress'),
@@ -835,8 +868,8 @@ ON DUPLICATE KEY UPDATE
   `label` = VALUES(`label`),
   `status` = VALUES(`status`);
 
-INSERT INTO `project_task_assignments`
-(`project_id`, `activity_id`, `phase_id`, `task_id`, `reporter_id`, `accountant_id`, `responsible_id`) VALUES
+INSERT INTO `project_activities_assignments`
+(`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `reporter_id`, `accountant_id`, `responsible_id`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'metier', 'Phase2', 'm2-1', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'changement', 'Phase3', 'c3-1', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
@@ -856,22 +889,22 @@ SET @seed_project_id := (
   LIMIT 1
 );
 
-SET @task_seq := 0;
-INSERT IGNORE INTO `project_type_tasks_default`
-(`project_type_id`, `phaseId`, `activitiesId`, `sequence`, `shortname`, `longname`, `status`, `date_created`)
+SET @activity_seq := 0;
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`)
 SELECT
   @id_project_type_pmbok AS `project_type_id`,
   t.`phase_id` AS `phaseId`,
-  t.`activity_id` AS `activitiesId`,
-  (@task_seq := @task_seq + 1) AS `sequence`,
-  t.`task_id` AS `shortname`,
+  t.`activity_type_id` AS `activity_type_id`,
+  (@activity_seq := @activity_seq + 1) AS `sequence`,
+  t.`activity_id` AS `activity_id`,
   t.`label` AS `longname`,
   'Active' AS `status`,
   NOW() AS `date_created`
-FROM `project_tasks` t
-LEFT JOIN `project_activities` a
+FROM `project_activities` t
+LEFT JOIN `project_activitie_types` a
   ON a.`project_id` = t.`project_id`
- AND a.`activity_id` = t.`activity_id`
+ AND a.`activity_type_id` = t.`activity_type_id`
 LEFT JOIN `project_phases` p
   ON p.`project_id` = t.`project_id`
  AND p.`shortname` = t.`phase_id`
@@ -879,11 +912,11 @@ WHERE t.`project_id` = @seed_project_id
 ORDER BY
   COALESCE(a.`sequence`, 999),
   COALESCE(p.`phase_order`, 999),
-  t.`task_id` ASC;
+  t.`activity_id` ASC;
 
 -- Données par défaut AgilePM
-INSERT IGNORE INTO `project_type_tasks_default`
-(`project_type_id`, `phaseId`, `activitiesId`, `sequence`, `shortname`, `longname`, `status`, `date_created`) VALUES
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
 (@id_project_type_agilepm, 'pre_project', 'projet', 1, 'agp-001', 'Nommer Executive et Business Sponsor', 'Active', NOW()),
 (@id_project_type_agilepm, 'pre_project', 'metier', 2, 'agp-002', 'Clarifier besoin métier initial', 'Active', NOW()),
 (@id_project_type_agilepm, 'feasibility', 'projet', 3, 'agp-003', 'Conduire l''étude de faisabilité', 'Active', NOW()),
@@ -904,8 +937,8 @@ INSERT IGNORE INTO `project_type_tasks_default`
 (@id_project_type_agilepm, 'post_project', 'changement', 18, 'agp-018', 'Consolider adoption et amélioration continue', 'Active', NOW());
 
 -- Données par défaut PRINCE2
-INSERT IGNORE INTO `project_type_tasks_default`
-(`project_type_id`, `phaseId`, `activitiesId`, `sequence`, `shortname`, `longname`, `status`, `date_created`) VALUES
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
 (@id_project_type_prince2, 'su', 'projet', 1, 'pr2-001', 'Désigner Executive et Project Manager', 'Active', NOW()),
 (@id_project_type_prince2, 'su', 'projet', 2, 'pr2-002', 'Capturer le Project Mandate', 'Active', NOW()),
 (@id_project_type_prince2, 'su', 'projet', 3, 'pr2-003', 'Assembler l''équipe de management projet', 'Active', NOW()),
@@ -924,6 +957,42 @@ INSERT IGNORE INTO `project_type_tasks_default`
 (@id_project_type_prince2, 'sb', 'metier', 16, 'pr2-016', 'Mettre à jour Business Case pour décision', 'Active', NOW()),
 (@id_project_type_prince2, 'cp', 'projet', 17, 'pr2-017', 'Préparer End Project Report', 'Active', NOW()),
 (@id_project_type_prince2, 'cp', 'changement', 18, 'pr2-018', 'Planifier revue post-projet et transfert en BAU', 'Active', NOW());
+
+-- Enrichissement "Gestion du changement" inspiré Prosci (ADKAR)
+-- PMBOK (Phase1..Phase6)
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_pmbok, 'Phase1', 'changement', 101, 'pmc-101', 'Évaluer la maturité changement et le contexte organisationnel', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase1', 'changement', 102, 'pmc-102', 'Identifier sponsors clés et parties prenantes impactées', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase2', 'changement', 103, 'pmc-103', 'Construire la stratégie changement et le plan de sponsorisation', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase2', 'changement', 104, 'pmc-104', 'Élaborer le plan de communication orienté ADKAR (Awareness/Desire)', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase3', 'changement', 105, 'pmc-105', 'Déployer le plan de coaching managers de proximité', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase3', 'changement', 106, 'pmc-106', 'Préparer et piloter le plan de formation (Knowledge/Ability)', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase4', 'changement', 107, 'pmc-107', 'Mesurer l''adoption et traiter les résistances prioritaires', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase5', 'changement', 108, 'pmc-108', 'Renforcer les comportements cibles (quick wins, reconnaissance)', 'Active', NOW()),
+(@id_project_type_pmbok, 'Phase6', 'changement', 109, 'pmc-109', 'Réaliser le bilan ADKAR et transférer en mode BAU', 'Active', NOW());
+
+-- AgilePM (pre_project..post_project)
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_agilepm, 'pre_project', 'changement', 101, 'agc-101', 'Qualifier les impacts humains et la capacité de changement', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'changement', 102, 'agc-102', 'Définir la stratégie de conduite du changement et les rôles sponsor', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'changement', 103, 'agc-103', 'Construire le plan de communication et de coaching (itératif)', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'changement', 104, 'agc-104', 'Animer des boucles de feedback utilisateurs et ajuster messages', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'changement', 105, 'agc-105', 'Préparer contenus de formation et support au fil des incréments', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'changement', 106, 'agc-106', 'Piloter le readiness go-live et le plan de gestion des résistances', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'changement', 107, 'agc-107', 'Mesurer adoption durable et planifier le renforcement', 'Active', NOW());
+
+-- PRINCE2 (su, ip, cs, mp, sb, dp, cp)
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_prince2, 'su', 'changement', 101, 'prc-101', 'Évaluer les impacts organisationnels et les parties prenantes', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'changement', 102, 'prc-102', 'Intégrer la stratégie changement dans le PID', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'changement', 103, 'prc-103', 'Suivre l''adoption, escalader résistances et actions correctives', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'changement', 104, 'prc-104', 'Accompagner les équipes de livraison sur les impacts utilisateurs', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'changement', 105, 'prc-105', 'Actualiser le plan changement pour le stage suivant', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'changement', 106, 'prc-106', 'Présenter au Project Board les indicateurs d''adoption', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'changement', 107, 'prc-107', 'Consolider le plan de renforcement et transfert aux opérations', 'Active', NOW());
 
 --
 -- Enrichissement non destructif des données existantes
@@ -1234,89 +1303,89 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_project'
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities_assignments' AND CONSTRAINT_NAME = 'fk_paa_project'
 );
 SET @fk_ref_table := (
   SELECT kcu.REFERENCED_TABLE_NAME
   FROM information_schema.KEY_COLUMN_USAGE kcu
   WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
-    AND kcu.TABLE_NAME = 'project_task_assignments'
-    AND kcu.CONSTRAINT_NAME = 'fk_pta_project'
+    AND kcu.TABLE_NAME = 'project_activities_assignments'
+    AND kcu.CONSTRAINT_NAME = 'fk_paa_project'
   LIMIT 1
 );
 SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'projects',
-  'ALTER TABLE `project_task_assignments` DROP FOREIGN KEY `fk_pta_project`',
+  'ALTER TABLE `project_activities_assignments` DROP FOREIGN KEY `fk_paa_project`',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_project'
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities_assignments' AND CONSTRAINT_NAME = 'fk_paa_project'
 );
 SET @col_match := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS c1
   JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
   WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_task_assignments' AND c1.COLUMN_NAME = 'project_id'
+    AND c1.TABLE_NAME = 'project_activities_assignments' AND c1.COLUMN_NAME = 'project_id'
     AND c2.TABLE_NAME = 'projects' AND c2.COLUMN_NAME = @projects_pk_col
     AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
 );
 SET @sql := IF(@fk_exists = 0 AND @projects_pk_col IS NOT NULL AND @col_match > 0,
-  CONCAT('ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`', @projects_pk_col, '`)'),
+  CONCAT('ALTER TABLE `project_activities_assignments` ADD CONSTRAINT `fk_paa_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`', @projects_pk_col, '`)'),
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_reporter'
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities_assignments' AND CONSTRAINT_NAME = 'fk_paa_reporter'
 );
 SET @col_match := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS c1
   JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
   WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_task_assignments' AND c1.COLUMN_NAME = 'reporter_id'
+    AND c1.TABLE_NAME = 'project_activities_assignments' AND c1.COLUMN_NAME = 'reporter_id'
     AND c2.TABLE_NAME = 'users' AND c2.COLUMN_NAME = @users_pk_col
     AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
 );
 SET @sql := IF(@fk_exists = 0 AND @users_pk_col IS NOT NULL AND @col_match > 0,
-  CONCAT('ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_reporter` FOREIGN KEY (`reporter_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
+  CONCAT('ALTER TABLE `project_activities_assignments` ADD CONSTRAINT `fk_paa_reporter` FOREIGN KEY (`reporter_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_accountant'
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities_assignments' AND CONSTRAINT_NAME = 'fk_paa_accountant'
 );
 SET @col_match := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS c1
   JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
   WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_task_assignments' AND c1.COLUMN_NAME = 'accountant_id'
+    AND c1.TABLE_NAME = 'project_activities_assignments' AND c1.COLUMN_NAME = 'accountant_id'
     AND c2.TABLE_NAME = 'users' AND c2.COLUMN_NAME = @users_pk_col
     AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
 );
 SET @sql := IF(@fk_exists = 0 AND @users_pk_col IS NOT NULL AND @col_match > 0,
-  CONCAT('ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_accountant` FOREIGN KEY (`accountant_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
+  CONCAT('ALTER TABLE `project_activities_assignments` ADD CONSTRAINT `fk_paa_accountant` FOREIGN KEY (`accountant_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_task_assignments' AND CONSTRAINT_NAME = 'fk_pta_responsible'
+  WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'project_activities_assignments' AND CONSTRAINT_NAME = 'fk_paa_responsible'
 );
 SET @col_match := (
   SELECT COUNT(*)
   FROM information_schema.COLUMNS c1
   JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
   WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_task_assignments' AND c1.COLUMN_NAME = 'responsible_id'
+    AND c1.TABLE_NAME = 'project_activities_assignments' AND c1.COLUMN_NAME = 'responsible_id'
     AND c2.TABLE_NAME = 'users' AND c2.COLUMN_NAME = @users_pk_col
     AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
 );
 SET @sql := IF(@fk_exists = 0 AND @users_pk_col IS NOT NULL AND @col_match > 0,
-  CONCAT('ALTER TABLE `project_task_assignments` ADD CONSTRAINT `fk_pta_responsible` FOREIGN KEY (`responsible_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
+  CONCAT('ALTER TABLE `project_activities_assignments` ADD CONSTRAINT `fk_paa_responsible` FOREIGN KEY (`responsible_id`) REFERENCES `users` (`', @users_pk_col, '`)'),
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
@@ -1359,127 +1428,33 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_type_tasks_default'
-    AND CONSTRAINT_NAME = 'fk_pttd_phase'
+    AND TABLE_NAME = 'project_type_activities_default'
+    AND CONSTRAINT_NAME = 'fk_ptad_phase'
 );
-SET @fk_ref_table := (
-  SELECT kcu.REFERENCED_TABLE_NAME
-  FROM information_schema.KEY_COLUMN_USAGE kcu
-  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
-    AND kcu.TABLE_NAME = 'project_type_tasks_default'
-    AND kcu.CONSTRAINT_NAME = 'fk_pttd_phase'
-  LIMIT 1
-);
-SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'project_type_phases_default',
-  'ALTER TABLE `project_type_tasks_default` DROP FOREIGN KEY `fk_pttd_phase`',
+SET @sql := IF(@fk_exists = 0,
+  'ALTER TABLE `project_type_activities_default` ADD CONSTRAINT `fk_ptad_phase` FOREIGN KEY (`project_type_id`, `phaseId`) REFERENCES `project_type_phases_default` (`project_type_id`, `shortname`)',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_type_tasks_default'
-    AND CONSTRAINT_NAME = 'fk_pttd_phase'
+    AND TABLE_NAME = 'project_type_activities_default'
+    AND CONSTRAINT_NAME = 'fk_ptad_activity_type'
 );
-SET @col_match := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS c1
-  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  JOIN information_schema.COLUMNS c3 ON c3.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  JOIN information_schema.COLUMNS c4 ON c4.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_type_tasks_default' AND c1.COLUMN_NAME = 'project_type_id'
-    AND c2.TABLE_NAME = 'project_type_phases_default' AND c2.COLUMN_NAME = 'project_type_id'
-    AND c3.TABLE_NAME = 'project_type_tasks_default' AND c3.COLUMN_NAME = 'phaseId'
-    AND c4.TABLE_NAME = 'project_type_phases_default' AND c4.COLUMN_NAME = 'shortname'
-    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
-    AND c3.COLUMN_TYPE = c4.COLUMN_TYPE
-);
-SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
-  'ALTER TABLE `project_type_tasks_default` ADD CONSTRAINT `fk_pttd_phase` FOREIGN KEY (`project_type_id`, `phaseId`) REFERENCES `project_type_phases_default` (`project_type_id`, `shortname`)',
+SET @sql := IF(@fk_exists = 0,
+  'ALTER TABLE `project_type_activities_default` ADD CONSTRAINT `fk_ptad_activity_type` FOREIGN KEY (`project_type_id`, `activity_type_id`) REFERENCES `project_type_activities_type_default` (`project_type_id`, `shortname`)',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @fk_exists := (
   SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
   WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_type_tasks_default'
-    AND CONSTRAINT_NAME = 'fk_pttd_activity'
+    AND TABLE_NAME = 'project_type_activities_default'
+    AND CONSTRAINT_NAME = 'fk_ptad_project_type'
 );
-SET @fk_ref_table := (
-  SELECT kcu.REFERENCED_TABLE_NAME
-  FROM information_schema.KEY_COLUMN_USAGE kcu
-  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
-    AND kcu.TABLE_NAME = 'project_type_tasks_default'
-    AND kcu.CONSTRAINT_NAME = 'fk_pttd_activity'
-  LIMIT 1
-);
-SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'project_type_activities_default',
-  'ALTER TABLE `project_type_tasks_default` DROP FOREIGN KEY `fk_pttd_activity`',
-  'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @fk_exists := (
-  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_type_tasks_default'
-    AND CONSTRAINT_NAME = 'fk_pttd_activity'
-);
-SET @col_match := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS c1
-  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  JOIN information_schema.COLUMNS c3 ON c3.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  JOIN information_schema.COLUMNS c4 ON c4.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_type_tasks_default' AND c1.COLUMN_NAME = 'project_type_id'
-    AND c2.TABLE_NAME = 'project_type_activities_default' AND c2.COLUMN_NAME = 'project_type_id'
-    AND c3.TABLE_NAME = 'project_type_tasks_default' AND c3.COLUMN_NAME = 'activitiesId'
-    AND c4.TABLE_NAME = 'project_type_activities_default' AND c4.COLUMN_NAME = 'shortname'
-    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
-    AND c3.COLUMN_TYPE = c4.COLUMN_TYPE
-);
-SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
-  'ALTER TABLE `project_type_tasks_default` ADD CONSTRAINT `fk_pttd_activity` FOREIGN KEY (`project_type_id`, `activitiesId`) REFERENCES `project_type_activities_default` (`project_type_id`, `shortname`)',
-  'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @fk_exists := (
-  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_type_tasks_default'
-    AND CONSTRAINT_NAME = 'fk_project_type_tasks_default_project_type'
-);
-SET @fk_ref_table := (
-  SELECT kcu.REFERENCED_TABLE_NAME
-  FROM information_schema.KEY_COLUMN_USAGE kcu
-  WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
-    AND kcu.TABLE_NAME = 'project_type_tasks_default'
-    AND kcu.CONSTRAINT_NAME = 'fk_project_type_tasks_default_project_type'
-  LIMIT 1
-);
-SET @sql := IF(@fk_exists > 0 AND @fk_ref_table IS NOT NULL AND @fk_ref_table <> 'project_type',
-  'ALTER TABLE `project_type_tasks_default` DROP FOREIGN KEY `fk_project_type_tasks_default_project_type`',
-  'SELECT 1');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @fk_exists := (
-  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
-  WHERE CONSTRAINT_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'project_type_tasks_default'
-    AND CONSTRAINT_NAME = 'fk_project_type_tasks_default_project_type'
-);
-SET @col_match := (
-  SELECT COUNT(*)
-  FROM information_schema.COLUMNS c1
-  JOIN information_schema.COLUMNS c2 ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
-  WHERE c1.TABLE_SCHEMA = DATABASE()
-    AND c1.TABLE_NAME = 'project_type_tasks_default' AND c1.COLUMN_NAME = 'project_type_id'
-    AND c2.TABLE_NAME = 'project_type' AND c2.COLUMN_NAME = 'uuid'
-    AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
-);
-SET @sql := IF(@fk_exists = 0 AND @col_match > 0,
-  'ALTER TABLE `project_type_tasks_default` ADD CONSTRAINT `fk_project_type_tasks_default_project_type` FOREIGN KEY (`project_type_id`) REFERENCES `project_type` (`uuid`)',
+SET @sql := IF(@fk_exists = 0,
+  'ALTER TABLE `project_type_activities_default` ADD CONSTRAINT `fk_ptad_project_type` FOREIGN KEY (`project_type_id`) REFERENCES `project_type` (`uuid`)',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 COMMIT;

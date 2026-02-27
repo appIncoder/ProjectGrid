@@ -71,14 +71,14 @@ export class ProjectTaskEditModal {
   @Output() save = new EventEmitter<void>();
 
   get modalTitle(): string {
-    return this.isCreateMode ? 'Add new task' : 'Modifier l activite';
+    return this.isCreateMode ? 'Ajouter une activité' : 'Modifier l activité';
   }
 
   get modalSubtitle(): string {
     if (this.isCreateMode) {
-      return 'Champs obligatoires: nom, phase, activite, debut, fin.';
+      return "Champs obligatoires : nom, phase, type d'activité, début, fin.";
     }
-    return this.editedTaskLabel || 'Activite sans titre';
+    return this.editedTaskLabel || 'Activité sans titre';
   }
 
   openAssignPopover(field: 'reporter' | 'accountant' | 'responsible'): void {

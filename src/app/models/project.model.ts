@@ -16,6 +16,10 @@ export type ActivityStatus =
 
 export type ProjectTab = 'scorecard' 
                         | 'risks' 
+                        | 'change'
+                        | 'detail_project'
+                        | 'detail_business'
+                        | 'detail_technology'
                         | 'budget' 
                         | 'roadmap' 
                         | 'board' 
@@ -69,6 +73,9 @@ export type ProjectDetail = {
   // optional metadata for phases (used by the roadmap)
   phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
   activities: Record<ActivityId, ActivityDefinition>;
+  // Canonical backend field
+  activityMatrix?: Record<ActivityId, Record<PhaseId, Task[]>>;
+  // Legacy frontend field (kept for backward compatibility during migration)
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
 
   // ✅ dépendances Gantt persistées (fake aujourd’hui, API demain)

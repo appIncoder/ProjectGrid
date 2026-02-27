@@ -1,0 +1,42 @@
+<div class="card tm-detail-card">
+  <div class="card-body">
+    <div class="tm-head">
+      <h3>Suivi détaillé - Gestion de la technologie</h3>
+      <span class="tm-kpi">{{ progress }}% readiness ITIL</span>
+    </div>
+
+    <p class="tm-subtitle">
+      Pilotage inspiré ITIL: Service Design, Change Enablement, Release & Deployment, Service Operation.
+    </p>
+
+    <div class="tm-progress">
+      <div class="tm-progress-bar" [style.width.%]="progress"></div>
+    </div>
+
+    <div class="tm-stats">
+      <span><strong>{{ ready }}</strong> stabilisées</span>
+      <span><strong>{{ inFlight }}</strong> en transit</span>
+      <span><strong>{{ total }}</strong> total</span>
+    </div>
+
+    <div class="tm-areas">
+      <article class="tm-area" *ngFor="let a of itilAreas">
+        <h4>{{ a.area }}</h4>
+        <p>{{ a.objective }}</p>
+        <span>{{ a.count }} activités</span>
+      </article>
+    </div>
+
+    <div class="tm-watch">
+      <h4>Points de vigilance technologiques</h4>
+      <div class="text-muted small" *ngIf="!watchList.length">Aucune action technologique en attente.</div>
+      <ul *ngIf="watchList.length">
+        <li *ngFor="let item of watchList">
+          <span class="tm-phase">{{ item.phase }}</span>
+          <span class="tm-label">{{ item.label }}</span>
+          <span class="tm-status">{{ item.status }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

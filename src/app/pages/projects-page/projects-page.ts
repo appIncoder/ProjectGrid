@@ -301,6 +301,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
       phases: seeded.phases,
       phaseDefinitions: seeded.phaseDefinitions,
       activities: seeded.activities,
+      activityMatrix: seeded.taskMatrix,
       taskMatrix: seeded.taskMatrix,
       owner,
       createdBy: owner,
@@ -472,7 +473,10 @@ export class ProjectsPage implements OnInit, OnDestroy {
     }
 
     const uniqueByCell = new Set<string>();
-    for (const t of defaults.tasks) {
+    const defaultsActivities = Array.isArray(defaults.activitiesDefault) && defaults.activitiesDefault.length
+      ? defaults.activitiesDefault
+      : defaults.tasks;
+    for (const t of defaultsActivities) {
       const aid = t.activityId as ActivityId;
       const ph = t.phaseId as PhaseId;
       if (!taskMatrix[aid] || !Array.isArray(taskMatrix[aid][ph])) continue;
