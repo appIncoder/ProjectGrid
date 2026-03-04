@@ -1,0 +1,62 @@
+<div class="pkm-modal-backdrop" *ngIf="open">
+  <div class="pkm-modal">
+    <div class="pkm-modal-head">
+      <h4>{{ title }}</h4>
+      <button type="button" class="pkm-modal-close" (click)="onClose()">x</button>
+    </div>
+
+    <div class="pkm-modal-body">
+      <label class="pkm-field">
+        <span>Nom de la tache</span>
+        <input
+          type="text"
+          [ngModel]="taskName"
+          (ngModelChange)="taskNameChange.emit($event)"
+          [disabled]="isSaving"
+        />
+      </label>
+
+      <label class="pkm-field">
+        <span>Activite mere</span>
+        <select
+          [ngModel]="parentId"
+          (ngModelChange)="parentIdChange.emit($event)"
+          [disabled]="isSaving"
+        >
+          <option *ngFor="let p of parentOptions" [ngValue]="p.id">{{ p.label }}</option>
+        </select>
+      </label>
+
+      <div class="pkm-field">
+        <span>Historique commentaires</span>
+        <div class="pkm-comments">
+          <div class="pkm-comment" *ngFor="let c of comments">
+            <div class="pkm-comment-meta">
+              <strong>{{ c.authorName || 'Utilisateur' }}</strong>
+              <small>{{ c.createdAt || '' }}</small>
+            </div>
+            <div class="pkm-comment-text">{{ c.text }}</div>
+          </div>
+          <div class="pkm-comments-empty" *ngIf="comments.length === 0">Aucun commentaire.</div>
+        </div>
+      </div>
+
+      <label class="pkm-field">
+        <span>Ajouter un commentaire</span>
+        <textarea
+          rows="3"
+          [ngModel]="newCommentText"
+          (ngModelChange)="newCommentTextChange.emit($event)"
+          [disabled]="isSaving"
+        ></textarea>
+      </label>
+
+      <div class="pkm-modal-error" *ngIf="error">{{ error }}</div>
+    </div>
+
+    <div class="pkm-modal-actions">
+      <button type="button" class="pkm-btn-secondary" (click)="onClose()" [disabled]="isSaving">Annuler</button>
+      <button type="button" class="pkm-btn-primary" (click)="save.emit()" [disabled]="isSaving">Enregistrer</button>
+    </div>
+  </div>
+</div>

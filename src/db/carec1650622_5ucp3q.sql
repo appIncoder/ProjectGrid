@@ -155,6 +155,106 @@ CREATE TABLE IF NOT EXISTS `project_activities` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Structure de la table `project_tasks`
+--
+
+CREATE TABLE IF NOT EXISTS `project_tasks` (
+  `project_id` uuid NOT NULL,
+  `activity_type_id` varchar(64) NOT NULL,
+  `phase_id` varchar(32) NOT NULL,
+  `activity_id` varchar(128) NOT NULL,
+  `task_id` varchar(128) NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `startdate` timestamp NOT NULL DEFAULT current_timestamp(),
+  `enddate` timestamp NOT NULL DEFAULT (current_timestamp() + interval 5 day),
+  `status` varchar(32) NOT NULL DEFAULT 'todo',
+  `reporter_id` uuid DEFAULT NULL,
+  `accountant_id` uuid DEFAULT NULL,
+  `responsible_id` uuid DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`project_id`,`activity_type_id`,`phase_id`,`activity_id`,`task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Alimentation initiale de tâches enfants réelles
+-- (liées aux activités existantes pour metier/changement/technologie)
+--
+INSERT IGNORE INTO `project_tasks` (
+  `project_id`,
+  `activity_type_id`,
+  `phase_id`,
+  `activity_id`,
+  `task_id`,
+  `label`,
+  `startdate`,
+  `enddate`,
+  `status`
+)
+SELECT
+  pa.`project_id`,
+  pa.`activity_type_id`,
+  pa.`phase_id`,
+  pa.`activity_id`,
+  CONCAT(pa.`activity_id`, '-exec-1') AS `task_id`,
+  CONCAT(pa.`label`, ' - execution') AS `label`,
+  COALESCE(pa.`startdate`, CURRENT_TIMESTAMP) AS `startdate`,
+  COALESCE(pa.`enddate`, CURRENT_TIMESTAMP + INTERVAL 5 DAY) AS `enddate`,
+  CASE
+    WHEN LOWER(TRIM(COALESCE(pa.`status`, 'todo'))) IN ('done', 'notapplicable') THEN LOWER(TRIM(pa.`status`))
+    WHEN LOWER(TRIM(COALESCE(pa.`status`, 'todo'))) IN ('inprogress', 'onhold', 'notdone') THEN LOWER(TRIM(pa.`status`))
+    ELSE 'todo'
+  END AS `status`
+FROM `project_activities` pa
+WHERE pa.`activity_type_id` IN ('metier', 'changement', 'technologie');
+
+INSERT IGNORE INTO `project_tasks` (
+  `project_id`,
+  `activity_type_id`,
+  `phase_id`,
+  `activity_id`,
+  `task_id`,
+  `label`,
+  `startdate`,
+  `enddate`,
+  `status`
+)
+SELECT
+  pa.`project_id`,
+  pa.`activity_type_id`,
+  pa.`phase_id`,
+  pa.`activity_id`,
+  CONCAT(pa.`activity_id`, '-qa-1') AS `task_id`,
+  CONCAT(pa.`label`, ' - validation') AS `label`,
+  COALESCE(pa.`startdate`, CURRENT_TIMESTAMP) AS `startdate`,
+  COALESCE(pa.`enddate`, CURRENT_TIMESTAMP + INTERVAL 7 DAY) AS `enddate`,
+  CASE
+    WHEN LOWER(TRIM(COALESCE(pa.`status`, 'todo'))) = 'done' THEN 'inprogress'
+    ELSE 'todo'
+  END AS `status`
+FROM `project_activities` pa
+WHERE pa.`activity_type_id` IN ('metier', 'changement', 'technologie');
+
+--
+-- Historique des commentaires de tâches projet
+--
+
+CREATE TABLE IF NOT EXISTS `project_task_comments` (
+  `comment_id` uuid NOT NULL DEFAULT uuid(),
+  `project_id` uuid NOT NULL,
+  `activity_type_id` varchar(64) NOT NULL,
+  `phase_id` varchar(32) NOT NULL,
+  `activity_id` varchar(128) NOT NULL,
+  `task_id` varchar(128) NOT NULL,
+  `comment_text` text NOT NULL,
+  `author_id` uuid DEFAULT NULL,
+  `author_name` varchar(180) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`comment_id`),
+  KEY `idx_project_task_comments_task` (`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`),
+  KEY `idx_project_task_comments_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
 -- Structure de la table `project_type` (paramètres)
 --
 
@@ -523,6 +623,10 @@ SET p.`longName` = COALESCE(NULLIF(p.`longName`, ''), d.`longname`, p.`shortname
 WHERE p.`shortname` IS NOT NULL;
 CREATE INDEX IF NOT EXISTS `idx_project_activities_owner` ON `project_activitie_types` (`owner_name`);
 CREATE INDEX IF NOT EXISTS `idx_project_activities_status` ON `project_activities` (`status`);
+CREATE INDEX IF NOT EXISTS `idx_project_tasks_parent` ON `project_tasks` (`project_id`, `activity_type_id`, `phase_id`, `activity_id`);
+CREATE INDEX IF NOT EXISTS `idx_project_tasks_status` ON `project_tasks` (`status`);
+CREATE INDEX IF NOT EXISTS `idx_project_task_comments_task` ON `project_task_comments` (`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`);
+CREATE INDEX IF NOT EXISTS `idx_project_task_comments_created` ON `project_task_comments` (`created_at`);
 CREATE INDEX IF NOT EXISTS `idx_project_type_activities_default_phase` ON `project_type_activities_default` (`project_type_id`, `phaseId`);
 CREATE INDEX IF NOT EXISTS `idx_project_type_activities_default_activity_type` ON `project_type_activities_default` (`project_type_id`, `activity_type_id`);
 CREATE INDEX IF NOT EXISTS `idx_project_activities_links_to` ON `project_activities_links` (`project_id`, `IdActivityTo`);
@@ -594,6 +698,8 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- (évite toute redondance lors des ré-exécutions du script)
 SET FOREIGN_KEY_CHECKS = 0;
 DELETE FROM `project_activities_assignments`;
+DELETE FROM `project_tasks`;
+DELETE FROM `project_task_comments`;
 DELETE FROM `project_activitie_types`;
 DELETE FROM `project_activities_links`;
 DELETE FROM `project_activitie_types`;
@@ -864,6 +970,21 @@ INSERT INTO `project_activities` (`project_id`, `activity_type_id`, `phase_id`, 
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase4', 't4-1', 'Tests de performance', 'todo'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase5', 't5-1', 'Déploiement', 'todo'),
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'technologie', 'Phase6', 't6-1', 'Support post-déploiement', 'todo')
+ON DUPLICATE KEY UPDATE
+  `label` = VALUES(`label`),
+  `status` = VALUES(`status`);
+
+INSERT INTO `project_tasks`
+(`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`, `label`, `status`)
+SELECT
+  pa.`project_id`,
+  pa.`activity_type_id`,
+  pa.`phase_id`,
+  pa.`activity_id`,
+  pa.`activity_id`,
+  pa.`label`,
+  pa.`status`
+FROM `project_activities` pa
 ON DUPLICATE KEY UPDATE
   `label` = VALUES(`label`),
   `status` = VALUES(`status`);

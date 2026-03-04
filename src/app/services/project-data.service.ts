@@ -434,6 +434,9 @@ export class ProjectDataService {
           : {} as Record<ActivityId, Record<PhaseId, any[]>>);
     const taskMatrix = matrix;
     const activityMatrix = matrix;
+    const projectTasksMatrix = (raw?.projectTasksMatrix && typeof raw.projectTasksMatrix === 'object')
+      ? (raw.projectTasksMatrix as Record<ActivityId, Record<PhaseId, Record<string, any[]>>>)
+      : {} as Record<ActivityId, Record<PhaseId, Record<string, any[]>>>;
     const phaseDefinitionsRaw = (raw?.phaseDefinitions && typeof raw.phaseDefinitions === 'object')
       ? raw.phaseDefinitions
       : {};
@@ -454,9 +457,15 @@ export class ProjectDataService {
       if (!taskMatrix[activityId] || typeof taskMatrix[activityId] !== 'object') {
         taskMatrix[activityId] = {} as Record<PhaseId, any[]>;
       }
+      if (!projectTasksMatrix[activityId] || typeof projectTasksMatrix[activityId] !== 'object') {
+        projectTasksMatrix[activityId] = {} as Record<PhaseId, Record<string, any[]>>;
+      }
       for (const phase of phases) {
         if (!Array.isArray(taskMatrix[activityId][phase])) {
           taskMatrix[activityId][phase] = [];
+        }
+        if (!projectTasksMatrix[activityId][phase] || typeof projectTasksMatrix[activityId][phase] !== 'object') {
+          projectTasksMatrix[activityId][phase] = {};
         }
       }
     }
@@ -496,6 +505,7 @@ export class ProjectDataService {
       activities,
       activityMatrix,
       taskMatrix,
+      projectTasksMatrix,
     } as ProjectDetail;
   }
 }

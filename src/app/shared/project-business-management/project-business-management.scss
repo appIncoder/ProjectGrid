@@ -1,136 +1,241 @@
 .bm-detail-card {
-  border: 1px solid #dfdde8;
+  border: 1px solid #d8e0ea;
 }
 
 .bm-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .bm-head h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.02rem;
 }
 
-.bm-kpi {
-  font-size: 0.78rem;
+.bm-phase-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.bm-filter-chip {
+  border: 1px solid #d3dce7;
+  border-radius: 999px;
+  background: #f2f6fb;
+  color: #6a7b8c;
+  padding: 0.32rem 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #6a2e8e;
+  line-height: 1.2;
+  cursor: pointer;
 }
 
-.bm-subtitle {
-  margin: 0.32rem 0 0.7rem;
-  color: #615872;
+.bm-filter-chip-primary {
+  background: #2c7dc7;
+  border-color: #2c7dc7;
+  color: #fff;
+}
+
+.bm-filter-chip.is-active {
+  background: #7fb0df;
+  border-color: #7fb0df;
+  color: #fff;
+}
+
+.bm-filter-chip-primary.is-active {
+  background: #2c7dc7;
+  border-color: #2c7dc7;
+}
+
+.bm-filter-chip.is-disabled,
+.bm-filter-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.bm-save-state {
+  font-size: 0.75rem;
+  color: #54738f;
+  margin-bottom: 0.4rem;
+}
+
+.bm-save-error {
+  font-size: 0.75rem;
+  color: #b2293d;
+  margin-bottom: 0.4rem;
+}
+
+.bm-board-head {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  align-items: stretch;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.bm-board-head-label {
+  border: 1px solid #dfe8f3;
+  border-radius: 0.55rem;
+  background: #f7fafd;
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #334a61;
+}
+
+.bm-board-columns {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.bm-board-col-title {
+  border: 1px solid #dfe8f3;
+  border-radius: 0.55rem;
+  background: #f7fafd;
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #395066;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.bm-board-col-title small {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #60758a;
+}
+
+.bm-board-empty {
+  padding: 0.9rem;
+  border: 1px dashed #ccdae9;
+  border-radius: 0.55rem;
+  color: #60758a;
   font-size: 0.8rem;
 }
 
-.bm-progress {
-  height: 8px;
-  border-radius: 999px;
-  background: #f1ecf7;
-  overflow: hidden;
-}
-
-.bm-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #8a3eb7 0%, #c07ee6 100%);
-}
-
-.bm-stats {
-  margin-top: 0.55rem;
-  display: flex;
-  gap: 0.8rem;
-  flex-wrap: wrap;
-  font-size: 0.74rem;
-  color: #5d5a69;
-}
-
-.bm-lenses {
-  margin-top: 0.8rem;
+.bm-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.bm-lane {
+  display: grid;
+  grid-template-columns: 280px 1fr;
   gap: 0.6rem;
+  align-items: stretch;
+  border: 1px solid #dbe7f2;
+  border-radius: 0.78rem;
+  background: linear-gradient(180deg, #fbfdff 0%, #f6faff 100%);
+  padding: 0.45rem;
 }
 
-.bm-lens {
-  border: 1px solid #e8e1f1;
-  background: #fcfbff;
+.bm-lane-meta {
+  border: 1px solid #d6e4f2;
   border-radius: 0.62rem;
-  padding: 0.52rem;
-}
-
-.bm-lens h4 {
-  margin: 0;
-  font-size: 0.78rem;
-}
-
-.bm-lens p {
-  margin: 0.2rem 0;
-  font-size: 0.72rem;
-  color: #6a6078;
-}
-
-.bm-lens span {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #7a44a1;
-}
-
-.bm-focus {
-  margin-top: 0.9rem;
-  border-top: 1px dashed #eadff3;
-  padding-top: 0.6rem;
-}
-
-.bm-focus h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.82rem;
-}
-
-.bm-focus ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  background: #f3f7fc;
+  padding: 0.6rem 0.7rem;
   display: grid;
+  gap: 0.25rem;
+}
+
+.bm-lane-phase {
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: #2d5f8f;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bm-lane-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2f4458;
+}
+
+.bm-lane-id {
+  font-size: 0.68rem;
+  color: #73879a;
+}
+
+.bm-lane-columns {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  gap: 0.5rem;
+  overflow-x: auto;
+  border: 1px solid #d6e4f2;
+  border-radius: 0.62rem;
+  background: #f5f9fe;
+  padding: 0.3rem;
+}
+
+.bm-lane-col {
+  min-height: 74px;
+  border: 0;
+  border-left: 1px solid #dbe5f0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.35rem 0.45rem;
+  display: grid;
+  align-content: start;
   gap: 0.35rem;
 }
 
-.bm-focus li {
-  display: grid;
-  grid-template-columns: 72px 1fr 92px;
-  gap: 0.5rem;
-  border: 1px solid #ece3f5;
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.5rem;
+.bm-lane-col:first-child {
+  border-left: 0;
 }
 
-.bm-phase {
-  font-size: 0.72rem;
+.bm-lane-col--drop-target {
+  border-radius: 0.45rem;
+  border-left-color: transparent;
+  background: #eef6ff;
+  box-shadow: inset 0 0 0 1px #2e7ec4;
+}
+
+.bm-task-card {
+  border-radius: 0.48rem;
+  padding: 0.35rem 0.45rem;
+  border-left: 4px solid #9cb3c9;
+  background: #fff;
+  box-shadow: 0 1px 1px rgb(29 49 69 / 8%);
+  cursor: grab;
+}
+
+.bm-task-title {
+  font-size: 0.74rem;
+  line-height: 1.22;
+  color: #23374a;
+}
+
+.bm-task-meta {
+  margin-top: 0.22rem;
+  font-size: 0.66rem;
   font-weight: 700;
-  color: #704291;
+  color: #5e7387;
 }
 
-.bm-label {
-  font-size: 0.77rem;
-}
+.bm-status-todo { border-left-color: #7b8ea1; }
+.bm-status-inprogress { border-left-color: #ec9e2b; }
+.bm-status-onhold { border-left-color: #2c83dd; }
+.bm-status-done { border-left-color: #28a745; }
+.bm-status-notdone { border-left-color: #dc3545; }
+.bm-status-notapplicable { border-left-color: #8a97a3; }
 
-.bm-status {
-  justify-self: end;
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #6e6280;
-}
-
-@media (max-width: 1200px) {
-  .bm-lenses {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1400px) {
+  .bm-board-head,
+  .bm-lane {
+    grid-template-columns: 240px 1fr;
   }
 }
 
-@media (max-width: 768px) {
-  .bm-lenses {
+@media (max-width: 992px) {
+  .bm-board-head,
+  .bm-lane {
     grid-template-columns: 1fr;
   }
 }

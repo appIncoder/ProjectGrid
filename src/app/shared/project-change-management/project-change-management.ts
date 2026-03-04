@@ -1,175 +1,484 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 
-import type { PhaseId, ProjectDetail, Task } from '../../models';
+import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kanban-task-modal';
+import { ProjectDataService } from '../../services/project-data.service';
+import type { ActivityStatus, PhaseId, ProjectDetail, Task, TaskComment } from '../../models';
 
-type AdkarStageId = 'awareness' | 'desire' | 'knowledge' | 'ability' | 'reinforcement';
-
-interface AdkarStageDef {
-  id: AdkarStageId;
-  code: 'A' | 'D' | 'K' | 'A2' | 'R';
-  label: string;
-  description: string;
-  phaseIds: PhaseId[];
-}
-
-interface AdkarStageVm extends AdkarStageDef {
-  total: number;
-  done: number;
-  inProgress: number;
-  todo: number;
-  progress: number;
-}
-
-interface ChangeTaskVm {
+interface ParentActivityLaneVm {
   id: string;
   label: string;
   phase: PhaseId;
-  status: string;
-  endDate?: string;
+  phaseLabel: string;
+  tasks: Task[];
+  groupedByStatus: Record<ActivityStatus, Task[]>;
 }
 
 @Component({
   selector: 'app-project-change-management',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ProjectKanbanTaskModal],
   templateUrl: './project-change-management.html',
   styleUrls: ['./project-change-management.scss'],
 })
 export class ProjectChangeManagement implements OnChanges {
   @Input() project: ProjectDetail | null = null;
 
-  stages: AdkarStageVm[] = [];
-  upcomingActions: ChangeTaskVm[] = [];
-  globalProgress = 0;
+  constructor(private projectData: ProjectDataService) {}
 
-  private readonly stageDefs: AdkarStageDef[] = [
-    {
-      id: 'awareness',
-      code: 'A',
-      label: 'Awareness',
-      description: 'Compréhension du pourquoi du changement',
-      phaseIds: ['Phase1', 'Phase2'],
-    },
-    {
-      id: 'desire',
-      code: 'D',
-      label: 'Desire',
-      description: 'Engagement individuel pour participer',
-      phaseIds: ['Phase2', 'Phase3'],
-    },
-    {
-      id: 'knowledge',
-      code: 'K',
-      label: 'Knowledge',
-      description: 'Acquisition des connaissances nécessaires',
-      phaseIds: ['Phase3', 'Phase4'],
-    },
-    {
-      id: 'ability',
-      code: 'A2',
-      label: 'Ability',
-      description: 'Capacité à appliquer en situation réelle',
-      phaseIds: ['Phase4', 'Phase5'],
-    },
-    {
-      id: 'reinforcement',
-      code: 'R',
-      label: 'Reinforcement',
-      description: 'Ancrage durable des nouveaux comportements',
-      phaseIds: ['Phase5', 'Phase6'],
-    },
+  readonly statusColumns: Array<{ id: ActivityStatus; label: string }> = [
+    { id: 'todo', label: 'A faire' },
+    { id: 'inprogress', label: 'En cours' },
+    { id: 'onhold', label: 'En attente' },
+    { id: 'done', label: 'Termine' },
+    { id: 'notdone', label: 'Non fait' },
+    { id: 'notapplicable', label: 'Non applicable' },
   ];
 
+  phaseFilters: Array<{ id: PhaseId; label: string; selected: boolean }> = [];
+  filteredLanes: ParentActivityLaneVm[] = [];
+  showCurrentPhaseOnly = false;
+  currentPhaseId: PhaseId | null = null;
+  private savedSelectedPhaseIds: Set<PhaseId> | null = null;
+  private allLanes: ParentActivityLaneVm[] = [];
+  private hasAppliedDefaultCurrentPhaseFilter = false;
+  private draggedTaskCtx: { phase: PhaseId; parentId: string; taskId: string } | null = null;
+  private dragOverTarget: { laneId: string; phase: PhaseId; status: ActivityStatus } | null = null;
+  isSaving = false;
+  saveError: string | null = null;
+  modalOpen = false;
+  modalError: string | null = null;
+  editedTask: Task | null = null;
+  editedTaskPhase: PhaseId | null = null;
+  editedTaskParentId = '';
+  editedTaskName = '';
+  newCommentText = '';
+  availableParentActivities: Array<{ id: string; label: string }> = [];
+
   ngOnChanges(): void {
-    this.rebuildViewModel();
+    this.rebuild();
   }
 
-  trackByStage(_: number, stage: AdkarStageVm): string {
-    return stage.id;
+  private rebuild(): void {
+    this.allLanes = this.buildLanes();
+    this.syncPhaseFilters();
+    this.currentPhaseId = this.detectCurrentPhase();
+    if (!this.hasAppliedDefaultCurrentPhaseFilter) {
+      this.activateCurrentPhaseFilterByDefault();
+      this.hasAppliedDefaultCurrentPhaseFilter = true;
+    }
+    this.applyFilters();
   }
 
-  trackByTask(_: number, task: ChangeTaskVm): string {
-    return task.id;
-  }
-
-  private rebuildViewModel(): void {
-    const tasks = this.getChangeTasks();
-
-    this.stages = this.stageDefs.map((def) => {
-      const scoped = tasks.filter((t) => def.phaseIds.includes(t.phase));
-      const total = scoped.length;
-      const done = scoped.filter((t) => this.isDoneStatus(t.status)).length;
-      const inProgress = scoped.filter((t) => this.isInProgressStatus(t.status)).length;
-      const todo = Math.max(0, total - done - inProgress);
-      const progress = total > 0 ? Math.round((done / total) * 100) : 0;
-
-      return { ...def, total, done, inProgress, todo, progress };
-    });
-
-    const totalActions = this.stages.reduce((acc, s) => acc + s.total, 0);
-    const totalDone = this.stages.reduce((acc, s) => acc + s.done, 0);
-    this.globalProgress = totalActions > 0 ? Math.round((totalDone / totalActions) * 100) : 0;
-
-    this.upcomingActions = tasks
-      .filter((t) => !this.isDoneStatus(t.status))
-      .sort((a, b) => this.compareTasks(a, b))
-      .slice(0, 8);
-  }
-
-  private compareTasks(a: ChangeTaskVm, b: ChangeTaskVm): number {
-    const aTs = this.parseDate(a.endDate);
-    const bTs = this.parseDate(b.endDate);
-    if (aTs !== bTs) return aTs - bTs;
-
-    const phases = this.project?.phases ?? [];
-    const aPhase = phases.indexOf(a.phase);
-    const bPhase = phases.indexOf(b.phase);
-    if (aPhase !== bPhase) return aPhase - bPhase;
-    return a.label.localeCompare(b.label);
-  }
-
-  private parseDate(raw?: string): number {
-    const value = String(raw ?? '').trim();
-    if (!value) return Number.MAX_SAFE_INTEGER;
-    const ts = Date.parse(value);
-    return Number.isFinite(ts) ? ts : Number.MAX_SAFE_INTEGER;
-  }
-
-  private getChangeTasks(): ChangeTaskVm[] {
+  private buildLanes(): ParentActivityLaneVm[] {
     const project = this.project;
     if (!project) return [];
 
+    const phases = project.phases ?? [];
     const matrix = ((project as any).activityMatrix ?? (project as any).taskMatrix) as
       | Record<string, Record<string, Task[]>>
       | undefined;
-    const changeRow = matrix?.['changement'] ?? {};
-    const phases = project.phases ?? [];
+    const parentRow = matrix?.['changement'] ?? {};
+    const childMatrix = ((project as any).projectTasksMatrix?.['changement'] ?? {}) as
+      | Record<string, Record<string, Task[]>>
+      | undefined;
 
-    const tasks: ChangeTaskVm[] = [];
+    const out: ParentActivityLaneVm[] = [];
     for (const phase of phases) {
-      const row = Array.isArray(changeRow?.[phase]) ? changeRow[phase] : [];
-      for (const task of row) {
-        if (!task) continue;
-        const id = String(task.id ?? '').trim();
-        if (!id) continue;
-        tasks.push({
-          id,
-          label: String(task.label ?? id).trim(),
+      const parentActivities = Array.isArray(parentRow[phase]) ? parentRow[phase] : [];
+      for (const parent of parentActivities) {
+        const parentId = String(parent?.id ?? '').trim();
+        if (!parentId) continue;
+        const childTasks = childMatrix?.[phase] && Array.isArray(childMatrix[phase][parentId])
+          ? childMatrix[phase][parentId]
+          : [];
+
+        const tasks = childTasks.length ? childTasks : [parent];
+        const groupedByStatus = this.statusColumns.reduce((acc, s) => {
+          acc[s.id] = [];
+          return acc;
+        }, {} as Record<ActivityStatus, Task[]>);
+        for (const task of tasks) {
+          groupedByStatus[this.normalizeStatus((task as any)?.status)].push(task);
+        }
+
+        out.push({
+          id: parentId,
+          label: String(parent?.label ?? parentId),
           phase,
-          status: String(task.status ?? 'todo').trim().toLowerCase(),
-          endDate: String((task as any).endDate ?? '').trim() || undefined,
+          phaseLabel: this.getPhaseLabel(phase),
+          tasks,
+          groupedByStatus,
         });
       }
     }
-    return tasks;
+
+    return out;
   }
 
-  private isDoneStatus(status: string): boolean {
-    return status === 'done' || status === 'notapplicable';
+  getColumnTaskCount(status: ActivityStatus): number {
+    return this.filteredLanes.reduce((acc, lane) => acc + (lane.groupedByStatus[status]?.length ?? 0), 0);
   }
 
-  private isInProgressStatus(status: string): boolean {
-    return status === 'inprogress' || status === 'onhold';
+  trackByPhase(_: number, item: { id: PhaseId }): string {
+    return item.id;
+  }
+
+  trackByLane(_: number, lane: ParentActivityLaneVm): string {
+    return `${lane.phase}:${lane.id}`;
+  }
+
+  trackByTask(_: number, task: Task): string {
+    return String(task?.id ?? '');
+  }
+
+  getStatusClass(status: ActivityStatus): string {
+    return `pcm-status-${status}`;
+  }
+
+  getStatusLabel(status: ActivityStatus): string {
+    return this.statusColumns.find((s) => s.id === status)?.label ?? status;
+  }
+
+  onTaskDragStart(event: DragEvent, phase: PhaseId, parentId: string, task: Task): void {
+    this.draggedTaskCtx = { phase, parentId, taskId: String(task?.id ?? '') };
+    event.dataTransfer?.setData('text/plain', this.draggedTaskCtx.taskId);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  onTaskDragEnd(): void {
+    this.draggedTaskCtx = null;
+    this.dragOverTarget = null;
+  }
+
+  onStatusDragOver(event: DragEvent, lane: ParentActivityLaneVm, targetStatus: ActivityStatus): void {
+    event.preventDefault();
+    this.dragOverTarget = { laneId: lane.id, phase: lane.phase, status: targetStatus };
+  }
+
+  onStatusDragLeave(lane: ParentActivityLaneVm, targetStatus: ActivityStatus): void {
+    if (
+      this.dragOverTarget?.laneId === lane.id &&
+      this.dragOverTarget?.phase === lane.phase &&
+      this.dragOverTarget?.status === targetStatus
+    ) {
+      this.dragOverTarget = null;
+    }
+  }
+
+  onStatusDrop(event: DragEvent, lane: ParentActivityLaneVm, targetStatus: ActivityStatus): void {
+    event.preventDefault();
+    this.dragOverTarget = null;
+    if (!this.project || !this.draggedTaskCtx) return;
+    const dragged = this.draggedTaskCtx;
+    this.draggedTaskCtx = null;
+
+    if (lane.phase !== dragged.phase || lane.id !== dragged.parentId) return;
+
+    void this.mutateAndPersist(async () => {
+      const taskRef = this.findTaskRef(dragged.phase, dragged.parentId, dragged.taskId);
+      if (!taskRef) return;
+      taskRef.task.status = targetStatus;
+      this.rebuild();
+    });
+  }
+
+  isDropTarget(lane: ParentActivityLaneVm, status: ActivityStatus): boolean {
+    return (
+      this.dragOverTarget?.laneId === lane.id &&
+      this.dragOverTarget?.phase === lane.phase &&
+      this.dragOverTarget?.status === status
+    );
+  }
+
+  openTaskModal(lane: ParentActivityLaneVm, task: Task): void {
+    const taskId = String(task?.id ?? '').trim();
+    if (!taskId) return;
+    this.modalOpen = true;
+    this.modalError = null;
+    this.editedTask = task;
+    this.editedTaskPhase = lane.phase;
+    this.editedTaskParentId = lane.id;
+    this.editedTaskName = String(task.label ?? '').trim();
+    this.newCommentText = '';
+    this.availableParentActivities = this.getParentActivitiesForPhase(lane.phase);
+  }
+
+  closeTaskModal(): void {
+    if (this.isSaving) return;
+    this.modalOpen = false;
+    this.modalError = null;
+    this.editedTask = null;
+    this.editedTaskPhase = null;
+    this.editedTaskParentId = '';
+    this.editedTaskName = '';
+    this.newCommentText = '';
+    this.availableParentActivities = [];
+  }
+
+  getEditedTaskComments(): TaskComment[] {
+    return Array.isArray(this.editedTask?.comments) ? this.editedTask!.comments! : [];
+  }
+
+  async saveTaskModal(): Promise<void> {
+    if (!this.project || !this.editedTask || !this.editedTaskPhase) return;
+    const nextName = this.editedTaskName.trim();
+    const nextParentId = this.editedTaskParentId.trim();
+    if (!nextName) {
+      this.modalError = 'Le nom de la tache est obligatoire.';
+      return;
+    }
+    if (!nextParentId) {
+      this.modalError = "L'activite mere est obligatoire.";
+      return;
+    }
+
+    const taskId = String(this.editedTask.id ?? '').trim();
+    const phase = this.editedTaskPhase;
+    const previousParentId = this.findParentActivityIdForTask(phase, taskId);
+    if (!previousParentId) {
+      this.modalError = 'Impossible de retrouver la tache a modifier.';
+      return;
+    }
+
+    this.modalError = null;
+    await this.mutateAndPersist(async () => {
+      const ref = this.findTaskRef(phase, previousParentId, taskId);
+      if (!ref) return;
+      ref.task.label = nextName;
+
+      const comment = this.newCommentText.trim();
+      if (comment) {
+        if (!Array.isArray(ref.task.comments)) ref.task.comments = [];
+        ref.task.comments.push({
+          text: comment,
+          authorName: 'Utilisateur',
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      if (nextParentId !== previousParentId) {
+        const matrix = this.getProjectTasksMatrix();
+        if (!matrix.changement[phase][nextParentId]) matrix.changement[phase][nextParentId] = [];
+        const moved = ref.task;
+        ref.list.splice(ref.index, 1);
+        moved.parentActivityId = nextParentId;
+        matrix.changement[phase][nextParentId].push(moved);
+      }
+
+      this.rebuild();
+    }, true);
+  }
+
+  togglePhase(phase: PhaseId): void {
+    if (this.showCurrentPhaseOnly) return;
+    const target = this.phaseFilters.find((f) => f.id === phase);
+    if (!target) return;
+    target.selected = !target.selected;
+    this.applyFilters();
+  }
+
+  toggleCurrentPhaseFilter(): void {
+    if (!this.showCurrentPhaseOnly) {
+      this.savedSelectedPhaseIds = new Set(
+        this.phaseFilters.filter((f) => f.selected).map((f) => f.id)
+      );
+      this.showCurrentPhaseOnly = true;
+      this.phaseFilters = this.phaseFilters.map((f) => ({
+        ...f,
+        selected: f.id === this.currentPhaseId,
+      }));
+      this.applyFilters();
+      return;
+    }
+
+    const saved = this.savedSelectedPhaseIds;
+    this.showCurrentPhaseOnly = false;
+    this.phaseFilters = this.phaseFilters.map((f) => ({
+      ...f,
+      selected: saved ? saved.has(f.id) : true,
+    }));
+    this.savedSelectedPhaseIds = null;
+    this.applyFilters();
+  }
+
+  selectAllPhases(): void {
+    if (this.showCurrentPhaseOnly) return;
+    this.phaseFilters = this.phaseFilters.map((f) => ({ ...f, selected: true }));
+    this.applyFilters();
+  }
+
+  deselectAllPhases(): void {
+    if (this.showCurrentPhaseOnly) return;
+    this.phaseFilters = this.phaseFilters.map((f) => ({ ...f, selected: false }));
+    this.applyFilters();
+  }
+
+  private getPhaseLabel(phase: PhaseId): string {
+    const defs = (this.project as any)?.phaseDefinitions;
+    const fromDefinitions = String(defs?.[phase]?.label ?? '').trim();
+    return fromDefinitions || String(phase);
+  }
+
+  private syncPhaseFilters(): void {
+    const phases = (this.project?.phases ?? []) as PhaseId[];
+    const existing = new Map(this.phaseFilters.map((f) => [f.id, f.selected]));
+
+    if (this.phaseFilters.length === 0) {
+      this.phaseFilters = phases.map((phase) => ({
+        id: phase,
+        label: this.getPhaseLabel(phase),
+        selected: true,
+      }));
+      return;
+    }
+
+    this.phaseFilters = phases.map((phase) => ({
+      id: phase,
+      label: this.getPhaseLabel(phase),
+      selected: existing.has(phase) ? !!existing.get(phase) : true,
+    }));
+  }
+
+  private detectCurrentPhase(): PhaseId | null {
+    const phases = this.project?.phases ?? [];
+    for (const phase of phases) {
+      const lanes = this.allLanes.filter((lane) => lane.phase === phase);
+      if (!lanes.length) continue;
+      const hasWorkInProgress = lanes.some((lane) =>
+        lane.tasks.some((task) => !this.isDone((task as any)?.status))
+      );
+      if (hasWorkInProgress) return phase;
+    }
+    return phases.find((phase) => this.allLanes.some((lane) => lane.phase === phase)) ?? null;
+  }
+
+  private activateCurrentPhaseFilterByDefault(): void {
+    if (!this.currentPhaseId || !this.phaseFilters.length) return;
+    this.savedSelectedPhaseIds = new Set(
+      this.phaseFilters.filter((f) => f.selected).map((f) => f.id)
+    );
+    this.showCurrentPhaseOnly = true;
+    this.phaseFilters = this.phaseFilters.map((f) => ({
+      ...f,
+      selected: f.id === this.currentPhaseId,
+    }));
+  }
+
+  private applyFilters(): void {
+    const selected = new Set(this.phaseFilters.filter((f) => f.selected).map((f) => f.id));
+    this.filteredLanes = this.allLanes.filter((lane) => selected.has(lane.phase));
+  }
+
+  private isDone(status: string): boolean {
+    const s = String(status ?? '').toLowerCase();
+    return s === 'done' || s === 'notapplicable';
+  }
+
+  private async mutateAndPersist(mutator: () => void | Promise<void>, closeModalOnSuccess = false): Promise<void> {
+    if (!this.project) return;
+    const backup =
+      typeof structuredClone === 'function'
+        ? structuredClone(this.project)
+        : JSON.parse(JSON.stringify(this.project));
+
+    this.isSaving = true;
+    this.saveError = null;
+    this.modalError = null;
+    try {
+      await mutator();
+      const snapshot =
+        typeof structuredClone === 'function'
+          ? structuredClone(this.project)
+          : JSON.parse(JSON.stringify(this.project));
+      await this.projectData.runProjectProcedure(snapshot.id, 'save_project', { project: snapshot });
+      if (closeModalOnSuccess) this.closeTaskModal();
+    } catch (e: any) {
+      this.project = backup;
+      this.rebuild();
+      const msg = String(e?.error?.detail ?? e?.message ?? "Erreur d'enregistrement");
+      this.saveError = msg;
+      this.modalError = msg;
+    } finally {
+      this.isSaving = false;
+    }
+  }
+
+  private ensureProjectTasksMatrix(): void {
+    if (!this.project) return;
+    const p: any = this.project;
+    if (!p.projectTasksMatrix || typeof p.projectTasksMatrix !== 'object') {
+      p.projectTasksMatrix = {};
+    }
+    if (!p.projectTasksMatrix.changement || typeof p.projectTasksMatrix.changement !== 'object') {
+      p.projectTasksMatrix.changement = {};
+    }
+
+    const activityMatrix = (p.activityMatrix ?? p.taskMatrix ?? {}) as Record<string, Record<string, Task[]>>;
+    const parentRow = activityMatrix?.['changement'] ?? {};
+    const phases = Array.isArray(p.phases) ? p.phases : [];
+
+    for (const phase of phases) {
+      if (!p.projectTasksMatrix.changement[phase] || typeof p.projectTasksMatrix.changement[phase] !== 'object') {
+        p.projectTasksMatrix.changement[phase] = {};
+      }
+      const parents = Array.isArray(parentRow[phase]) ? parentRow[phase] : [];
+      for (const parent of parents) {
+        const parentId = String(parent?.id ?? '').trim();
+        if (!parentId) continue;
+        if (!Array.isArray(p.projectTasksMatrix.changement[phase][parentId])) {
+          p.projectTasksMatrix.changement[phase][parentId] = [{ ...parent, parentActivityId: parentId, comments: [] }];
+        } else {
+          for (const t of p.projectTasksMatrix.changement[phase][parentId]) {
+            if (t && typeof t === 'object' && !Array.isArray((t as any).comments)) {
+              (t as any).comments = [];
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private getProjectTasksMatrix(): Record<'changement', Record<PhaseId, Record<string, Task[]>>> {
+    return ((this.project as any).projectTasksMatrix ?? {}) as Record<'changement', Record<PhaseId, Record<string, Task[]>>>;
+  }
+
+  private findTaskRef(phase: PhaseId, parentId: string, taskId: string): { list: Task[]; index: number; task: Task } | null {
+    this.ensureProjectTasksMatrix();
+    const matrix = this.getProjectTasksMatrix();
+    const list = matrix?.changement?.[phase]?.[parentId];
+    if (!Array.isArray(list)) return null;
+    const index = list.findIndex((t) => String(t?.id ?? '') === taskId);
+    if (index < 0) return null;
+    return { list, index, task: list[index] };
+  }
+
+  private findParentActivityIdForTask(phase: PhaseId, taskId: string): string | null {
+    const matrix = this.getProjectTasksMatrix();
+    const phaseMap = matrix?.changement?.[phase] ?? {};
+    for (const parentId of Object.keys(phaseMap)) {
+      const list = phaseMap[parentId];
+      if (!Array.isArray(list)) continue;
+      if (list.some((t) => String(t?.id ?? '') === taskId)) return parentId;
+    }
+    return null;
+  }
+
+  private getParentActivitiesForPhase(phase: PhaseId): Array<{ id: string; label: string }> {
+    const matrix = (((this.project as any)?.activityMatrix ?? (this.project as any)?.taskMatrix ?? {}) as Record<string, Record<string, Task[]>>);
+    const parents = Array.isArray(matrix?.['changement']?.[phase]) ? matrix['changement'][phase] : [];
+    return parents
+      .map((p) => ({ id: String(p?.id ?? '').trim(), label: String(p?.label ?? p?.id ?? '').trim() }))
+      .filter((p) => !!p.id);
+  }
+
+  private normalizeStatus(raw: unknown): ActivityStatus {
+    const status = String(raw ?? '').trim().toLowerCase();
+    if (status === 'done') return 'done';
+    if (status === 'inprogress') return 'inprogress';
+    if (status === 'onhold') return 'onhold';
+    if (status === 'notdone') return 'notdone';
+    if (status === 'notapplicable') return 'notapplicable';
+    return 'todo';
   }
 }

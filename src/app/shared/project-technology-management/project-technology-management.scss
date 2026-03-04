@@ -1,136 +1,241 @@
 .tm-detail-card {
-  border: 1px solid #d6e3e1;
+  border: 1px solid #d8e0ea;
 }
 
 .tm-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
+  margin-bottom: 0.85rem;
 }
 
 .tm-head h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.02rem;
 }
 
-.tm-kpi {
-  font-size: 0.78rem;
+.tm-phase-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.tm-filter-chip {
+  border: 1px solid #d3dce7;
+  border-radius: 999px;
+  background: #f2f6fb;
+  color: #6a7b8c;
+  padding: 0.32rem 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #1f7a68;
+  line-height: 1.2;
+  cursor: pointer;
 }
 
-.tm-subtitle {
-  margin: 0.32rem 0 0.7rem;
-  color: #56766f;
+.tm-filter-chip-primary {
+  background: #2c7dc7;
+  border-color: #2c7dc7;
+  color: #fff;
+}
+
+.tm-filter-chip.is-active {
+  background: #7fb0df;
+  border-color: #7fb0df;
+  color: #fff;
+}
+
+.tm-filter-chip-primary.is-active {
+  background: #2c7dc7;
+  border-color: #2c7dc7;
+}
+
+.tm-filter-chip.is-disabled,
+.tm-filter-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tm-save-state {
+  font-size: 0.75rem;
+  color: #54738f;
+  margin-bottom: 0.4rem;
+}
+
+.tm-save-error {
+  font-size: 0.75rem;
+  color: #b2293d;
+  margin-bottom: 0.4rem;
+}
+
+.tm-board-head {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  align-items: stretch;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.tm-board-head-label {
+  border: 1px solid #dfe8f3;
+  border-radius: 0.55rem;
+  background: #f7fafd;
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #334a61;
+}
+
+.tm-board-columns {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.tm-board-col-title {
+  border: 1px solid #dfe8f3;
+  border-radius: 0.55rem;
+  background: #f7fafd;
+  padding: 0.45rem 0.55rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #395066;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.tm-board-col-title small {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #60758a;
+}
+
+.tm-board-empty {
+  padding: 0.9rem;
+  border: 1px dashed #ccdae9;
+  border-radius: 0.55rem;
+  color: #60758a;
   font-size: 0.8rem;
 }
 
-.tm-progress {
-  height: 8px;
-  border-radius: 999px;
-  background: #eaf3f1;
-  overflow: hidden;
-}
-
-.tm-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #259d87 0%, #78d0c1 100%);
-}
-
-.tm-stats {
-  margin-top: 0.55rem;
-  display: flex;
-  gap: 0.8rem;
-  flex-wrap: wrap;
-  font-size: 0.74rem;
-  color: #4b645f;
-}
-
-.tm-areas {
-  margin-top: 0.8rem;
+.tm-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.tm-lane {
+  display: grid;
+  grid-template-columns: 280px 1fr;
   gap: 0.6rem;
+  align-items: stretch;
+  border: 1px solid #dbe7f2;
+  border-radius: 0.78rem;
+  background: linear-gradient(180deg, #fbfdff 0%, #f6faff 100%);
+  padding: 0.45rem;
 }
 
-.tm-area {
-  border: 1px solid #dbeae7;
-  background: #fafdfe;
+.tm-lane-meta {
+  border: 1px solid #d6e4f2;
   border-radius: 0.62rem;
-  padding: 0.52rem;
-}
-
-.tm-area h4 {
-  margin: 0;
-  font-size: 0.78rem;
-}
-
-.tm-area p {
-  margin: 0.2rem 0;
-  font-size: 0.72rem;
-  color: #5f7872;
-}
-
-.tm-area span {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #2a8574;
-}
-
-.tm-watch {
-  margin-top: 0.9rem;
-  border-top: 1px dashed #d9ebe7;
-  padding-top: 0.6rem;
-}
-
-.tm-watch h4 {
-  margin: 0 0 0.4rem;
-  font-size: 0.82rem;
-}
-
-.tm-watch ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  background: #f3f7fc;
+  padding: 0.6rem 0.7rem;
   display: grid;
+  gap: 0.25rem;
+}
+
+.tm-lane-phase {
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: #2d5f8f;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tm-lane-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2f4458;
+}
+
+.tm-lane-id {
+  font-size: 0.68rem;
+  color: #73879a;
+}
+
+.tm-lane-columns {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
+  gap: 0.5rem;
+  overflow-x: auto;
+  border: 1px solid #d6e4f2;
+  border-radius: 0.62rem;
+  background: #f5f9fe;
+  padding: 0.3rem;
+}
+
+.tm-lane-col {
+  min-height: 74px;
+  border: 0;
+  border-left: 1px solid #dbe5f0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.35rem 0.45rem;
+  display: grid;
+  align-content: start;
   gap: 0.35rem;
 }
 
-.tm-watch li {
-  display: grid;
-  grid-template-columns: 72px 1fr 92px;
-  gap: 0.5rem;
-  border: 1px solid #deece9;
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.5rem;
+.tm-lane-col:first-child {
+  border-left: 0;
 }
 
-.tm-phase {
-  font-size: 0.72rem;
+.tm-lane-col--drop-target {
+  border-radius: 0.45rem;
+  border-left-color: transparent;
+  background: #eef6ff;
+  box-shadow: inset 0 0 0 1px #2e7ec4;
+}
+
+.tm-task-card {
+  border-radius: 0.48rem;
+  padding: 0.35rem 0.45rem;
+  border-left: 4px solid #9cb3c9;
+  background: #fff;
+  box-shadow: 0 1px 1px rgb(29 49 69 / 8%);
+  cursor: grab;
+}
+
+.tm-task-title {
+  font-size: 0.74rem;
+  line-height: 1.22;
+  color: #23374a;
+}
+
+.tm-task-meta {
+  margin-top: 0.22rem;
+  font-size: 0.66rem;
   font-weight: 700;
-  color: #2a7468;
+  color: #5e7387;
 }
 
-.tm-label {
-  font-size: 0.77rem;
-}
+.tm-status-todo { border-left-color: #7b8ea1; }
+.tm-status-inprogress { border-left-color: #ec9e2b; }
+.tm-status-onhold { border-left-color: #2c83dd; }
+.tm-status-done { border-left-color: #28a745; }
+.tm-status-notdone { border-left-color: #dc3545; }
+.tm-status-notapplicable { border-left-color: #8a97a3; }
 
-.tm-status {
-  justify-self: end;
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #5b736d;
-}
-
-@media (max-width: 1200px) {
-  .tm-areas {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 1400px) {
+  .tm-board-head,
+  .tm-lane {
+    grid-template-columns: 240px 1fr;
   }
 }
 
-@media (max-width: 768px) {
-  .tm-areas {
+@media (max-width: 992px) {
+  .tm-board-head,
+  .tm-lane {
     grid-template-columns: 1fr;
   }
 }

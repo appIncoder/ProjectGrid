@@ -66,6 +66,48 @@ function normalize_project_payload(array $payload): array {
   $payload['activityMatrix'] = $matrix;
   unset($payload['taskMatrix']);
 
+  $tasksMatrix = $payload['projectTasksMatrix'] ?? null;
+  if (is_array($tasksMatrix)) {
+    foreach ($tasksMatrix as $activityId => $phaseMap) {
+      if (!is_array($phaseMap)) continue;
+      foreach ($phaseMap as $phaseId => $activityMap) {
+        if (!is_array($activityMap)) continue;
+        foreach ($activityMap as $parentActivityId => $tasks) {
+          if (!is_array($tasks)) continue;
+          foreach ($tasks as $idx => $task) {
+            if (!is_array($task)) continue;
+            foreach (['reporterId', 'accountantId', 'responsibleId'] as $k) {
+              if (!array_key_exists($k, $task)) continue;
+              $v = trim((string)($task[$k] ?? ''));
+              if ($v === '') {
+                unset($task[$k]);
+              } else {
+                $task[$k] = $v;
+              }
+            }
+            if (isset($task['comments']) && is_array($task['comments'])) {
+              $cleanComments = [];
+              foreach ($task['comments'] as $comment) {
+                if (!is_array($comment)) continue;
+                $text = trim((string)($comment['text'] ?? $comment['comment'] ?? ''));
+                if ($text === '') continue;
+                $cleanComments[] = [
+                  'text' => $text,
+                  'authorId' => trim((string)($comment['authorId'] ?? '')),
+                  'authorName' => trim((string)($comment['authorName'] ?? '')),
+                  'createdAt' => trim((string)($comment['createdAt'] ?? '')),
+                ];
+              }
+              $task['comments'] = $cleanComments;
+            }
+            $tasksMatrix[$activityId][$phaseId][$parentActivityId][$idx] = $task;
+          }
+        }
+      }
+    }
+    $payload['projectTasksMatrix'] = $tasksMatrix;
+  }
+
   return $payload;
 }
 
@@ -81,29 +123,6 @@ function project_default_activities(): array {
     'technologie' => ['id' => 'technologie', 'label' => 'Gestion de la technologie', 'owner' => '—', 'sequence' => 4],
   ];
 } 
-
-function build_payload_activity_lookup(array $payload): array {
-  $lookup = [];
-  $tm = $payload['activityMatrix'] ?? ($payload['taskMatrix'] ?? null);
-  if (!is_array($tm)) return $lookup;
-
-  foreach ($tm as $activityId => $phaseMap) {
-    $aid = trim((string)$activityId);
-    if ($aid === '' || !is_array($phaseMap)) continue;
-    foreach ($phaseMap as $phaseId => $tasks) {
-      $pid = trim((string)$phaseId);
-      if ($pid === '' || !is_array($tasks)) continue;
-      foreach ($tasks as $task) {
-        if (!is_array($task)) continue;
-        $taskId = trim((string)($task['id'] ?? ''));
-        if ($taskId === '') continue;
-        $lookup[$aid][$pid][$taskId] = $task;
-      }
-    }
-  }
-
-  return $lookup;
-}
 
 function default_phase_long_name(string $phaseId): string {
   if (preg_match('/^Phase\s*([0-9]+)$/i', trim($phaseId), $m)) {
@@ -254,6 +273,64 @@ function ensure_project_activity_links_table(PDO $pdo): void {
 function ensure_project_task_links_table(PDO $pdo): void {
   // Compat interne temporaire
   ensure_project_activity_links_table($pdo);
+}
+
+function ensure_project_tasks_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `project_tasks` (
+      `project_id` uuid NOT NULL,
+      `activity_type_id` varchar(64) NOT NULL,
+      `phase_id` varchar(32) NOT NULL,
+      `activity_id` varchar(128) NOT NULL,
+      `task_id` varchar(128) NOT NULL,
+      `label` varchar(255) NOT NULL,
+      `startdate` timestamp NOT NULL DEFAULT current_timestamp(),
+      `enddate` timestamp NOT NULL DEFAULT (current_timestamp() + interval 5 day),
+      `status` varchar(32) NOT NULL DEFAULT 'todo',
+      `reporter_id` uuid DEFAULT NULL,
+      `accountant_id` uuid DEFAULT NULL,
+      `responsible_id` uuid DEFAULT NULL,
+      `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      PRIMARY KEY (`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`),
+      KEY `idx_project_tasks_parent` (`project_id`, `activity_type_id`, `phase_id`, `activity_id`),
+      KEY `idx_project_tasks_status` (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  $ready = true;
+}
+
+function ensure_project_task_comments_table(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+
+  $pdo->exec("
+    CREATE TABLE IF NOT EXISTS `project_task_comments` (
+      `comment_id` uuid NOT NULL DEFAULT uuid(),
+      `project_id` uuid NOT NULL,
+      `activity_type_id` varchar(64) NOT NULL,
+      `phase_id` varchar(32) NOT NULL,
+      `activity_id` varchar(128) NOT NULL,
+      `task_id` varchar(128) NOT NULL,
+      `comment_text` text NOT NULL,
+      `author_id` uuid DEFAULT NULL,
+      `author_name` varchar(180) DEFAULT NULL,
+      `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+      PRIMARY KEY (`comment_id`),
+      KEY `idx_project_task_comments_task` (`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`),
+      KEY `idx_project_task_comments_created` (`created_at`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  ");
+
+  $ready = true;
+}
+
+function is_done_status(string $status): bool {
+  $s = strtolower(trim($status));
+  return $s === 'done' || $s === 'notapplicable';
 }
 
 function ensure_project_health_default_table(PDO $pdo): void {
@@ -962,18 +1039,12 @@ function fetch_project_dependencies(PDO $pdo, string $projectId): array {
 }
 
 function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
-  $stmt = $pdo->prepare('SELECT id, name, description, payload FROM projects WHERE id = :id LIMIT 1');
+  $stmt = $pdo->prepare('SELECT id, name, description FROM projects WHERE id = :id LIMIT 1');
   $stmt->execute([':id' => $projectId]);
   $row = $stmt->fetch();
   if (!$row) return null;
-
-  $payloadData = [];
-  $payloadRaw = (string)($row['payload'] ?? '');
-  if ($payloadRaw !== '') {
-    $decoded = json_decode($payloadRaw, true);
-    if (is_array($decoded)) $payloadData = $decoded;
-  }
-  $payloadTaskLookup = build_payload_activity_lookup($payloadData);
+  ensure_project_tasks_table($pdo);
+  ensure_project_task_comments_table($pdo);
   $schema = resolve_project_data_schema($pdo);
   $activityTypesTable = $schema['activityTypesTable'];
   $activitiesTable = $schema['activitiesTable'];
@@ -992,6 +1063,7 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     'phaseDefinitions' => [],
     'activities' => [],
     'activityMatrix' => [],
+    'projectTasksMatrix' => [],
     'projectHealth' => [],
     'projectRisks' => [],
   ];
@@ -1052,8 +1124,10 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
 
   foreach ($detail['activities'] as $activityId => $_a) {
     $detail['activityMatrix'][$activityId] = [];
+    $detail['projectTasksMatrix'][$activityId] = [];
     foreach ($detail['phases'] as $phaseId) {
       $detail['activityMatrix'][$activityId][$phaseId] = [];
+      $detail['projectTasksMatrix'][$activityId][$phaseId] = [];
     }
   }
 
@@ -1122,19 +1196,141 @@ function fetch_project_from_tables(PDO $pdo, string $projectId): ?array {
     if ($accountant !== '') $task['accountantId'] = $accountant;
     if ($responsible !== '') $task['responsibleId'] = $responsible;
 
-    $overlay = $payloadTaskLookup[$activityId][$phaseId][$taskId] ?? null;
-    if (is_array($overlay)) {
-      foreach (['category', 'phase'] as $k) {
-        if (!array_key_exists($k, $overlay)) continue;
-        $v = trim((string)($overlay[$k] ?? ''));
-        if ($v !== '') $task[$k] = $v;
-      }
-      if (isset($overlay['constraints']) && is_array($overlay['constraints'])) {
-        $task['constraints'] = $overlay['constraints'];
-      }
+    $detail['activityMatrix'][$activityId][$phaseId][] = $task;
+  }
+
+  $hasChildTasks = false;
+  $childStmt = $pdo->prepare("
+    SELECT
+      activity_type_id,
+      phase_id,
+      activity_id,
+      task_id,
+      label,
+      startdate,
+      enddate,
+      status,
+      reporter_id,
+      accountant_id,
+      responsible_id
+    FROM `project_tasks`
+    WHERE project_id = :id
+    ORDER BY activity_type_id ASC, phase_id ASC, activity_id ASC, task_id ASC
+  ");
+  $childStmt->execute([':id' => $projectId]);
+  foreach ($childStmt->fetchAll() as $t) {
+    $activityId = trim((string)($t['activity_type_id'] ?? ''));
+    $phaseId = trim((string)($t['phase_id'] ?? ''));
+    $parentActivityId = trim((string)($t['activity_id'] ?? ''));
+    $taskId = trim((string)($t['task_id'] ?? ''));
+    if ($activityId === '' || $phaseId === '' || $parentActivityId === '' || $taskId === '') continue;
+    if (!isset($detail['projectTasksMatrix'][$activityId][$phaseId])) continue;
+
+    $task = [
+      'id' => $taskId,
+      'label' => (string)($t['label'] ?? $taskId),
+      'status' => (string)($t['status'] ?? 'todo'),
+      'parentActivityId' => $parentActivityId,
+    ];
+
+    $startDate = trim((string)($t['startdate'] ?? ''));
+    $endDate = trim((string)($t['enddate'] ?? ''));
+    if ($startDate !== '') {
+      $startTs = strtotime($startDate);
+      if ($startTs !== false) $task['startDate'] = date('Y-m-d', $startTs);
+    }
+    if ($endDate !== '') {
+      $endTs = strtotime($endDate);
+      if ($endTs !== false) $task['endDate'] = date('Y-m-d', $endTs);
     }
 
-    $detail['activityMatrix'][$activityId][$phaseId][] = $task;
+    $reporter = trim((string)($t['reporter_id'] ?? ''));
+    $accountant = trim((string)($t['accountant_id'] ?? ''));
+    $responsible = trim((string)($t['responsible_id'] ?? ''));
+    if ($reporter !== '') $task['reporterId'] = $reporter;
+    if ($accountant !== '') $task['accountantId'] = $accountant;
+    if ($responsible !== '') $task['responsibleId'] = $responsible;
+
+    if (!isset($detail['projectTasksMatrix'][$activityId][$phaseId][$parentActivityId])) {
+      $detail['projectTasksMatrix'][$activityId][$phaseId][$parentActivityId] = [];
+    }
+    $detail['projectTasksMatrix'][$activityId][$phaseId][$parentActivityId][] = $task;
+    $hasChildTasks = true;
+  }
+
+  $commentsByTaskKey = [];
+  $commentStmt = $pdo->prepare("
+    SELECT
+      activity_type_id,
+      phase_id,
+      activity_id,
+      task_id,
+      comment_text,
+      author_id,
+      author_name,
+      created_at
+    FROM `project_task_comments`
+    WHERE project_id = :id
+    ORDER BY created_at ASC
+  ");
+  $commentStmt->execute([':id' => $projectId]);
+  foreach ($commentStmt->fetchAll() as $c) {
+    $aid = trim((string)($c['activity_type_id'] ?? ''));
+    $pid = trim((string)($c['phase_id'] ?? ''));
+    $parentId = trim((string)($c['activity_id'] ?? ''));
+    $taskId = trim((string)($c['task_id'] ?? ''));
+    if ($aid === '' || $pid === '' || $parentId === '' || $taskId === '') continue;
+    $key = "{$aid}|{$pid}|{$parentId}|{$taskId}";
+    if (!isset($commentsByTaskKey[$key])) $commentsByTaskKey[$key] = [];
+    $commentsByTaskKey[$key][] = [
+      'text' => trim((string)($c['comment_text'] ?? '')),
+      'authorId' => trim((string)($c['author_id'] ?? '')),
+      'authorName' => trim((string)($c['author_name'] ?? '')),
+      'createdAt' => trim((string)($c['created_at'] ?? '')),
+    ];
+  }
+
+  foreach ($detail['projectTasksMatrix'] as $aid => $phaseMap) {
+    if (!is_array($phaseMap)) continue;
+    foreach ($phaseMap as $pid => $activityMap) {
+      if (!is_array($activityMap)) continue;
+      foreach ($activityMap as $parentId => $tasks) {
+        if (!is_array($tasks)) continue;
+        foreach ($tasks as $idx => $task) {
+          if (!is_array($task)) continue;
+          $taskId = trim((string)($task['id'] ?? ''));
+          if ($taskId === '') continue;
+          $key = "{$aid}|{$pid}|{$parentId}|{$taskId}";
+          $task['comments'] = $commentsByTaskKey[$key] ?? [];
+          $detail['projectTasksMatrix'][$aid][$pid][$parentId][$idx] = $task;
+        }
+      }
+    }
+  }
+
+  // Compat: si aucune tâche fille n'existe encore, créer une vue 1:1 depuis les activités.
+  if (!$hasChildTasks) {
+    foreach ($detail['activityMatrix'] as $activityId => $phaseMap) {
+      foreach ($phaseMap as $phaseId => $activities) {
+        foreach ($activities as $activity) {
+          if (!is_array($activity)) continue;
+          $parentId = trim((string)($activity['id'] ?? ''));
+          if ($parentId === '') continue;
+          $detail['projectTasksMatrix'][$activityId][$phaseId][$parentId] = [[
+            'id' => $parentId,
+            'label' => (string)($activity['label'] ?? $parentId),
+            'status' => (string)($activity['status'] ?? 'todo'),
+            'startDate' => (string)($activity['startDate'] ?? ''),
+            'endDate' => (string)($activity['endDate'] ?? ''),
+            'parentActivityId' => $parentId,
+            'reporterId' => (string)($activity['reporterId'] ?? ''),
+            'accountantId' => (string)($activity['accountantId'] ?? ''),
+            'responsibleId' => (string)($activity['responsibleId'] ?? ''),
+            'comments' => [],
+          ]];
+        }
+      }
+    }
   }
 
   foreach (array_keys($detail['activities']) as $activityId) {
@@ -1201,9 +1397,16 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
   $assignItemIdCol = $schema['assignItemIdCol'];
   $depFromCol = $schema['depFromCol'];
   $depToCol = $schema['depToCol'];
+  $rawProjectTasksMatrix = (isset($body['projectTasksMatrix']) && is_array($body['projectTasksMatrix']))
+    ? $body['projectTasksMatrix']
+    : [];
 
   ensure_project_activity_links_table($pdo);
+  ensure_project_tasks_table($pdo);
+  ensure_project_task_comments_table($pdo);
   $pdo->prepare("DELETE FROM `{$linksTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+  $pdo->prepare("DELETE FROM `project_tasks` WHERE project_id = :id")->execute([':id' => $projectId]);
+  $pdo->prepare("DELETE FROM `project_task_comments` WHERE project_id = :id")->execute([':id' => $projectId]);
   $pdo->prepare("DELETE FROM `{$assignmentsTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
   $pdo->prepare("DELETE FROM `{$activitiesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
   $pdo->prepare("DELETE FROM `{$activityTypesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
@@ -1243,9 +1446,21 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
     ]);
   }
 
-  $taskInsert = $pdo->prepare("
+  $activityInsertRows = $pdo->prepare("
     INSERT INTO `{$activitiesTable}` (project_id, `{$activityItemTypeIdCol}`, phase_id, `{$activityItemIdCol}`, label, startdate, enddate, status)
     VALUES (:project_id, :activity_type_id, :phase_id, :activity_id, :label, COALESCE(:startdate, CURRENT_TIMESTAMP), COALESCE(:enddate, CURRENT_TIMESTAMP + INTERVAL 5 DAY), :status)
+  ");
+  $taskInsert = $pdo->prepare("
+    INSERT INTO `project_tasks`
+    (project_id, activity_type_id, phase_id, activity_id, task_id, label, startdate, enddate, status, reporter_id, accountant_id, responsible_id)
+    VALUES
+    (:project_id, :activity_type_id, :phase_id, :activity_id, :task_id, :label, COALESCE(:startdate, CURRENT_TIMESTAMP), COALESCE(:enddate, CURRENT_TIMESTAMP + INTERVAL 5 DAY), :status, :reporter_id, :accountant_id, :responsible_id)
+  ");
+  $commentInsert = $pdo->prepare("
+    INSERT INTO `project_task_comments`
+    (project_id, activity_type_id, phase_id, activity_id, task_id, comment_text, author_id, author_name, created_at)
+    VALUES
+    (:project_id, :activity_type_id, :phase_id, :activity_id, :task_id, :comment_text, :author_id, :author_name, COALESCE(:created_at, CURRENT_TIMESTAMP))
   ");
   $assignInsert = $pdo->prepare("
     INSERT INTO `{$assignmentsTable}` (project_id, `{$assignTypeIdCol}`, phase_id, `{$assignItemIdCol}`, reporter_id, accountant_id, responsible_id)
@@ -1260,6 +1475,8 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
   ");
 
   $existingTaskIds = [];
+  $activityStatusById = [];
+  $activityById = [];
 
   foreach ($activityMatrix as $activityId => $phaseMap) {
     $aid = trim((string)$activityId);
@@ -1273,18 +1490,22 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
         if (!is_array($task)) continue;
         $taskId = trim((string)($task['id'] ?? ''));
         if ($taskId === '') continue;
+        $taskLabel = trim((string)($task['label'] ?? $taskId));
+        $taskStatus = trim((string)($task['status'] ?? 'todo'));
 
-        $taskInsert->execute([
+        $activityInsertRows->execute([
           ':project_id' => $projectId,
           ':activity_type_id' => $aid,
           ':phase_id' => $pid,
           ':activity_id' => $taskId,
-          ':label' => trim((string)($task['label'] ?? $taskId)),
+          ':label' => $taskLabel,
           ':startdate' => task_date_to_db_value(isset($task['startDate']) ? (string)$task['startDate'] : null, false),
           ':enddate' => task_date_to_db_value(isset($task['endDate']) ? (string)$task['endDate'] : null, true),
-          ':status' => trim((string)($task['status'] ?? 'todo')),
+          ':status' => $taskStatus,
         ]);
         $existingTaskIds[$taskId] = true;
+        $activityStatusById[$aid][$pid][$taskId] = $taskStatus;
+        $activityById[$aid][$pid][$taskId] = $task;
 
         $reporter = trim((string)($task['reporterId'] ?? ''));
         $accountant = trim((string)($task['accountantId'] ?? ''));
@@ -1299,6 +1520,82 @@ function persist_project_tables(PDO $pdo, array $body, string $projectId): void 
             ':accountant_id' => $accountant !== '' ? $accountant : null,
             ':responsible_id' => $responsible !== '' ? $responsible : null,
           ]);
+        }
+      }
+    }
+  }
+
+  foreach ($activityById as $aid => $phaseMap) {
+    foreach ($phaseMap as $pid => $activityMap) {
+      foreach ($activityMap as $parentId => $parentActivity) {
+        $children = $rawProjectTasksMatrix[$aid][$pid][$parentId] ?? [];
+        if (!is_array($children) || !$children) {
+          $children = [[
+            'id' => $parentId,
+            'label' => $parentActivity['label'] ?? $parentId,
+            'status' => $parentActivity['status'] ?? 'todo',
+            'startDate' => $parentActivity['startDate'] ?? null,
+            'endDate' => $parentActivity['endDate'] ?? null,
+            'reporterId' => $parentActivity['reporterId'] ?? null,
+            'accountantId' => $parentActivity['accountantId'] ?? null,
+            'responsibleId' => $parentActivity['responsibleId'] ?? null,
+          ]];
+        }
+
+        $openChildCount = 0;
+        foreach ($children as $childTask) {
+          if (!is_array($childTask)) continue;
+          if (!is_done_status((string)($childTask['status'] ?? 'todo'))) {
+            $openChildCount++;
+          }
+        }
+
+        $parentStatus = (string)($activityStatusById[$aid][$pid][$parentId] ?? 'todo');
+        if (strtolower(trim($parentStatus)) === 'done' && $openChildCount > 0) {
+          throw new InvalidArgumentException(
+            "Impossible de passer l'activité '{$parentId}' en Terminé: toutes les tâches filles ne sont pas terminées."
+          );
+        }
+
+        foreach ($children as $childTask) {
+          if (!is_array($childTask)) continue;
+          $childTaskId = trim((string)($childTask['id'] ?? ''));
+          if ($childTaskId === '') continue;
+          $taskInsert->execute([
+            ':project_id' => $projectId,
+            ':activity_type_id' => $aid,
+            ':phase_id' => $pid,
+            ':activity_id' => $parentId,
+            ':task_id' => $childTaskId,
+            ':label' => trim((string)($childTask['label'] ?? $childTaskId)),
+            ':startdate' => task_date_to_db_value(isset($childTask['startDate']) ? (string)$childTask['startDate'] : null, false),
+            ':enddate' => task_date_to_db_value(isset($childTask['endDate']) ? (string)$childTask['endDate'] : null, true),
+            ':status' => trim((string)($childTask['status'] ?? 'todo')),
+            ':reporter_id' => (($v = trim((string)($childTask['reporterId'] ?? ''))) !== '') ? $v : null,
+            ':accountant_id' => (($v = trim((string)($childTask['accountantId'] ?? ''))) !== '') ? $v : null,
+            ':responsible_id' => (($v = trim((string)($childTask['responsibleId'] ?? ''))) !== '') ? $v : null,
+          ]);
+
+          $comments = (isset($childTask['comments']) && is_array($childTask['comments'])) ? $childTask['comments'] : [];
+          foreach ($comments as $comment) {
+            if (!is_array($comment)) continue;
+            $commentText = trim((string)($comment['text'] ?? $comment['comment'] ?? ''));
+            if ($commentText === '') continue;
+            $authorId = trim((string)($comment['authorId'] ?? ''));
+            $authorName = trim((string)($comment['authorName'] ?? ''));
+            $createdAt = trim((string)($comment['createdAt'] ?? ''));
+            $commentInsert->execute([
+              ':project_id' => $projectId,
+              ':activity_type_id' => $aid,
+              ':phase_id' => $pid,
+              ':activity_id' => $parentId,
+              ':task_id' => $childTaskId,
+              ':comment_text' => $commentText,
+              ':author_id' => $authorId !== '' ? $authorId : null,
+              ':author_name' => $authorName !== '' ? $authorName : null,
+              ':created_at' => $createdAt !== '' ? $createdAt : null,
+            ]);
+          }
         }
       }
     }
@@ -1358,6 +1655,8 @@ function save_project_detail(PDO $pdo, string $projectId, array $project, string
   // sinon commit implicite et "There is no active transaction".
   ensure_project_changes_table($pdo);
   ensure_project_activity_links_table($pdo);
+  ensure_project_tasks_table($pdo);
+  ensure_project_task_comments_table($pdo);
   ensure_project_health_infra($pdo);
 
   $project['id'] = $projectId;
@@ -1443,6 +1742,8 @@ function rebuild_project_payload(PDO $pdo, string $projectId): array {
 
 function delete_project_everywhere(PDO $pdo, string $projectId): bool {
   ensure_project_health_infra($pdo);
+  ensure_project_tasks_table($pdo);
+  ensure_project_task_comments_table($pdo);
   $schema = resolve_project_data_schema($pdo);
   $activityTypesTable = $schema['activityTypesTable'];
   $activitiesTable = $schema['activitiesTable'];
@@ -1458,6 +1759,8 @@ function delete_project_everywhere(PDO $pdo, string $projectId): bool {
   try {
     // Enfants -> parent pour respecter les FKs éventuelles.
     $pdo->prepare("DELETE FROM `{$linksTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
+    $pdo->prepare("DELETE FROM `project_task_comments` WHERE project_id = :id")->execute([':id' => $projectId]);
+    $pdo->prepare("DELETE FROM `project_tasks` WHERE project_id = :id")->execute([':id' => $projectId]);
     $pdo->prepare("DELETE FROM `{$assignmentsTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
     $pdo->prepare("DELETE FROM `{$activitiesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);
     $pdo->prepare("DELETE FROM `{$activityTypesTable}` WHERE project_id = :id")->execute([':id' => $projectId]);

@@ -1,54 +1,114 @@
-<div class="card project-change-management">
+<div class="card pcm-detail-card">
   <div class="card-body">
     <div class="pcm-head">
-      <div>
-        <h3 class="pcm-title">Conduite du changement</h3>
-        <p class="pcm-subtitle">Référentiel ADKAR inspiré Prosci</p>
+      <h3>Gestion du changement - Kanban</h3>
+    </div>
+
+    <div class="pcm-phase-filters" *ngIf="phaseFilters.length">
+      <button
+        type="button"
+        class="pcm-filter-chip pcm-filter-chip-primary"
+        [class.is-active]="showCurrentPhaseOnly"
+        (click)="toggleCurrentPhaseFilter()"
+      >
+        Phase en cours
+      </button>
+      <button
+        type="button"
+        class="pcm-filter-chip"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="selectAllPhases()"
+      >
+        Selectionner toutes les phases
+      </button>
+      <button
+        type="button"
+        class="pcm-filter-chip"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="deselectAllPhases()"
+      >
+        Deselectionner toutes les phases
+      </button>
+      <button
+        type="button"
+        class="pcm-filter-chip"
+        *ngFor="let phase of phaseFilters; trackBy: trackByPhase"
+        [class.is-active]="phase.selected"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="togglePhase(phase.id)"
+      >
+        {{ phase.label }}
+      </button>
+    </div>
+
+    <div class="pcm-save-state" *ngIf="isSaving">Enregistrement...</div>
+    <div class="pcm-save-error" *ngIf="saveError">{{ saveError }}</div>
+
+    <div class="pcm-board-head">
+      <div class="pcm-board-head-label">Swimlane (activite mere)</div>
+      <div class="pcm-board-columns">
+        <div class="pcm-board-col-title" *ngFor="let col of statusColumns">
+          <span>{{ col.label }}</span>
+          <small>{{ getColumnTaskCount(col.id) }}</small>
+        </div>
       </div>
-      <div class="pcm-progress-pill">{{ globalProgress }}% global</div>
     </div>
 
-    <div class="pcm-global-progress">
-      <div class="pcm-global-progress-bar" [style.width.%]="globalProgress"></div>
+    <div class="pcm-board-empty" *ngIf="!filteredLanes.length">
+      Aucune activite changement visible.
     </div>
 
-    <div class="pcm-stages">
-      <article class="pcm-stage-card" *ngFor="let stage of stages; trackBy: trackByStage">
-        <div class="pcm-stage-header">
-          <div class="pcm-stage-code">{{ stage.code }}</div>
-          <div>
-            <h4 class="pcm-stage-title">{{ stage.label }}</h4>
-            <p class="pcm-stage-desc">{{ stage.description }}</p>
+    <div class="pcm-board" *ngIf="filteredLanes.length">
+      <div class="pcm-lane" *ngFor="let lane of filteredLanes; trackBy: trackByLane">
+        <div class="pcm-lane-meta">
+          <div class="pcm-lane-phase">{{ lane.phaseLabel }}</div>
+          <div class="pcm-lane-title">{{ lane.label }}</div>
+          <div class="pcm-lane-id">ID: {{ lane.id }}</div>
+        </div>
+
+        <div class="pcm-lane-columns">
+          <div
+            class="pcm-lane-col"
+            *ngFor="let col of statusColumns"
+            [class.pcm-lane-col--drop-target]="isDropTarget(lane, col.id)"
+            (dragover)="onStatusDragOver($event, lane, col.id)"
+            (dragleave)="onStatusDragLeave(lane, col.id)"
+            (drop)="onStatusDrop($event, lane, col.id)"
+          >
+            <div
+              class="pcm-task-card"
+              *ngFor="let task of lane.groupedByStatus[col.id]; trackBy: trackByTask"
+              [ngClass]="getStatusClass(col.id)"
+              draggable="true"
+              (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
+              (dragend)="onTaskDragEnd()"
+              (click)="openTaskModal(lane, task)"
+            >
+              <div class="pcm-task-title">{{ task.label }}</div>
+              <div class="pcm-task-meta">{{ getStatusLabel(col.id) }}</div>
+            </div>
           </div>
         </div>
-
-        <div class="pcm-stage-progress">
-          <div class="pcm-stage-progress-bar" [style.width.%]="stage.progress"></div>
-        </div>
-        <div class="pcm-stage-progress-label">{{ stage.progress }}%</div>
-
-        <div class="pcm-stage-kpis">
-          <span><strong>{{ stage.done }}</strong> fait</span>
-          <span><strong>{{ stage.inProgress }}</strong> en cours</span>
-          <span><strong>{{ stage.todo }}</strong> à faire</span>
-        </div>
-      </article>
-    </div>
-
-    <div class="pcm-actions">
-      <h4 class="pcm-actions-title">Actions changement prioritaires</h4>
-
-      <div class="pcm-empty" *ngIf="!upcomingActions.length">
-        Aucune action de changement en attente.
       </div>
-
-      <ul class="pcm-actions-list" *ngIf="upcomingActions.length">
-        <li *ngFor="let action of upcomingActions; trackBy: trackByTask">
-          <span class="pcm-action-phase">{{ action.phase }}</span>
-          <span class="pcm-action-label">{{ action.label }}</span>
-          <span class="pcm-action-status">{{ action.status }}</span>
-        </li>
-      </ul>
     </div>
+
+    <app-project-kanban-task-modal
+      [open]="modalOpen"
+      [isSaving]="isSaving"
+      [error]="modalError"
+      [taskName]="editedTaskName"
+      [parentId]="editedTaskParentId"
+      [parentOptions]="availableParentActivities"
+      [comments]="getEditedTaskComments()"
+      [newCommentText]="newCommentText"
+      (close)="closeTaskModal()"
+      (save)="saveTaskModal()"
+      (taskNameChange)="editedTaskName = $event"
+      (parentIdChange)="editedTaskParentId = $event"
+      (newCommentTextChange)="newCommentText = $event"
+    ></app-project-kanban-task-modal>
   </div>
 </div>

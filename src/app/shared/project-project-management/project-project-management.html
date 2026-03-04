@@ -1,38 +1,114 @@
 <div class="card pm-detail-card">
   <div class="card-body">
     <div class="pm-head">
-      <h3>Suivi détaillé - Gestion de projet</h3>
-      <span class="pm-kpi">{{ globalProgress }}% global</span>
+      <h3>Gestion du projet - Kanban des activites et taches</h3>
     </div>
 
-    <div class="pm-progress">
-      <div class="pm-progress-bar" [style.width.%]="globalProgress"></div>
+    <div class="pm-phase-filters">
+      <button
+        type="button"
+        class="pm-filter-chip"
+        [class.pm-filter-chip--active]="showCurrentPhaseOnly"
+        (click)="toggleCurrentPhaseFilter()"
+      >
+        Phase en cours
+      </button>
+
+      <button
+        type="button"
+        class="pm-filter-chip"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="selectAllPhases()"
+      >
+        Selectionner toutes les phases
+      </button>
+
+      <button
+        type="button"
+        class="pm-filter-chip"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="deselectAllPhases()"
+      >
+        Deselectionner toutes les phases
+      </button>
+
+      <button
+        type="button"
+        *ngFor="let phase of phaseFilters; trackBy: trackByPhase"
+        class="pm-filter-chip"
+        [class.pm-filter-chip--active]="phase.selected"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="togglePhase(phase.id)"
+      >
+        {{ phase.label }}
+      </button>
     </div>
 
-    <div class="pm-phases">
-      <article class="pm-phase-card" *ngFor="let p of phaseProgress">
-        <h4>{{ p.phase }}</h4>
-        <div class="pm-phase-kpis">
-          <span><strong>{{ p.done }}</strong> faits</span>
-          <span><strong>{{ p.inProgress }}</strong> en cours</span>
-          <span><strong>{{ p.total }}</strong> total</span>
+    <div class="pm-save-state" *ngIf="isSaving">Enregistrement...</div>
+    <div class="pm-save-error" *ngIf="saveError">{{ saveError }}</div>
+
+    <div class="pm-board-head">
+      <div class="pm-board-head-label">Swimlane (activite mere)</div>
+      <div class="pm-board-columns">
+        <div class="pm-board-col-title" *ngFor="let col of statusColumns">
+          <span>{{ col.label }}</span>
+          <small>{{ getColumnTaskCount(col.id) }}</small>
         </div>
-        <div class="pm-mini-progress">
-          <div class="pm-mini-progress-bar" [style.width.%]="p.progress"></div>
-        </div>
-      </article>
+      </div>
     </div>
 
-    <div class="pm-actions">
-      <h4>Actions prioritaires</h4>
-      <div class="text-muted small" *ngIf="!nextActions.length">Aucune action en attente.</div>
-      <ul *ngIf="nextActions.length">
-        <li *ngFor="let a of nextActions">
-          <span class="pm-action-phase">{{ a.phase }}</span>
-          <span class="pm-action-label">{{ a.label }}</span>
-          <span class="pm-action-status">{{ a.status }}</span>
-        </li>
-      </ul>
+    <div class="pm-board-empty" *ngIf="!filteredLanes.length">
+      Aucune activite visible pour les filtres de phase selectionnes.
     </div>
+
+    <div class="pm-board" *ngIf="filteredLanes.length">
+      <div class="pm-lane" *ngFor="let lane of filteredLanes; trackBy: trackByLane">
+        <div class="pm-lane-meta">
+          <div class="pm-lane-phase">{{ lane.phaseLabel }}</div>
+          <div class="pm-lane-title">{{ lane.label }}</div>
+          <div class="pm-lane-id">ID: {{ lane.id }}</div>
+        </div>
+
+        <div class="pm-lane-columns">
+          <div
+            class="pm-lane-col"
+            *ngFor="let col of statusColumns"
+            [class.pm-lane-col--drop-target]="isDropTarget(lane, col.id)"
+            (dragover)="onStatusDragOver($event, lane, col.id)"
+            (dragleave)="onStatusDragLeave(lane, col.id)"
+            (drop)="onStatusDrop($event, lane, col.id)"
+          >
+            <div
+              class="pm-task-card"
+              *ngFor="let task of lane.groupedByStatus[col.id]; trackBy: trackByTask"
+              [ngClass]="getStatusClass(col.id)"
+              draggable="true"
+              (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
+              (dragend)="onTaskDragEnd()"
+              (click)="openTaskModal(lane, task)"
+            >
+              <div class="pm-task-title">{{ task.label }}</div>
+              <div class="pm-task-meta">{{ getStatusLabel(col.id) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <app-project-kanban-task-modal
+      [open]="modalOpen"
+      [isSaving]="isSaving"
+      [error]="modalError"
+      [taskName]="editedTaskName"
+      [parentId]="editedTaskParentId"
+      [parentOptions]="availableParentActivities"
+      [comments]="getEditedTaskComments()"
+      [newCommentText]="newCommentText"
+      (close)="closeTaskModal()"
+      (save)="saveTaskModal()"
+      (taskNameChange)="editedTaskName = $event"
+      (parentIdChange)="editedTaskParentId = $event"
+      (newCommentTextChange)="newCommentText = $event"
+    ></app-project-kanban-task-modal>
   </div>
 </div>

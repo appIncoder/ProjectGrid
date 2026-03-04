@@ -11,6 +11,12 @@ export type ActivityStatus =
   | 'notdone'
   | 'notapplicable'; // ✅ Non applicable (Gris)
 
+export interface TaskComment {
+  text: string;
+  authorId?: string;
+  authorName?: string;
+  createdAt?: string;
+}
 
 
 
@@ -21,6 +27,8 @@ export interface Task {
   id: string;
   label: string;
   status: ActivityStatus; 
+  parentActivityId?: string;
+  comments?: TaskComment[];
 }
 
 export interface ActivityDefinition {
@@ -43,6 +51,7 @@ export interface ProjectDetail {
 
   activities: Record<ActivityId, ActivityDefinition>;
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
+  projectTasksMatrix?: Record<ActivityId, Record<PhaseId, Record<string, Task[]>>>;
 }
 
 

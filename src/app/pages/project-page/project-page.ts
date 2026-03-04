@@ -177,6 +177,8 @@ export class ProjectPage implements OnInit, OnDestroy {
           this.saveError = detail
             ? `Les modifications n'ont pas pu être enregistrées: ${detail}`
             : "Les modifications n'ont pas pu être enregistrées.";
+          // Annule localement la modification rejetée par le backend.
+          await this.loadProject(projectSnapshot.id);
           break;
         }
       } while (this.saveRequestedWhileInFlight);
@@ -248,14 +250,23 @@ export class ProjectPage implements OnInit, OnDestroy {
           ? (p as any).taskMatrix
           : {}));
     const taskMatrix = { ...matrix };
+    const projectTasksMatrix = ((((p as any)?.projectTasksMatrix) && typeof (p as any).projectTasksMatrix === 'object')
+      ? (p as any).projectTasksMatrix
+      : {});
 
     for (const activityId of Object.keys(activities)) {
       if (!taskMatrix[activityId] || typeof taskMatrix[activityId] !== 'object') {
         taskMatrix[activityId] = {};
       }
+      if (!projectTasksMatrix[activityId] || typeof projectTasksMatrix[activityId] !== 'object') {
+        projectTasksMatrix[activityId] = {};
+      }
       for (const phase of phases) {
         if (!Array.isArray(taskMatrix[activityId][phase])) {
           taskMatrix[activityId][phase] = [];
+        }
+        if (!projectTasksMatrix[activityId][phase] || typeof projectTasksMatrix[activityId][phase] !== 'object') {
+          projectTasksMatrix[activityId][phase] = {};
         }
       }
     }
@@ -269,6 +280,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       activities,
       activityMatrix: taskMatrix,
       taskMatrix,
+      projectTasksMatrix,
     } as ProjectDetail;
   }
 }

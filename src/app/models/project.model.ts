@@ -25,6 +25,13 @@ export type ProjectTab = 'scorecard'
                         | 'board' 
                         | 'ressources'; 
  
+export interface TaskComment {
+  text: string;
+  authorId?: string;
+  authorName?: string;
+  createdAt?: string;
+}
+
 /* ----- Scorecard / tâches ----- */
 export interface Task {
   id: string;
@@ -77,6 +84,9 @@ export type ProjectDetail = {
   activityMatrix?: Record<ActivityId, Record<PhaseId, Task[]>>;
   // Legacy frontend field (kept for backward compatibility during migration)
   taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
+  // Tâches filles par activité mère:
+  // activity -> phase -> activityId(parent) -> tasks[]
+  projectTasksMatrix?: Record<ActivityId, Record<PhaseId, Record<string, Task[]>>>;
 
   // ✅ dépendances Gantt persistées (fake aujourd’hui, API demain)
   ganttDependencies?: Array<{
@@ -187,6 +197,8 @@ export interface Task {
   reporterId?: string;
   accountantId?: string;
   responsibleId?: string;
+  parentActivityId?: string;
+  comments?: TaskComment[];
 
   // IMPORTANT : une tâche "vit" dans une phase de la matrice
   phase?: PhaseId;

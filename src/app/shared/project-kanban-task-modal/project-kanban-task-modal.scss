@@ -1,0 +1,144 @@
+.pkm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(16 24 34 / 45%);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+  padding: 1rem;
+}
+
+.pkm-modal {
+  width: min(720px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 0.75rem;
+  border: 1px solid #d6e1ef;
+  box-shadow: 0 12px 30px rgb(13 28 43 / 22%);
+}
+
+.pkm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #e6edf6;
+}
+
+.pkm-modal-head h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.pkm-modal-close {
+  border: 0;
+  background: transparent;
+  color: #44596f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pkm-modal-body {
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pkm-field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.pkm-field > span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #3d556b;
+}
+
+.pkm-field input,
+.pkm-field select,
+.pkm-field textarea {
+  border: 1px solid #cfdbe9;
+  border-radius: 0.45rem;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.78rem;
+}
+
+.pkm-comments {
+  border: 1px solid #e2e9f2;
+  border-radius: 0.45rem;
+  padding: 0.5rem;
+  background: #f9fbfe;
+  display: grid;
+  gap: 0.45rem;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.pkm-comment {
+  border: 1px solid #e2e9f2;
+  border-radius: 0.4rem;
+  background: #fff;
+  padding: 0.35rem 0.45rem;
+}
+
+.pkm-comment-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.66rem;
+  color: #60758a;
+}
+
+.pkm-comment-text {
+  margin-top: 0.2rem;
+  font-size: 0.74rem;
+  color: #31495f;
+}
+
+.pkm-comments-empty {
+  font-size: 0.73rem;
+  color: #6b7f93;
+}
+
+.pkm-modal-actions {
+  border-top: 1px solid #e6edf6;
+  padding: 0.7rem 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.pkm-btn-secondary,
+.pkm-btn-primary {
+  border: 1px solid #cfdbe9;
+  border-radius: 0.45rem;
+  padding: 0.42rem 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pkm-btn-secondary {
+  background: #f5f8fb;
+  color: #41576d;
+}
+
+.pkm-btn-primary {
+  background: #2e7ec4;
+  border-color: #2e7ec4;
+  color: #fff;
+}
+
+.pkm-btn-secondary:disabled,
+.pkm-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pkm-modal-error {
+  font-size: 0.74rem;
+  color: #b2293d;
+}

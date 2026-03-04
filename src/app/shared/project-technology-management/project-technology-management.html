@@ -1,42 +1,114 @@
 <div class="card tm-detail-card">
   <div class="card-body">
     <div class="tm-head">
-      <h3>Suivi détaillé - Gestion de la technologie</h3>
-      <span class="tm-kpi">{{ progress }}% readiness ITIL</span>
+      <h3>Gestion de la technologie - Kanban</h3>
     </div>
 
-    <p class="tm-subtitle">
-      Pilotage inspiré ITIL: Service Design, Change Enablement, Release & Deployment, Service Operation.
-    </p>
-
-    <div class="tm-progress">
-      <div class="tm-progress-bar" [style.width.%]="progress"></div>
+    <div class="tm-phase-filters" *ngIf="phaseFilters.length">
+      <button
+        type="button"
+        class="tm-filter-chip tm-filter-chip-primary"
+        [class.is-active]="showCurrentPhaseOnly"
+        (click)="toggleCurrentPhaseFilter()"
+      >
+        Phase en cours
+      </button>
+      <button
+        type="button"
+        class="tm-filter-chip"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="selectAllPhases()"
+      >
+        Selectionner toutes les phases
+      </button>
+      <button
+        type="button"
+        class="tm-filter-chip"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="deselectAllPhases()"
+      >
+        Deselectionner toutes les phases
+      </button>
+      <button
+        type="button"
+        class="tm-filter-chip"
+        *ngFor="let phase of phaseFilters; trackBy: trackByPhase"
+        [class.is-active]="phase.selected"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="togglePhase(phase.id)"
+      >
+        {{ phase.label }}
+      </button>
     </div>
 
-    <div class="tm-stats">
-      <span><strong>{{ ready }}</strong> stabilisées</span>
-      <span><strong>{{ inFlight }}</strong> en transit</span>
-      <span><strong>{{ total }}</strong> total</span>
+    <div class="tm-save-state" *ngIf="isSaving">Enregistrement...</div>
+    <div class="tm-save-error" *ngIf="saveError">{{ saveError }}</div>
+
+    <div class="tm-board-head">
+      <div class="tm-board-head-label">Swimlane (activite mere)</div>
+      <div class="tm-board-columns">
+        <div class="tm-board-col-title" *ngFor="let col of statusColumns">
+          <span>{{ col.label }}</span>
+          <small>{{ getColumnTaskCount(col.id) }}</small>
+        </div>
+      </div>
     </div>
 
-    <div class="tm-areas">
-      <article class="tm-area" *ngFor="let a of itilAreas">
-        <h4>{{ a.area }}</h4>
-        <p>{{ a.objective }}</p>
-        <span>{{ a.count }} activités</span>
-      </article>
+    <div class="tm-board-empty" *ngIf="!filteredLanes.length">
+      Aucune activite technologie visible.
     </div>
 
-    <div class="tm-watch">
-      <h4>Points de vigilance technologiques</h4>
-      <div class="text-muted small" *ngIf="!watchList.length">Aucune action technologique en attente.</div>
-      <ul *ngIf="watchList.length">
-        <li *ngFor="let item of watchList">
-          <span class="tm-phase">{{ item.phase }}</span>
-          <span class="tm-label">{{ item.label }}</span>
-          <span class="tm-status">{{ item.status }}</span>
-        </li>
-      </ul>
+    <div class="tm-board" *ngIf="filteredLanes.length">
+      <div class="tm-lane" *ngFor="let lane of filteredLanes; trackBy: trackByLane">
+        <div class="tm-lane-meta">
+          <div class="tm-lane-phase">{{ lane.phaseLabel }}</div>
+          <div class="tm-lane-title">{{ lane.label }}</div>
+          <div class="tm-lane-id">ID: {{ lane.id }}</div>
+        </div>
+
+        <div class="tm-lane-columns">
+          <div
+            class="tm-lane-col"
+            *ngFor="let col of statusColumns"
+            [class.tm-lane-col--drop-target]="isDropTarget(lane, col.id)"
+            (dragover)="onStatusDragOver($event, lane, col.id)"
+            (dragleave)="onStatusDragLeave(lane, col.id)"
+            (drop)="onStatusDrop($event, lane, col.id)"
+          >
+            <div
+              class="tm-task-card"
+              *ngFor="let task of lane.groupedByStatus[col.id]; trackBy: trackByTask"
+              [ngClass]="getStatusClass(col.id)"
+              draggable="true"
+              (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
+              (dragend)="onTaskDragEnd()"
+              (click)="openTaskModal(lane, task)"
+            >
+              <div class="tm-task-title">{{ task.label }}</div>
+              <div class="tm-task-meta">{{ getStatusLabel(col.id) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <app-project-kanban-task-modal
+      [open]="modalOpen"
+      [isSaving]="isSaving"
+      [error]="modalError"
+      [taskName]="editedTaskName"
+      [parentId]="editedTaskParentId"
+      [parentOptions]="availableParentActivities"
+      [comments]="getEditedTaskComments()"
+      [newCommentText]="newCommentText"
+      (close)="closeTaskModal()"
+      (save)="saveTaskModal()"
+      (taskNameChange)="editedTaskName = $event"
+      (parentIdChange)="editedTaskParentId = $event"
+      (newCommentTextChange)="newCommentText = $event"
+    ></app-project-kanban-task-modal>
   </div>
 </div>

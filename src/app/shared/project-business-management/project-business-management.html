@@ -1,42 +1,114 @@
 <div class="card bm-detail-card">
   <div class="card-body">
     <div class="bm-head">
-      <h3>Suivi détaillé - Gestion du métier</h3>
-      <span class="bm-kpi">{{ progress }}% de maturité</span>
+      <h3>Gestion du metier - Kanban</h3>
     </div>
 
-    <p class="bm-subtitle">
-      Cadre de suivi combiné ArchiMate (vue métier) + Business Analysis (requirements & value).
-    </p>
-
-    <div class="bm-progress">
-      <div class="bm-progress-bar" [style.width.%]="progress"></div>
+    <div class="bm-phase-filters" *ngIf="phaseFilters.length">
+      <button
+        type="button"
+        class="bm-filter-chip bm-filter-chip-primary"
+        [class.is-active]="showCurrentPhaseOnly"
+        (click)="toggleCurrentPhaseFilter()"
+      >
+        Phase en cours
+      </button>
+      <button
+        type="button"
+        class="bm-filter-chip"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="selectAllPhases()"
+      >
+        Selectionner toutes les phases
+      </button>
+      <button
+        type="button"
+        class="bm-filter-chip"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="deselectAllPhases()"
+      >
+        Deselectionner toutes les phases
+      </button>
+      <button
+        type="button"
+        class="bm-filter-chip"
+        *ngFor="let phase of phaseFilters; trackBy: trackByPhase"
+        [class.is-active]="phase.selected"
+        [class.is-disabled]="showCurrentPhaseOnly"
+        [disabled]="showCurrentPhaseOnly"
+        (click)="togglePhase(phase.id)"
+      >
+        {{ phase.label }}
+      </button>
     </div>
 
-    <div class="bm-stats">
-      <span><strong>{{ done }}</strong> validées</span>
-      <span><strong>{{ inProgress }}</strong> en cours</span>
-      <span><strong>{{ total }}</strong> total</span>
+    <div class="bm-save-state" *ngIf="isSaving">Enregistrement...</div>
+    <div class="bm-save-error" *ngIf="saveError">{{ saveError }}</div>
+
+    <div class="bm-board-head">
+      <div class="bm-board-head-label">Swimlane (activite mere)</div>
+      <div class="bm-board-columns">
+        <div class="bm-board-col-title" *ngFor="let col of statusColumns">
+          <span>{{ col.label }}</span>
+          <small>{{ getColumnTaskCount(col.id) }}</small>
+        </div>
+      </div>
     </div>
 
-    <div class="bm-lenses">
-      <article class="bm-lens" *ngFor="let lens of lenses">
-        <h4>{{ lens.title }}</h4>
-        <p>{{ lens.subtitle }}</p>
-        <span>{{ lens.count }} activités</span>
-      </article>
+    <div class="bm-board-empty" *ngIf="!filteredLanes.length">
+      Aucune activite metier visible.
     </div>
 
-    <div class="bm-focus">
-      <h4>Backlog métier prioritaire</h4>
-      <div class="text-muted small" *ngIf="!focusList.length">Aucune activité métier en attente.</div>
-      <ul *ngIf="focusList.length">
-        <li *ngFor="let item of focusList">
-          <span class="bm-phase">{{ item.phase }}</span>
-          <span class="bm-label">{{ item.label }}</span>
-          <span class="bm-status">{{ item.status }}</span>
-        </li>
-      </ul>
+    <div class="bm-board" *ngIf="filteredLanes.length">
+      <div class="bm-lane" *ngFor="let lane of filteredLanes; trackBy: trackByLane">
+        <div class="bm-lane-meta">
+          <div class="bm-lane-phase">{{ lane.phaseLabel }}</div>
+          <div class="bm-lane-title">{{ lane.label }}</div>
+          <div class="bm-lane-id">ID: {{ lane.id }}</div>
+        </div>
+
+        <div class="bm-lane-columns">
+          <div
+            class="bm-lane-col"
+            *ngFor="let col of statusColumns"
+            [class.bm-lane-col--drop-target]="isDropTarget(lane, col.id)"
+            (dragover)="onStatusDragOver($event, lane, col.id)"
+            (dragleave)="onStatusDragLeave(lane, col.id)"
+            (drop)="onStatusDrop($event, lane, col.id)"
+          >
+            <div
+              class="bm-task-card"
+              *ngFor="let task of lane.groupedByStatus[col.id]; trackBy: trackByTask"
+              [ngClass]="getStatusClass(col.id)"
+              draggable="true"
+              (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
+              (dragend)="onTaskDragEnd()"
+              (click)="openTaskModal(lane, task)"
+            >
+              <div class="bm-task-title">{{ task.label }}</div>
+              <div class="bm-task-meta">{{ getStatusLabel(col.id) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <app-project-kanban-task-modal
+      [open]="modalOpen"
+      [isSaving]="isSaving"
+      [error]="modalError"
+      [taskName]="editedTaskName"
+      [parentId]="editedTaskParentId"
+      [parentOptions]="availableParentActivities"
+      [comments]="getEditedTaskComments()"
+      [newCommentText]="newCommentText"
+      (close)="closeTaskModal()"
+      (save)="saveTaskModal()"
+      (taskNameChange)="editedTaskName = $event"
+      (parentIdChange)="editedTaskParentId = $event"
+      (newCommentTextChange)="newCommentText = $event"
+    ></app-project-kanban-task-modal>
   </div>
 </div>
