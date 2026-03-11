@@ -102,7 +102,7 @@ export class ProjectPage implements OnInit, OnDestroy {
     try {
       const [p, users, healthDefaults] = await Promise.all([
         this.data.getProjectById(projectId),
-        this.data.listUsers().catch(() => [] as UserRef[]),
+        this.data.listUsers(projectId).catch(() => [] as UserRef[]),
         this.data.listProjectHealthDefaults().catch(() => [] as ProjectHealthDefaultRef[]),
       ]);
 

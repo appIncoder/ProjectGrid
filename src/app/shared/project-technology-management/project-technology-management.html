@@ -2,6 +2,11 @@
   <div class="card-body">
     <div class="tm-head">
       <h3>Gestion de la technologie - Kanban</h3>
+      <app-project-add-task-button
+        label="Ajouter une tache"
+        [disabled]="isSaving"
+        (action)="openCreateTaskModal()"
+      ></app-project-add-task-button>
     </div>
 
     <div class="tm-phase-filters" *ngIf="phaseFilters.length">
@@ -99,6 +104,7 @@
       [open]="modalOpen"
       [isSaving]="isSaving"
       [error]="modalError"
+      [title]="isCreateMode ? 'Ajouter une tache' : 'Modifier la tache'"
       [taskName]="editedTaskName"
       [parentId]="editedTaskParentId"
       [parentOptions]="availableParentActivities"

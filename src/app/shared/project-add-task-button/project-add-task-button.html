@@ -1,0 +1,9 @@
+<button
+  type="button"
+  class="btn scorecard-add-task-btn"
+  [disabled]="disabled"
+  (click)="action.emit()"
+>
+  <span class="scorecard-add-task-btn__plus">+</span>
+  <span>{{ label }}</span>
+</button>

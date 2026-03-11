@@ -122,8 +122,10 @@ export class ProjectDataService {
     return list;
   }
 
-  async listUsers(): Promise<UserRef[]> {
-    const url = this.withNoCache(`${this.baseUrl}/users`);
+  async listUsers(projectId?: string | null): Promise<UserRef[]> {
+    const id = String(projectId ?? '').trim();
+    const qp = id ? `?projectId=${encodeURIComponent(id)}` : '';
+    const url = this.withNoCache(`${this.baseUrl}/users${qp}`);
     const rows = await firstValueFrom(this.http.get<Array<{ id?: unknown; label?: unknown; name?: unknown }>>(url));
     return (Array.isArray(rows) ? rows : [])
       .map((r) => ({

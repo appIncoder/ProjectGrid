@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, OnChanges } from '@angular/core';
+import { Component, Input, NgZone, OnChanges } from '@angular/core';
 
 import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kanban-task-modal';
+import { ProjectAddTaskButton } from '../project-add-task-button/project-add-task-button';
 import { ProjectDataService } from '../../services/project-data.service';
 import type { ActivityStatus, PhaseId, ProjectDetail, Task, TaskComment } from '../../models';
 
@@ -17,14 +18,14 @@ interface ParentActivityLaneVm {
 @Component({
   selector: 'app-project-change-management',
   standalone: true,
-  imports: [CommonModule, ProjectKanbanTaskModal],
+  imports: [CommonModule, ProjectKanbanTaskModal, ProjectAddTaskButton],
   templateUrl: './project-change-management.html',
   styleUrls: ['./project-change-management.scss'],
 })
 export class ProjectChangeManagement implements OnChanges {
   @Input() project: ProjectDetail | null = null;
 
-  constructor(private projectData: ProjectDataService) {}
+  constructor(private projectData: ProjectDataService, private zone: NgZone) {}
 
   readonly statusColumns: Array<{ id: ActivityStatus; label: string }> = [
     { id: 'todo', label: 'A faire' },
@@ -54,6 +55,7 @@ export class ProjectChangeManagement implements OnChanges {
   editedTaskName = '';
   newCommentText = '';
   availableParentActivities: Array<{ id: string; label: string }> = [];
+  isCreateMode = false;
 
   ngOnChanges(): void {
     this.rebuild();
@@ -202,10 +204,29 @@ export class ProjectChangeManagement implements OnChanges {
     this.editedTaskName = String(task.label ?? '').trim();
     this.newCommentText = '';
     this.availableParentActivities = this.getParentActivitiesForPhase(lane.phase);
+    this.isCreateMode = false;
   }
 
-  closeTaskModal(): void {
-    if (this.isSaving) return;
+  openCreateTaskModal(): void {
+    if (!this.project) return;
+    this.ensureProjectTasksMatrix();
+    const phase = this.currentPhaseId ?? this.project.phases?.[0] ?? null;
+    if (!phase) return;
+    const parents = this.getParentActivitiesForPhase(phase);
+
+    this.modalOpen = true;
+    this.modalError = null;
+    this.editedTask = null;
+    this.editedTaskPhase = phase;
+    this.availableParentActivities = parents;
+    this.editedTaskParentId = parents[0]?.id ?? '';
+    this.editedTaskName = '';
+    this.newCommentText = '';
+    this.isCreateMode = true;
+  }
+
+  closeTaskModal(force = false): void {
+    if (this.isSaving && !force) return;
     this.modalOpen = false;
     this.modalError = null;
     this.editedTask = null;
@@ -214,6 +235,7 @@ export class ProjectChangeManagement implements OnChanges {
     this.editedTaskName = '';
     this.newCommentText = '';
     this.availableParentActivities = [];
+    this.isCreateMode = false;
   }
 
   getEditedTaskComments(): TaskComment[] {
@@ -221,7 +243,7 @@ export class ProjectChangeManagement implements OnChanges {
   }
 
   async saveTaskModal(): Promise<void> {
-    if (!this.project || !this.editedTask || !this.editedTaskPhase) return;
+    if (!this.project || !this.editedTaskPhase) return;
     const nextName = this.editedTaskName.trim();
     const nextParentId = this.editedTaskParentId.trim();
     if (!nextName) {
@@ -233,16 +255,40 @@ export class ProjectChangeManagement implements OnChanges {
       return;
     }
 
-    const taskId = String(this.editedTask.id ?? '').trim();
     const phase = this.editedTaskPhase;
-    const previousParentId = this.findParentActivityIdForTask(phase, taskId);
-    if (!previousParentId) {
-      this.modalError = 'Impossible de retrouver la tache a modifier.';
-      return;
-    }
 
     this.modalError = null;
+    this.modalOpen = false;
     await this.mutateAndPersist(async () => {
+      if (this.isCreateMode) {
+        const matrix = this.getProjectTasksMatrix();
+        if (!matrix.changement[phase][nextParentId]) matrix.changement[phase][nextParentId] = [];
+        const taskId = this.generateTaskId('changement', phase, nextParentId, nextName);
+        const created: Task = {
+          id: taskId,
+          label: nextName,
+          status: 'todo',
+          parentActivityId: nextParentId,
+          comments: [],
+        };
+        const comment = this.newCommentText.trim();
+        if (comment) {
+          created.comments!.push({
+            text: comment,
+            authorName: 'Utilisateur',
+            createdAt: new Date().toISOString(),
+          });
+        }
+        matrix.changement[phase][nextParentId].push(created);
+        this.rebuild();
+        return;
+      }
+
+      const taskId = String(this.editedTask?.id ?? '').trim();
+      const previousParentId = this.findParentActivityIdForTask(phase, taskId);
+      if (!previousParentId) {
+        throw new Error('Impossible de retrouver la tache a modifier.');
+      }
       const ref = this.findTaskRef(phase, previousParentId, taskId);
       if (!ref) return;
       ref.task.label = nextName;
@@ -392,15 +438,19 @@ export class ProjectChangeManagement implements OnChanges {
           ? structuredClone(this.project)
           : JSON.parse(JSON.stringify(this.project));
       await this.projectData.runProjectProcedure(snapshot.id, 'save_project', { project: snapshot });
-      if (closeModalOnSuccess) this.closeTaskModal();
+      if (closeModalOnSuccess) this.zone.run(() => this.closeTaskModal(true));
     } catch (e: any) {
-      this.project = backup;
-      this.rebuild();
       const msg = String(e?.error?.detail ?? e?.message ?? "Erreur d'enregistrement");
-      this.saveError = msg;
-      this.modalError = msg;
+      this.zone.run(() => {
+        this.project = backup;
+        this.rebuild();
+        this.saveError = msg;
+        this.modalError = msg;
+      });
     } finally {
-      this.isSaving = false;
+      this.zone.run(() => {
+        this.isSaving = false;
+      });
     }
   }
 
@@ -470,6 +520,16 @@ export class ProjectChangeManagement implements OnChanges {
     return parents
       .map((p) => ({ id: String(p?.id ?? '').trim(), label: String(p?.label ?? p?.id ?? '').trim() }))
       .filter((p) => !!p.id);
+  }
+
+  private generateTaskId(activityType: string, phase: PhaseId, parentId: string, label: string): string {
+    const base = String(label || parentId || 'task')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24) || 'task';
+    const stamp = Date.now().toString(36);
+    return `${activityType}-${phase}-${parentId}-${base}-${stamp}`;
   }
 
   private normalizeStatus(raw: unknown): ActivityStatus {

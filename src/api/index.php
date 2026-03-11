@@ -1650,6 +1650,87 @@ function insert_project_change(PDO $pdo, string $projectId, string $changeType, 
   ]);
 }
 
+function ensure_admin_manages_project(PDO $pdo, string $projectId): void {
+  $schema = resolve_access_schema($pdo);
+  if (empty($schema['ready'])) return;
+
+  $usersColumns = table_columns($pdo, 'users');
+  $usersPkCol = find_first_existing_column($usersColumns, ['id', 'user_id', 'uuid', 'user_uuid']);
+  $usersUsernameCol = find_first_existing_column($usersColumns, ['username', 'user', 'login', 'email']);
+  if ($usersPkCol === null || $usersUsernameCol === null) return;
+
+  $adminStmt = $pdo->prepare("
+    SELECT `{$usersPkCol}` AS id
+    FROM `users`
+    WHERE LOWER(TRIM(`{$usersUsernameCol}`)) = 'admin'
+    LIMIT 1
+  ");
+  $adminStmt->execute();
+  $adminUserId = trim((string)($adminStmt->fetchColumn() ?? ''));
+  if ($adminUserId === '') return;
+
+  $rolePkCol = $schema['rolePkCol'];
+  $roleNameCol = $schema['roleNameCol'];
+  $rolesStmt = $pdo->prepare("
+    SELECT `{$rolePkCol}` AS id, LOWER(TRIM(`{$roleNameCol}`)) AS role_name
+    FROM `roles`
+    WHERE LOWER(TRIM(`{$roleNameCol}`)) IN ('projectadmin', 'sysadmin')
+  ");
+  $rolesStmt->execute();
+
+  $roleIds = [];
+  foreach ($rolesStmt->fetchAll() as $row) {
+    $roleName = trim((string)($row['role_name'] ?? ''));
+    $roleId = trim((string)($row['id'] ?? ''));
+    if ($roleName !== '' && $roleId !== '') {
+      $roleIds[$roleName] = $roleId;
+    }
+  }
+  if (!$roleIds) return;
+
+  $userCol = $schema['userCol'];
+  $projectCol = $schema['projectCol'];
+  $roleRefCol = $schema['roleRefCol'];
+  $urpStatusCol = $schema['urpStatusCol'];
+
+  foreach ($roleIds as $roleId) {
+    if ($urpStatusCol !== null) {
+      $assignStmt = $pdo->prepare("
+        INSERT INTO `users_roles_projects` (`{$userCol}`, `{$roleRefCol}`, `{$projectCol}`, `{$urpStatusCol}`)
+        SELECT :user_id, :role_id, :project_id, 'active'
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM `users_roles_projects`
+          WHERE `{$userCol}` = :user_id_chk
+            AND `{$roleRefCol}` = :role_id_chk
+            AND `{$projectCol}` = :project_id_chk
+        )
+      ");
+    } else {
+      $assignStmt = $pdo->prepare("
+        INSERT INTO `users_roles_projects` (`{$userCol}`, `{$roleRefCol}`, `{$projectCol}`)
+        SELECT :user_id, :role_id, :project_id
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM `users_roles_projects`
+          WHERE `{$userCol}` = :user_id_chk
+            AND `{$roleRefCol}` = :role_id_chk
+            AND `{$projectCol}` = :project_id_chk
+        )
+      ");
+    }
+
+    $assignStmt->execute([
+      ':user_id' => $adminUserId,
+      ':role_id' => $roleId,
+      ':project_id' => $projectId,
+      ':user_id_chk' => $adminUserId,
+      ':role_id_chk' => $roleId,
+      ':project_id_chk' => $projectId,
+    ]);
+  }
+}
+
 function save_project_detail(PDO $pdo, string $projectId, array $project, string $source = 'api'): void {
   // IMPORTANT: ne pas exécuter de DDL pendant une transaction MariaDB,
   // sinon commit implicite et "There is no active transaction".
@@ -1658,8 +1739,10 @@ function save_project_detail(PDO $pdo, string $projectId, array $project, string
   ensure_project_tasks_table($pdo);
   ensure_project_task_comments_table($pdo);
   ensure_project_health_infra($pdo);
+  ensure_access_project_fk($pdo);
 
   $project['id'] = $projectId;
+  $project = apply_project_type_defaults($pdo, $project);
   $project = normalize_project_payload($project);
   $activeHealthShortName = detect_active_health_short_name($project);
 
@@ -1692,6 +1775,7 @@ function save_project_detail(PDO $pdo, string $projectId, array $project, string
       ':payload' => $payloadStr,
     ]);
 
+    ensure_admin_manages_project($pdo, $projectId);
     persist_project_tables($pdo, $project, $projectId);
     ensure_project_health_for_project($pdo, $projectId);
     if ($activeHealthShortName !== null) {
@@ -1930,11 +2014,164 @@ function fetch_project_type_defaults(PDO $pdo, string $projectTypeId): ?array {
   ];
 }
 
+function matrix_has_rows(mixed $matrix): bool {
+  if (!is_array($matrix)) return false;
+  foreach ($matrix as $phaseMap) {
+    if (!is_array($phaseMap)) continue;
+    foreach ($phaseMap as $rows) {
+      if (is_array($rows) && count($rows) > 0) return true;
+    }
+  }
+  return false;
+}
+
+function apply_project_type_defaults(PDO $pdo, array $project): array {
+  $projectTypeId = normalize_id((string)($project['projectTypeId'] ?? ''));
+  if ($projectTypeId === '') return $project;
+
+  $defaults = fetch_project_type_defaults($pdo, $projectTypeId);
+  if ($defaults === null) return $project;
+
+  $defaultPhases = [];
+  foreach (($defaults['phases'] ?? []) as $phase) {
+    if (!is_array($phase)) continue;
+    $phaseId = trim((string)($phase['id'] ?? ''));
+    if ($phaseId === '') continue;
+    $defaultPhases[] = $phaseId;
+  }
+
+  if (empty($project['phases']) && $defaultPhases) {
+    $project['phases'] = $defaultPhases;
+  }
+
+  $phaseDefinitions = (isset($project['phaseDefinitions']) && is_array($project['phaseDefinitions']))
+    ? $project['phaseDefinitions']
+    : [];
+  foreach (($defaults['phases'] ?? []) as $phase) {
+    if (!is_array($phase)) continue;
+    $phaseId = trim((string)($phase['id'] ?? ''));
+    if ($phaseId === '') continue;
+    if (!isset($phaseDefinitions[$phaseId]) || !is_array($phaseDefinitions[$phaseId])) {
+      $phaseDefinitions[$phaseId] = ['id' => $phaseId];
+    }
+    if (trim((string)($phaseDefinitions[$phaseId]['label'] ?? '')) === '') {
+      $phaseDefinitions[$phaseId]['label'] = trim((string)($phase['label'] ?? $phaseId));
+    }
+  }
+  if ($phaseDefinitions) {
+    $project['phaseDefinitions'] = $phaseDefinitions;
+  }
+
+  $activities = (isset($project['activities']) && is_array($project['activities']))
+    ? $project['activities']
+    : [];
+  foreach (($defaults['activities'] ?? []) as $activity) {
+    if (!is_array($activity)) continue;
+    $activityId = trim((string)($activity['id'] ?? ''));
+    if ($activityId === '') continue;
+    $existing = (isset($activities[$activityId]) && is_array($activities[$activityId])) ? $activities[$activityId] : [];
+    $activities[$activityId] = [
+      'id' => $activityId,
+      'label' => trim((string)($existing['label'] ?? $activity['label'] ?? $activityId)),
+      'owner' => trim((string)($existing['owner'] ?? $project['owner'] ?? $project['projectManager'] ?? '—')),
+      'sequence' => isset($existing['sequence']) && is_numeric($existing['sequence'])
+        ? (int)$existing['sequence']
+        : (isset($activity['sequence']) && is_numeric($activity['sequence']) ? (int)$activity['sequence'] : null),
+    ];
+  }
+  if ($activities) {
+    $project['activities'] = $activities;
+  }
+
+  $phases = (isset($project['phases']) && is_array($project['phases'])) ? $project['phases'] : $defaultPhases;
+  $activityMatrix = (isset($project['activityMatrix']) && is_array($project['activityMatrix'])) ? $project['activityMatrix'] : [];
+  $taskMatrix = (isset($project['taskMatrix']) && is_array($project['taskMatrix'])) ? $project['taskMatrix'] : [];
+
+  foreach ($activities as $activityId => $_activity) {
+    if (!isset($activityMatrix[$activityId]) || !is_array($activityMatrix[$activityId])) $activityMatrix[$activityId] = [];
+    if (!isset($taskMatrix[$activityId]) || !is_array($taskMatrix[$activityId])) $taskMatrix[$activityId] = [];
+    foreach ($phases as $phaseId) {
+      if (!isset($activityMatrix[$activityId][$phaseId]) || !is_array($activityMatrix[$activityId][$phaseId])) {
+        $activityMatrix[$activityId][$phaseId] = [];
+      }
+      if (!isset($taskMatrix[$activityId][$phaseId]) || !is_array($taskMatrix[$activityId][$phaseId])) {
+        $taskMatrix[$activityId][$phaseId] = [];
+      }
+    }
+  }
+
+  $hasActivityRows = matrix_has_rows($activityMatrix);
+  $hasTaskRows = matrix_has_rows($taskMatrix);
+  if (!$hasActivityRows && !$hasTaskRows) {
+    $defaultsRows = [];
+    if (isset($defaults['activitiesDefault']) && is_array($defaults['activitiesDefault']) && count($defaults['activitiesDefault']) > 0) {
+      $defaultsRows = $defaults['activitiesDefault'];
+    } elseif (isset($defaults['tasks']) && is_array($defaults['tasks'])) {
+      $defaultsRows = $defaults['tasks'];
+    }
+
+    $seen = [];
+    foreach ($defaultsRows as $row) {
+      if (!is_array($row)) continue;
+      $activityId = trim((string)($row['activityId'] ?? ''));
+      $phaseId = trim((string)($row['phaseId'] ?? ''));
+      $taskId = trim((string)($row['id'] ?? ''));
+      if ($activityId === '' || $phaseId === '' || $taskId === '') continue;
+      if (!isset($activityMatrix[$activityId][$phaseId]) || !isset($taskMatrix[$activityId][$phaseId])) continue;
+      $key = $activityId . '|' . $phaseId . '|' . $taskId;
+      if (isset($seen[$key])) continue;
+      $seen[$key] = true;
+      $task = [
+        'id' => $taskId,
+        'label' => trim((string)($row['label'] ?? $taskId)),
+        'status' => 'todo',
+      ];
+      $activityMatrix[$activityId][$phaseId][] = $task;
+      $taskMatrix[$activityId][$phaseId][] = $task;
+    }
+  }
+
+  $project['activityMatrix'] = $activityMatrix;
+  $project['taskMatrix'] = $taskMatrix;
+
+  return $project;
+}
+
 function find_first_existing_column(array $columns, array $candidates): ?string {
   foreach ($candidates as $c) {
     if (in_array($c, $columns, true)) return $c;
   }
   return null;
+}
+
+function is_admin_user(PDO $pdo, string $userId): bool {
+  $uid = trim($userId);
+  if ($uid === '') return false;
+  if (strtolower($uid) === 'admin') return true;
+  if (!table_exists($pdo, 'users')) return false;
+
+  $userCols = table_columns($pdo, 'users');
+  $idCol = find_first_existing_column($userCols, ['id', 'user_id', 'uuid', 'user_uuid']);
+  if ($idCol === null) return false;
+
+  $loginCols = array_values(array_filter(
+    ['username', 'user', 'login', 'email'],
+    static fn(string $c): bool => in_array($c, $userCols, true)
+  ));
+  if (!$loginCols) return false;
+
+  $selectExpr = implode(', ', array_map(static fn(string $c): string => "`{$c}`", $loginCols));
+  $stmt = $pdo->prepare("SELECT {$selectExpr} FROM `users` WHERE `{$idCol}` = :uid LIMIT 1");
+  $stmt->execute([':uid' => $uid]);
+  $row = $stmt->fetch();
+  if (!is_array($row)) return false;
+
+  foreach ($loginCols as $col) {
+    $value = strtolower(trim((string)($row[$col] ?? '')));
+    if ($value === 'admin') return true;
+  }
+
+  return false;
 }
 
 function verify_login(PDO $pdo, string $username, string $password, ?string &$authError = null): ?array {
@@ -2023,6 +2260,338 @@ function verify_login(PDO $pdo, string $username, string $password, ?string &$au
   ];
 }
 
+function request_user_id_from_headers(): string {
+  $candidates = [
+    $_SERVER['HTTP_X_USER_ID'] ?? null,
+    $_SERVER['HTTP_X_USERID'] ?? null,
+    $_SERVER['REDIRECT_HTTP_X_USER_ID'] ?? null,
+  ];
+
+  foreach ($candidates as $value) {
+    $id = normalize_id($value !== null ? (string)$value : null);
+    if ($id !== '') return $id;
+  }
+
+  $auth = trim((string)($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
+  if ($auth !== '' && preg_match('/^Bearer\s+user:(.+)$/i', $auth, $m)) {
+    return normalize_id($m[1] ?? '');
+  }
+
+  return '';
+}
+
+function resolve_access_schema(PDO $pdo): array {
+  static $schema = null;
+  if (is_array($schema)) return $schema;
+
+  if (!table_exists($pdo, 'users_roles_projects') || !table_exists($pdo, 'roles')) {
+    $schema = ['ready' => false];
+    return $schema;
+  }
+
+  $urpCols = table_columns($pdo, 'users_roles_projects');
+  $roleCols = table_columns($pdo, 'roles');
+
+  $userCol = find_first_existing_column($urpCols, ['user_id', 'user', 'user_uuid']);
+  $projectCol = find_first_existing_column($urpCols, ['project_id', 'project', 'project_uuid']);
+  $roleRefCol = find_first_existing_column($urpCols, ['role_id', 'role', 'role_uuid']);
+  $rolePkCol = find_first_existing_column($roleCols, ['id', 'role_id', 'uuid']);
+  $roleNameCol = find_first_existing_column($roleCols, ['name', 'role_name', 'label']);
+  $urpStatusCol = find_first_existing_column($urpCols, ['status']);
+  $roleStatusCol = find_first_existing_column($roleCols, ['status']);
+
+  $schema = [
+    'ready' => $userCol !== null && $projectCol !== null && $roleRefCol !== null && $rolePkCol !== null && $roleNameCol !== null,
+    'userCol' => $userCol,
+    'projectCol' => $projectCol,
+    'roleRefCol' => $roleRefCol,
+    'rolePkCol' => $rolePkCol,
+    'roleNameCol' => $roleNameCol,
+    'urpStatusCol' => $urpStatusCol,
+    'roleStatusCol' => $roleStatusCol,
+  ];
+
+  return $schema;
+}
+
+function ensure_access_project_fk(PDO $pdo): void {
+  static $ready = false;
+  if ($ready) return;
+  if (!table_exists($pdo, 'users_roles_projects') || !table_exists($pdo, 'projects')) {
+    $ready = true;
+    return;
+  }
+
+  $fkProjectExistsStmt = $pdo->query("
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'users_roles_projects'
+      AND CONSTRAINT_NAME = 'fk_urp_project'
+  ");
+  $fkProjectExists = (int)$fkProjectExistsStmt->fetchColumn();
+
+  if ($fkProjectExists > 0) {
+    $fkProjectRefStmt = $pdo->query("
+      SELECT kcu.REFERENCED_TABLE_NAME
+      FROM information_schema.KEY_COLUMN_USAGE kcu
+      WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+        AND kcu.TABLE_NAME = 'users_roles_projects'
+        AND kcu.CONSTRAINT_NAME = 'fk_urp_project'
+      LIMIT 1
+    ");
+    $fkProjectRefTable = trim((string)($fkProjectRefStmt->fetchColumn() ?? ''));
+    if ($fkProjectRefTable !== '' && $fkProjectRefTable !== 'projects') {
+      $pdo->exec("ALTER TABLE `users_roles_projects` DROP FOREIGN KEY `fk_urp_project`");
+      $fkProjectExists = 0;
+    }
+  }
+
+  if ($fkProjectExists === 0) {
+    $fkProjectColMatchStmt = $pdo->query("
+      SELECT COUNT(*)
+      FROM information_schema.COLUMNS c1
+      JOIN information_schema.COLUMNS c2
+        ON c2.TABLE_SCHEMA = c1.TABLE_SCHEMA
+      WHERE c1.TABLE_SCHEMA = DATABASE()
+        AND c1.TABLE_NAME = 'users_roles_projects'
+        AND c1.COLUMN_NAME = 'project_id'
+        AND c2.TABLE_NAME = 'projects'
+        AND c2.COLUMN_NAME = 'id'
+        AND c1.COLUMN_TYPE = c2.COLUMN_TYPE
+    ");
+    $fkProjectColMatch = (int)$fkProjectColMatchStmt->fetchColumn();
+    if ($fkProjectColMatch > 0) {
+      $pdo->exec("
+        ALTER TABLE `users_roles_projects`
+        ADD CONSTRAINT `fk_urp_project`
+        FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
+      ");
+    }
+  }
+
+  $ready = true;
+}
+
+function build_user_access_context(PDO $pdo, string $userId): array {
+  $ctx = [
+    'userId' => $userId,
+    'isSysAdmin' => false,
+    'globalRoles' => [],
+    'rolesByProject' => [],
+  ];
+
+  if ($userId === '') return $ctx;
+  if (is_admin_user($pdo, $userId)) {
+    $ctx['isSysAdmin'] = true;
+    $ctx['globalRoles']['sysadmin'] = true;
+  }
+
+  $schema = resolve_access_schema($pdo);
+  if (empty($schema['ready'])) return $ctx;
+
+  $userCol = $schema['userCol'];
+  $projectCol = $schema['projectCol'];
+  $roleRefCol = $schema['roleRefCol'];
+  $rolePkCol = $schema['rolePkCol'];
+  $roleNameCol = $schema['roleNameCol'];
+  $urpStatusCol = $schema['urpStatusCol'];
+  $roleStatusCol = $schema['roleStatusCol'];
+
+  $sql = "
+    SELECT
+      urp.`{$projectCol}` AS project_id,
+      r.`{$roleNameCol}` AS role_name,
+      " . ($urpStatusCol !== null ? "urp.`{$urpStatusCol}`" : "NULL") . " AS urp_status,
+      " . ($roleStatusCol !== null ? "r.`{$roleStatusCol}`" : "NULL") . " AS role_status
+    FROM `users_roles_projects` urp
+    JOIN `roles` r ON r.`{$rolePkCol}` = urp.`{$roleRefCol}`
+    WHERE urp.`{$userCol}` = :uid
+  ";
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute([':uid' => $userId]);
+
+  foreach ($stmt->fetchAll() as $row) {
+    $urpStatus = strtolower(trim((string)($row['urp_status'] ?? '')));
+    if ($urpStatus !== '' && !in_array($urpStatus, ['active', '1', 'true'], true)) continue;
+    $roleStatus = strtolower(trim((string)($row['role_status'] ?? '')));
+    if ($roleStatus !== '' && !in_array($roleStatus, ['active', '1', 'true'], true)) continue;
+
+    $roleName = strtolower(trim((string)($row['role_name'] ?? '')));
+    if ($roleName === '') continue;
+
+    if ($roleName === 'sysadmin') {
+      $ctx['isSysAdmin'] = true;
+    }
+
+    $projectId = normalize_id((string)($row['project_id'] ?? ''));
+    if ($projectId === '') {
+      $ctx['globalRoles'][$roleName] = true;
+      continue;
+    }
+
+    if (!isset($ctx['rolesByProject'][$projectId])) {
+      $ctx['rolesByProject'][$projectId] = [];
+    }
+    $ctx['rolesByProject'][$projectId][$roleName] = true;
+  }
+
+  return $ctx;
+}
+
+function require_access_context(PDO $pdo): array {
+  $userId = request_user_id_from_headers();
+  if ($userId === '') {
+    send_json(['error' => 'Authentication required'], 401);
+  }
+
+  return build_user_access_context($pdo, $userId);
+}
+
+function context_has_project_membership(array $ctx, string $projectId): bool {
+  return isset($ctx['rolesByProject'][$projectId]) && is_array($ctx['rolesByProject'][$projectId]) && count($ctx['rolesByProject'][$projectId]) > 0;
+}
+
+function context_has_project_role(array $ctx, string $projectId, array $roles): bool {
+  if (!empty($ctx['isSysAdmin'])) return true;
+
+  foreach ($roles as $role) {
+    $r = strtolower(trim((string)$role));
+    if ($r === '') continue;
+    if (!empty($ctx['globalRoles'][$r])) return true;
+    if (!empty($ctx['rolesByProject'][$projectId][$r])) return true;
+  }
+
+  return false;
+}
+
+function context_has_any_role(array $ctx, array $roles): bool {
+  if (!empty($ctx['isSysAdmin'])) return true;
+
+  foreach ($roles as $role) {
+    $r = strtolower(trim((string)$role));
+    if ($r === '') continue;
+    if (!empty($ctx['globalRoles'][$r])) return true;
+    foreach (($ctx['rolesByProject'] ?? []) as $projectRoles) {
+      if (!empty($projectRoles[$r])) return true;
+    }
+  }
+
+  return false;
+}
+
+function require_project_access(array $ctx, string $projectId, array $roles, bool $allowAnyMember = false): void {
+  if (context_has_project_role($ctx, $projectId, $roles)) return;
+  if ($allowAnyMember && context_has_project_membership($ctx, $projectId)) return;
+
+  send_json(['error' => 'Forbidden', 'projectId' => $projectId], 403);
+}
+
+function fetch_users_for_project(PDO $pdo, string $projectId): array {
+  $schema = resolve_access_schema($pdo);
+  if (empty($schema['ready'])) return [];
+
+  $projectCol = $schema['projectCol'];
+  $userCol = $schema['userCol'];
+  $urpStatusCol = $schema['urpStatusCol'];
+
+  $sql = "
+    SELECT DISTINCT urp.`{$userCol}` AS user_id, " . ($urpStatusCol !== null ? "urp.`{$urpStatusCol}`" : "NULL") . " AS urp_status
+    FROM `users_roles_projects` urp
+    WHERE urp.`{$projectCol}` = :projectId
+  ";
+  $stmt = $pdo->prepare($sql);
+  $stmt->execute([':projectId' => $projectId]);
+
+  $allowed = [];
+  foreach ($stmt->fetchAll() as $row) {
+    $urpStatus = strtolower(trim((string)($row['urp_status'] ?? '')));
+    if ($urpStatus !== '' && !in_array($urpStatus, ['active', '1', 'true'], true)) continue;
+    $id = normalize_id((string)($row['user_id'] ?? ''));
+    if ($id !== '') $allowed[$id] = true;
+  }
+
+  if (count($allowed) === 0) return [];
+  $users = fetch_users($pdo);
+
+  return array_values(array_filter($users, static function (array $u) use ($allowed): bool {
+    return isset($allowed[normalize_id((string)($u['id'] ?? ''))]);
+  }));
+}
+
+function format_access_for_response(array $ctx): array {
+  $projectRoles = [];
+  foreach (($ctx['rolesByProject'] ?? []) as $projectId => $rolesMap) {
+    $projectRoles[$projectId] = array_values(array_keys($rolesMap));
+  }
+
+  return [
+    'isSysAdmin' => !empty($ctx['isSysAdmin']),
+    'globalRoles' => array_values(array_keys($ctx['globalRoles'] ?? [])),
+    'projectRoles' => $projectRoles,
+  ];
+}
+
+function ensure_user_project_role(PDO $pdo, string $userId, string $projectId, string $roleName): void {
+  $userId = normalize_id($userId);
+  $projectId = normalize_id($projectId);
+  $roleName = strtolower(trim($roleName));
+  if ($userId === '' || $projectId === '' || $roleName === '') return;
+
+  $schema = resolve_access_schema($pdo);
+  if (empty($schema['ready'])) return;
+
+  $rolePkCol = $schema['rolePkCol'];
+  $roleNameCol = $schema['roleNameCol'];
+  $roleStmt = $pdo->prepare("
+    SELECT `{$rolePkCol}` AS id
+    FROM `roles`
+    WHERE LOWER(TRIM(`{$roleNameCol}`)) = :role_name
+    LIMIT 1
+  ");
+  $roleStmt->execute([':role_name' => $roleName]);
+  $roleId = trim((string)($roleStmt->fetchColumn() ?? ''));
+  if ($roleId === '') return;
+
+  $userCol = $schema['userCol'];
+  $projectCol = $schema['projectCol'];
+  $roleRefCol = $schema['roleRefCol'];
+  $urpStatusCol = $schema['urpStatusCol'];
+
+  if ($urpStatusCol !== null) {
+    $insertStmt = $pdo->prepare("
+      INSERT INTO `users_roles_projects` (`{$userCol}`, `{$roleRefCol}`, `{$projectCol}`, `{$urpStatusCol}`)
+      SELECT :user_id, :role_id, :project_id, 'active'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM `users_roles_projects`
+        WHERE `{$userCol}` = :user_id_chk
+          AND `{$roleRefCol}` = :role_id_chk
+          AND `{$projectCol}` = :project_id_chk
+      )
+    ");
+  } else {
+    $insertStmt = $pdo->prepare("
+      INSERT INTO `users_roles_projects` (`{$userCol}`, `{$roleRefCol}`, `{$projectCol}`)
+      SELECT :user_id, :role_id, :project_id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM `users_roles_projects`
+        WHERE `{$userCol}` = :user_id_chk
+          AND `{$roleRefCol}` = :role_id_chk
+          AND `{$projectCol}` = :project_id_chk
+      )
+    ");
+  }
+
+  $insertStmt->execute([
+    ':user_id' => $userId,
+    ':role_id' => $roleId,
+    ':project_id' => $projectId,
+    ':user_id_chk' => $userId,
+    ':role_id_chk' => $roleId,
+    ':project_id_chk' => $projectId,
+  ]);
+}
+
 try {
   // -----------------------------
   // GET /health
@@ -2045,7 +2614,20 @@ try {
   // -----------------------------
   if ($method === 'GET' && $path === '/users') {
     $pdo = db();
-    $rows = fetch_users($pdo);
+    $access = require_access_context($pdo);
+    $projectId = normalize_id((string)($_GET['projectId'] ?? ''));
+
+    if (!empty($access['isSysAdmin'])) {
+      $rows = fetch_users($pdo);
+      send_json($rows);
+    }
+
+    if ($projectId === '') {
+      send_json(['error' => 'projectId is required for non sysAdmin users'], 400);
+    }
+
+    require_project_access($access, $projectId, ['projectAdmin']);
+    $rows = fetch_users_for_project($pdo, $projectId);
     send_json($rows);
   }
 
@@ -2113,7 +2695,12 @@ try {
       send_json(['error' => 'Invalid credentials'], 401);
     }
 
-    send_json(['ok' => true, 'user' => $user]);
+    $access = build_user_access_context($pdo, normalize_id((string)($user['id'] ?? '')));
+    send_json([
+      'ok' => true,
+      'user' => $user,
+      'access' => format_access_for_response($access),
+    ]);
   }
 
   // -----------------------------
@@ -2142,6 +2729,8 @@ try {
     }
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $projectId, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember']);
     try {
       $projectHealth = set_project_health_active($pdo, $projectId, $healthShortName, $description);
       send_json([
@@ -2183,6 +2772,8 @@ try {
 
     $body = read_json_body();
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $projectId, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember']);
     try {
       $risk = create_project_risk($pdo, $projectId, $body);
       send_json([
@@ -2203,6 +2794,8 @@ try {
 
     $body = read_json_body();
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $projectId, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember']);
     try {
       $risk = update_project_risk($pdo, $projectId, $riskId, $body);
       send_json([
@@ -2242,6 +2835,8 @@ try {
     $payload = (isset($body['payload']) && is_array($body['payload'])) ? $body['payload'] : [];
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $projectId, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember']);
     try {
       $result = run_project_procedure($pdo, $projectId, $procedure, $payload);
       send_json($result);
@@ -2268,6 +2863,8 @@ try {
     if ($projectId === '') send_json(['error' => 'Missing project id in route'], 400);
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $projectId, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin']);
     try {
       $rebuilt = rebuild_project_payload($pdo, $projectId);
       send_json([
@@ -2286,8 +2883,16 @@ try {
   // -----------------------------
   if ($method === 'GET' && $path === '/projects') {
     $pdo = db();
+    $access = require_access_context($pdo);
     $stmt = $pdo->query('SELECT id, name FROM projects ORDER BY updated_at DESC, name ASC');
     $rows = $stmt->fetchAll();
+    if (empty($access['isSysAdmin'])) {
+      $allowed = $access['rolesByProject'] ?? [];
+      $rows = array_values(array_filter($rows, static function (array $row) use ($allowed): bool {
+        $projectId = normalize_id((string)($row['id'] ?? ''));
+        return $projectId !== '' && isset($allowed[$projectId]);
+      }));
+    }
     send_json($rows);
   }
 
@@ -2299,6 +2904,8 @@ try {
     if ($id === '') send_json(['error' => 'Missing id'], 400);
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $id, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember', 'projectStakeholder'], true);
     $rows = fetch_project_risks($pdo, $id);
     send_json($rows);
   }
@@ -2311,6 +2918,8 @@ try {
     if ($id === '') send_json(['error' => 'Missing id'], 400);
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $id, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember', 'projectStakeholder'], true);
     $detail = fetch_project_from_tables($pdo, $id);
     if ($detail === null) {
       send_json(['error' => 'Project not found', 'requestedId' => $id], 404);
@@ -2327,6 +2936,8 @@ try {
     if ($id === '') send_json(['error' => 'Missing id'], 400);
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    require_project_access($access, $id, ['projectAdmin']);
     $deleted = delete_project_everywhere($pdo, $id);
     if (!$deleted) {
       send_json(['error' => 'Project not found', 'requestedId' => $id], 404);
@@ -2347,8 +2958,20 @@ try {
     }
 
     $pdo = db();
+    $access = require_access_context($pdo);
+    $existsStmt = $pdo->prepare('SELECT COUNT(*) FROM projects WHERE id = :id');
+    $existsStmt->execute([':id' => $id]);
+    $projectExists = (int)$existsStmt->fetchColumn() > 0;
+    if ($projectExists) {
+      require_project_access($access, $id, ['projectAdmin', 'businessAdmin', 'changeAdmin', 'technoAdmin', 'projectTeamMember']);
+    } elseif (!context_has_any_role($access, ['sysAdmin', 'projectAdmin'])) {
+      send_json(['error' => 'Forbidden'], 403);
+    }
     try {
       save_project_detail($pdo, $id, $body, 'route.projects');
+      if (!$projectExists) {
+        ensure_user_project_role($pdo, (string)($access['userId'] ?? ''), $id, 'projectAdmin');
+      }
     } catch (InvalidArgumentException $e) {
       send_json(['error' => $e->getMessage()], 400);
     }

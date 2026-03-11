@@ -634,6 +634,99 @@ CREATE INDEX IF NOT EXISTS `idx_project_activities_links_type` ON `project_activ
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_name` ON `project_type` (`name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_activities_type_short` ON `activities` (`id_project_type`, `short_name`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_phases_default_type_short` ON `project_type_phases_default` (`project_type_id`, `shortname`);
+
+-- Correction d'un ancien index unique mal posé sur project_type_activities_default.
+-- Certaines bases ont conservé `uidx_project_type_activities_default_type_short`
+-- sur cette table, ce qui bloque la régénération des defaults PMBOK.
+SET @ptad_fk_drop_sql := (
+  SELECT IFNULL(
+    CONCAT(
+      'ALTER TABLE `project_type_activities_default` ',
+      GROUP_CONCAT(CONCAT('DROP FOREIGN KEY `', tc.CONSTRAINT_NAME, '`') ORDER BY tc.CONSTRAINT_NAME SEPARATOR ', ')
+    ),
+    'SELECT 1'
+  )
+  FROM information_schema.TABLE_CONSTRAINTS tc
+  WHERE tc.CONSTRAINT_SCHEMA = DATABASE()
+    AND tc.TABLE_NAME = 'project_type_activities_default'
+    AND tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+);
+PREPARE stmt FROM @ptad_fk_drop_sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+DROP PROCEDURE IF EXISTS `drop_ptad_inbound_foreign_keys`;
+DELIMITER //
+CREATE PROCEDURE `drop_ptad_inbound_foreign_keys`()
+BEGIN
+  DECLARE done INT DEFAULT 0;
+  DECLARE ref_table_name VARCHAR(64);
+  DECLARE drop_sql LONGTEXT;
+  DECLARE ref_cursor CURSOR FOR
+    SELECT ref_tables.TABLE_NAME
+    FROM (
+      SELECT DISTINCT kcu.TABLE_NAME
+      FROM information_schema.KEY_COLUMN_USAGE kcu
+      JOIN information_schema.TABLE_CONSTRAINTS tc
+        ON tc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+       AND tc.TABLE_NAME = kcu.TABLE_NAME
+       AND tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+      WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+        AND kcu.REFERENCED_TABLE_NAME = 'project_type_activities_default'
+        AND tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+    ) ref_tables;
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+
+  OPEN ref_cursor;
+  read_loop: LOOP
+    FETCH ref_cursor INTO ref_table_name;
+    IF done = 1 THEN
+      LEAVE read_loop;
+    END IF;
+
+    SET drop_sql := (
+      SELECT CONCAT(
+        'ALTER TABLE `', ref_table_name, '` ',
+        GROUP_CONCAT(CONCAT('DROP FOREIGN KEY `', fk.CONSTRAINT_NAME, '`') ORDER BY fk.CONSTRAINT_NAME SEPARATOR ', ')
+      )
+      FROM (
+        SELECT DISTINCT kcu.CONSTRAINT_NAME
+        FROM information_schema.KEY_COLUMN_USAGE kcu
+        JOIN information_schema.TABLE_CONSTRAINTS tc
+          ON tc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA
+         AND tc.TABLE_NAME = kcu.TABLE_NAME
+         AND tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+        WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+          AND kcu.TABLE_NAME = ref_table_name
+          AND kcu.REFERENCED_TABLE_NAME = 'project_type_activities_default'
+          AND tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+      ) fk
+    );
+
+    IF drop_sql IS NOT NULL AND drop_sql <> '' THEN
+      SET @drop_sql := drop_sql;
+      PREPARE stmt FROM @drop_sql;
+      EXECUTE stmt;
+      DEALLOCATE PREPARE stmt;
+    END IF;
+  END LOOP;
+  CLOSE ref_cursor;
+END//
+DELIMITER ;
+CALL `drop_ptad_inbound_foreign_keys`();
+DROP PROCEDURE IF EXISTS `drop_ptad_inbound_foreign_keys`;
+
+SET @ptad_bad_idx_exists := (
+  SELECT COUNT(*)
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'project_type_activities_default'
+    AND INDEX_NAME = 'uidx_project_type_activities_default_type_short'
+);
+SET @sql := IF(@ptad_bad_idx_exists > 0,
+  'ALTER TABLE `project_type_activities_default` DROP INDEX `uidx_project_type_activities_default_type_short`',
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_short` ON `project_type_activities_type_default` (`project_type_id`, `shortname`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_type_activities_default_type_activity` ON `project_type_activities_default` (`project_type_id`, `activity_id`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uidx_project_health_default_short_name` ON `project_health_default` (`health_short_name`);
@@ -883,12 +976,16 @@ SET @users_pk_seed_col := IF(
 );
 
 SET @sql := IF(@roles_pk_seed_col IS NULL,
-  'INSERT IGNORE INTO `roles` (`name`, `status`) VALUES (''Administrateur'', ''active''), (''Chef de projet'', ''active''), (''Contributeur'', ''active'')',
+  'INSERT IGNORE INTO `roles` (`name`, `status`) VALUES (''sysAdmin'', ''active''), (''projectAdmin'', ''active''), (''businessAdmin'', ''active''), (''changeAdmin'', ''active''), (''technoAdmin'', ''active''), (''projectTeamMember'', ''active''), (''projectStakeholder'', ''active'')',
   CONCAT(
     'INSERT IGNORE INTO `roles` (`', @roles_pk_seed_col, '`, `name`, `status`) VALUES ',
-    '(''11111111-1111-1111-1111-111111111111'', ''Administrateur'', ''active''), ',
-    '(''22222222-2222-2222-2222-222222222222'', ''Chef de projet'', ''active''), ',
-    '(''33333333-3333-3333-3333-333333333333'', ''Contributeur'', ''active'')'
+    '(''11111111-1111-1111-1111-111111111111'', ''sysAdmin'', ''active''), ',
+    '(''22222222-2222-2222-2222-222222222222'', ''projectAdmin'', ''active''), ',
+    '(''33333333-3333-3333-3333-333333333333'', ''businessAdmin'', ''active''), ',
+    '(''44444444-4444-4444-4444-444444444444'', ''changeAdmin'', ''active''), ',
+    '(''55555555-5555-5555-5555-555555555555'', ''technoAdmin'', ''active''), ',
+    '(''66666666-6666-6666-6666-666666666666'', ''projectTeamMember'', ''active''), ',
+    '(''77777777-7777-7777-7777-777777777777'', ''projectStakeholder'', ''active'')'
   )
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -915,15 +1012,33 @@ SET @urp_pk_seed_col := IF(
   )
 );
 SET @sql := IF(@urp_pk_seed_col IS NULL,
-  'INSERT IGNORE INTO `users_roles_projects` (`user_id`, `role_id`, `project_id`, `status`) VALUES (''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'', ''22222222-2222-2222-2222-222222222222'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), (''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'', ''33333333-3333-3333-3333-333333333333'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), (''cccccccc-cccc-cccc-cccc-cccccccccccc'', ''33333333-3333-3333-3333-333333333333'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active'')',
+  'INSERT IGNORE INTO `users_roles_projects` (`user_id`, `role_id`, `project_id`, `status`) VALUES
+(''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'', ''22222222-2222-2222-2222-222222222222'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''),
+(''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'', ''55555555-5555-5555-5555-555555555555'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''),
+(''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'', ''44444444-4444-4444-4444-444444444444'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''),
+(''cccccccc-cccc-cccc-cccc-cccccccccccc'', ''33333333-3333-3333-3333-333333333333'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''),
+(''dddddddd-dddd-dddd-dddd-dddddddddddd'', ''66666666-6666-6666-6666-666666666666'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''),
+(''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'', ''77777777-7777-7777-7777-777777777777'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active'')',
   CONCAT(
     'INSERT IGNORE INTO `users_roles_projects` (`', @urp_pk_seed_col, '`, `user_id`, `role_id`, `project_id`, `status`) VALUES ',
     '(''90000000-0000-0000-0000-000000000001'', ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'', ''22222222-2222-2222-2222-222222222222'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), ',
-    '(''90000000-0000-0000-0000-000000000002'', ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'', ''33333333-3333-3333-3333-333333333333'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), ',
-    '(''90000000-0000-0000-0000-000000000003'', ''cccccccc-cccc-cccc-cccc-cccccccccccc'', ''33333333-3333-3333-3333-333333333333'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active'')'
+    '(''90000000-0000-0000-0000-000000000002'', ''aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'', ''55555555-5555-5555-5555-555555555555'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), ',
+    '(''90000000-0000-0000-0000-000000000003'', ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'', ''44444444-4444-4444-4444-444444444444'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), ',
+    '(''90000000-0000-0000-0000-000000000004'', ''cccccccc-cccc-cccc-cccc-cccccccccccc'', ''33333333-3333-3333-3333-333333333333'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), ',
+    '(''90000000-0000-0000-0000-000000000005'', ''dddddddd-dddd-dddd-dddd-dddddddddddd'', ''66666666-6666-6666-6666-666666666666'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active''), ',
+    '(''90000000-0000-0000-0000-000000000006'', ''bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'', ''77777777-7777-7777-7777-777777777777'', ''6c4a8c7c-95ca-4b5d-8667-7e8242f73596'', ''active'')'
   )
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Affectations supplémentaires multi-projets (même user sur plusieurs projets, si plusieurs projets existent)
+INSERT IGNORE INTO `users_roles_projects` (`user_id`, `role_id`, `project_id`, `status`)
+SELECT 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', p.`id`, 'active'
+FROM `projects` p;
+
+INSERT IGNORE INTO `users_roles_projects` (`user_id`, `role_id`, `project_id`, `status`)
+SELECT 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '11111111-1111-1111-1111-111111111111', p.`id`, 'active'
+FROM `projects` p;
 
 INSERT IGNORE INTO `project_phases` (`project_id`, `shortname`, `longName`, `phase_order`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'Phase1', 'Phase 1', 1),
@@ -989,6 +1104,45 @@ ON DUPLICATE KEY UPDATE
   `label` = VALUES(`label`),
   `status` = VALUES(`status`);
 
+-- Taches filles supplementaires, liees automatiquement aux activites existantes.
+-- Objectif: illustrer qu'une activite peut regrouper 1 ou plusieurs taches, sur toute phase.
+INSERT IGNORE INTO `project_tasks`
+(`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`, `label`, `startdate`, `enddate`, `status`)
+SELECT
+  pa.`project_id`,
+  pa.`activity_type_id`,
+  pa.`phase_id`,
+  pa.`activity_id`,
+  CONCAT(pa.`activity_id`, '-child-1') AS `task_id`,
+  CONCAT(pa.`label`, ' - execution') AS `label`,
+  COALESCE(pa.`startdate`, CURRENT_TIMESTAMP) AS `startdate`,
+  COALESCE(pa.`enddate`, CURRENT_TIMESTAMP + INTERVAL 5 DAY) AS `enddate`,
+  CASE
+    WHEN LOWER(TRIM(COALESCE(pa.`status`, 'todo'))) IN ('done', 'notapplicable') THEN LOWER(TRIM(pa.`status`))
+    WHEN LOWER(TRIM(COALESCE(pa.`status`, 'todo'))) IN ('inprogress', 'onhold', 'notdone') THEN LOWER(TRIM(pa.`status`))
+    ELSE 'todo'
+  END AS `status`
+FROM `project_activities` pa;
+
+-- Deuxieme tache fille pour environ 1 activite sur 2 (1:N), quelle que soit la phase.
+INSERT IGNORE INTO `project_tasks`
+(`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `task_id`, `label`, `startdate`, `enddate`, `status`)
+SELECT
+  pa.`project_id`,
+  pa.`activity_type_id`,
+  pa.`phase_id`,
+  pa.`activity_id`,
+  CONCAT(pa.`activity_id`, '-child-2') AS `task_id`,
+  CONCAT(pa.`label`, ' - validation') AS `label`,
+  COALESCE(pa.`startdate`, CURRENT_TIMESTAMP) AS `startdate`,
+  COALESCE(pa.`enddate`, CURRENT_TIMESTAMP + INTERVAL 7 DAY) AS `enddate`,
+  CASE
+    WHEN LOWER(TRIM(COALESCE(pa.`status`, 'todo'))) = 'done' THEN 'inprogress'
+    ELSE 'todo'
+  END AS `status`
+FROM `project_activities` pa
+WHERE MOD(CRC32(CONCAT(pa.`project_id`, '|', pa.`activity_type_id`, '|', pa.`phase_id`, '|', pa.`activity_id`)), 2) = 0;
+
 INSERT INTO `project_activities_assignments`
 (`project_id`, `activity_type_id`, `phase_id`, `activity_id`, `reporter_id`, `accountant_id`, `responsible_id`) VALUES
 ('6c4a8c7c-95ca-4b5d-8667-7e8242f73596', 'projet', 'Phase1', 'p1-1', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
@@ -1011,7 +1165,10 @@ SET @seed_project_id := (
 );
 
 SET @activity_seq := 0;
-INSERT IGNORE INTO `project_type_activities_default`
+DELETE FROM `project_type_activities_default`
+WHERE `project_type_id` = @id_project_type_pmbok;
+
+INSERT INTO `project_type_activities_default`
 (`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`)
 SELECT
   @id_project_type_pmbok AS `project_type_id`,
@@ -1107,6 +1264,203 @@ INSERT IGNORE INTO `project_type_activities_default`
 -- PRINCE2 (su, ip, cs, mp, sb, dp, cp)
 INSERT IGNORE INTO `project_type_activities_default`
 (`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_prince2, 'su', 'changement', 101, 'prc-101', 'Évaluer les impacts organisationnels et les parties prenantes', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'changement', 102, 'prc-102', 'Intégrer la stratégie changement dans le PID', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'changement', 103, 'prc-103', 'Suivre l''adoption, escalader résistances et actions correctives', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'changement', 104, 'prc-104', 'Accompagner les équipes de livraison sur les impacts utilisateurs', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'changement', 105, 'prc-105', 'Actualiser le plan changement pour le stage suivant', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'changement', 106, 'prc-106', 'Présenter au Project Board les indicateurs d''adoption', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'changement', 107, 'prc-107', 'Consolider le plan de renforcement et transfert aux opérations', 'Active', NOW());
+
+-- Régénération explicite du catalogue des activités par défaut des types de projet.
+-- Utile si la table a été vidée ou si un import précédent n'a pas exécuté les seeds complets.
+DELETE FROM `project_type_activities_default`
+WHERE `project_type_id` IN (@id_project_type_pmbok, @id_project_type_agilepm, @id_project_type_prince2);
+
+SET @activity_seq := 0;
+INSERT INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`)
+SELECT
+  @id_project_type_pmbok AS `project_type_id`,
+  t.`phase_id` AS `phaseId`,
+  t.`activity_type_id` AS `activity_type_id`,
+  (@activity_seq := @activity_seq + 1) AS `sequence`,
+  t.`activity_id` AS `activity_id`,
+  t.`label` AS `longname`,
+  'Active' AS `status`,
+  NOW() AS `date_created`
+FROM `project_activities` t
+LEFT JOIN `project_activitie_types` a
+  ON a.`project_id` = t.`project_id`
+ AND a.`activity_type_id` = t.`activity_type_id`
+LEFT JOIN `project_phases` p
+  ON p.`project_id` = t.`project_id`
+ AND p.`shortname` = t.`phase_id`
+WHERE t.`project_id` = @seed_project_id
+ORDER BY
+  COALESCE(a.`sequence`, 999),
+  COALESCE(p.`phase_order`, 999),
+  t.`activity_id` ASC;
+
+INSERT INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_agilepm, 'pre_project', 'projet', 1, 'agp-001', 'Nommer Executive et Business Sponsor', 'Active', NOW()),
+(@id_project_type_agilepm, 'pre_project', 'metier', 2, 'agp-002', 'Clarifier besoin métier initial', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'projet', 3, 'agp-003', 'Conduire l''étude de faisabilité', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'technologie', 4, 'agp-004', 'Valider faisabilité technique de haut niveau', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'metier', 5, 'agp-005', 'Établir Prioritised Requirements List (PRL)', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'projet', 6, 'agp-006', 'Produire Foundations Summary', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'projet', 7, 'agp-007', 'Construire Delivery Plan et Timeboxes', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'metier', 8, 'agp-008', 'Animer ateliers de clarification des exigences', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'technologie', 9, 'agp-009', 'Réaliser prototypage fonctionnel', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'changement', 10, 'agp-010', 'Préparer conduite du changement incrémentale', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'technologie', 11, 'agp-011', 'Développer solution en timebox', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'technologie', 12, 'agp-012', 'Exécuter tests techniques et qualité', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'metier', 13, 'agp-013', 'Valider fonctionnalités avec Business Ambassador', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'projet', 14, 'agp-014', 'Préparer déploiement incrémental', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'changement', 15, 'agp-015', 'Former utilisateurs et support', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'metier', 16, 'agp-016', 'Confirmer bénéfices attendus de l''incrément', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'projet', 17, 'agp-017', 'Mesurer bénéfices et retour d''expérience', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'changement', 18, 'agp-018', 'Consolider adoption et amélioration continue', 'Active', NOW()),
+(@id_project_type_agilepm, 'pre_project', 'changement', 101, 'agc-101', 'Qualifier les impacts humains et la capacité de changement', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'changement', 102, 'agc-102', 'Définir la stratégie de conduite du changement et les rôles sponsor', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'changement', 103, 'agc-103', 'Construire le plan de communication et de coaching (itératif)', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'changement', 104, 'agc-104', 'Animer des boucles de feedback utilisateurs et ajuster messages', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'changement', 105, 'agc-105', 'Préparer contenus de formation et support au fil des incréments', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'changement', 106, 'agc-106', 'Piloter le readiness go-live et le plan de gestion des résistances', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'changement', 107, 'agc-107', 'Mesurer adoption durable et planifier le renforcement', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 1, 'pr2-001', 'Désigner Executive et Project Manager', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 2, 'pr2-002', 'Capturer le Project Mandate', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 3, 'pr2-003', 'Assembler l''équipe de management projet', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'projet', 4, 'pr2-004', 'Élaborer Project Initiation Documentation (PID)', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'metier', 5, 'pr2-005', 'Définir Business Case détaillé', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'projet', 6, 'pr2-006', 'Mettre en place registres (risks, issues, quality)', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'projet', 7, 'pr2-007', 'Soumettre stage plan au Project Board', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'projet', 8, 'pr2-008', 'Obtenir autorisation de démarrage de stage', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'projet', 9, 'pr2-009', 'Suivre avancement et écarts du stage', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'projet', 10, 'pr2-010', 'Gérer risques et issues du stage', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'technologie', 11, 'pr2-011', 'Accepter work package', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'technologie', 12, 'pr2-012', 'Produire et vérifier produits', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'metier', 13, 'pr2-013', 'Livrer produits complétés au Project Manager', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'projet', 14, 'pr2-014', 'Préparer End Stage Report', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'projet', 15, 'pr2-015', 'Préparer plan du stage suivant', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'metier', 16, 'pr2-016', 'Mettre à jour Business Case pour décision', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'projet', 17, 'pr2-017', 'Préparer End Project Report', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'changement', 18, 'pr2-018', 'Planifier revue post-projet et transfert en BAU', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'changement', 101, 'prc-101', 'Évaluer les impacts organisationnels et les parties prenantes', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'changement', 102, 'prc-102', 'Intégrer la stratégie changement dans le PID', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'changement', 103, 'prc-103', 'Suivre l''adoption, escalader résistances et actions correctives', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'changement', 104, 'prc-104', 'Accompagner les équipes de livraison sur les impacts utilisateurs', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'changement', 105, 'prc-105', 'Actualiser le plan changement pour le stage suivant', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'changement', 106, 'prc-106', 'Présenter au Project Board les indicateurs d''adoption', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'changement', 107, 'prc-107', 'Consolider le plan de renforcement et transfert aux opérations', 'Active', NOW());
+
+-- Rattrapage explicite: garantir la présence des données par défaut AgilePM et Prince2,
+-- même après un import partiel ou une base déjà peuplée sans ces seeds.
+INSERT IGNORE INTO `project_type` (`name`, `description`, `date_created`)
+VALUES
+('AgilePM', 'Lifecycle AgilePM (DSDM): Pre-Project, Feasibility, Foundations, Exploration, Engineering, Deployment, Post-Project', NOW()),
+('Prince2', 'PRINCE2 process model: SU, IP, CS, MP, SB, DP, CP', NOW());
+
+SET @id_project_type_agilepm := (
+  SELECT `uuid`
+  FROM `project_type`
+  WHERE LOWER(`name`) = LOWER('AgilePM')
+  ORDER BY `date_created` ASC
+  LIMIT 1
+);
+SET @id_project_type_prince2 := (
+  SELECT `uuid`
+  FROM `project_type`
+  WHERE LOWER(`name`) = LOWER('Prince2')
+  ORDER BY `date_created` ASC
+  LIMIT 1
+);
+
+INSERT IGNORE INTO `activities` (`sequence`, `short_name`, `long_name`, `id_project_type`, `date_created`) VALUES
+(1, 'projet', 'Gestion du projet', @id_project_type_agilepm, NOW()),
+(2, 'metier', 'Gestion du métier', @id_project_type_agilepm, NOW()),
+(3, 'changement', 'Gestion du changement', @id_project_type_agilepm, NOW()),
+(4, 'technologie', 'Gestion de la technologie', @id_project_type_agilepm, NOW()),
+(1, 'projet', 'Gestion du projet', @id_project_type_prince2, NOW()),
+(2, 'metier', 'Gestion du métier', @id_project_type_prince2, NOW()),
+(3, 'changement', 'Gestion du changement', @id_project_type_prince2, NOW()),
+(4, 'technologie', 'Gestion de la technologie', @id_project_type_prince2, NOW());
+
+INSERT IGNORE INTO `project_type_activities_type_default`
+(`project_type_id`, `sequence`, `shortname`, `longname`, `status`, `date_created`)
+SELECT
+  a.`id_project_type`,
+  a.`sequence`,
+  a.`short_name`,
+  a.`long_name`,
+  'Active',
+  NOW()
+FROM `activities` a
+WHERE a.`id_project_type` IN (@id_project_type_agilepm, @id_project_type_prince2);
+
+INSERT IGNORE INTO `project_type_phases_default`
+(`project_type_id`, `sequence`, `shortname`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_agilepm, 1, 'pre_project', 'Pre-Project', 'Active', NOW()),
+(@id_project_type_agilepm, 2, 'feasibility', 'Feasibility', 'Active', NOW()),
+(@id_project_type_agilepm, 3, 'foundations', 'Foundations', 'Active', NOW()),
+(@id_project_type_agilepm, 4, 'exploration', 'Exploration', 'Active', NOW()),
+(@id_project_type_agilepm, 5, 'engineering', 'Engineering', 'Active', NOW()),
+(@id_project_type_agilepm, 6, 'deployment', 'Deployment', 'Active', NOW()),
+(@id_project_type_agilepm, 7, 'post_project', 'Post-Project', 'Active', NOW()),
+(@id_project_type_prince2, 1, 'su', 'Starting up a Project (SU)', 'Active', NOW()),
+(@id_project_type_prince2, 2, 'ip', 'Initiating a Project (IP)', 'Active', NOW()),
+(@id_project_type_prince2, 3, 'cs', 'Controlling a Stage (CS)', 'Active', NOW()),
+(@id_project_type_prince2, 4, 'mp', 'Managing Product Delivery (MP)', 'Active', NOW()),
+(@id_project_type_prince2, 5, 'sb', 'Managing a Stage Boundary (SB)', 'Active', NOW()),
+(@id_project_type_prince2, 6, 'dp', 'Directing a Project (DP)', 'Active', NOW()),
+(@id_project_type_prince2, 7, 'cp', 'Closing a Project (CP)', 'Active', NOW());
+
+INSERT IGNORE INTO `project_type_activities_default`
+(`project_type_id`, `phaseId`, `activity_type_id`, `sequence`, `activity_id`, `longname`, `status`, `date_created`) VALUES
+(@id_project_type_agilepm, 'pre_project', 'projet', 1, 'agp-001', 'Nommer Executive et Business Sponsor', 'Active', NOW()),
+(@id_project_type_agilepm, 'pre_project', 'metier', 2, 'agp-002', 'Clarifier besoin métier initial', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'projet', 3, 'agp-003', 'Conduire l''étude de faisabilité', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'technologie', 4, 'agp-004', 'Valider faisabilité technique de haut niveau', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'metier', 5, 'agp-005', 'Établir Prioritised Requirements List (PRL)', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'projet', 6, 'agp-006', 'Produire Foundations Summary', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'projet', 7, 'agp-007', 'Construire Delivery Plan et Timeboxes', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'metier', 8, 'agp-008', 'Animer ateliers de clarification des exigences', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'technologie', 9, 'agp-009', 'Réaliser prototypage fonctionnel', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'changement', 10, 'agp-010', 'Préparer conduite du changement incrémentale', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'technologie', 11, 'agp-011', 'Développer solution en timebox', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'technologie', 12, 'agp-012', 'Exécuter tests techniques et qualité', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'metier', 13, 'agp-013', 'Valider fonctionnalités avec Business Ambassador', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'projet', 14, 'agp-014', 'Préparer déploiement incrémental', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'changement', 15, 'agp-015', 'Former utilisateurs et support', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'metier', 16, 'agp-016', 'Confirmer bénéfices attendus de l''incrément', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'projet', 17, 'agp-017', 'Mesurer bénéfices et retour d''expérience', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'changement', 18, 'agp-018', 'Consolider adoption et amélioration continue', 'Active', NOW()),
+(@id_project_type_agilepm, 'pre_project', 'changement', 101, 'agc-101', 'Qualifier les impacts humains et la capacité de changement', 'Active', NOW()),
+(@id_project_type_agilepm, 'feasibility', 'changement', 102, 'agc-102', 'Définir la stratégie de conduite du changement et les rôles sponsor', 'Active', NOW()),
+(@id_project_type_agilepm, 'foundations', 'changement', 103, 'agc-103', 'Construire le plan de communication et de coaching (itératif)', 'Active', NOW()),
+(@id_project_type_agilepm, 'exploration', 'changement', 104, 'agc-104', 'Animer des boucles de feedback utilisateurs et ajuster messages', 'Active', NOW()),
+(@id_project_type_agilepm, 'engineering', 'changement', 105, 'agc-105', 'Préparer contenus de formation et support au fil des incréments', 'Active', NOW()),
+(@id_project_type_agilepm, 'deployment', 'changement', 106, 'agc-106', 'Piloter le readiness go-live et le plan de gestion des résistances', 'Active', NOW()),
+(@id_project_type_agilepm, 'post_project', 'changement', 107, 'agc-107', 'Mesurer adoption durable et planifier le renforcement', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 1, 'pr2-001', 'Désigner Executive et Project Manager', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 2, 'pr2-002', 'Capturer le Project Mandate', 'Active', NOW()),
+(@id_project_type_prince2, 'su', 'projet', 3, 'pr2-003', 'Assembler l''équipe de management projet', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'projet', 4, 'pr2-004', 'Élaborer Project Initiation Documentation (PID)', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'metier', 5, 'pr2-005', 'Définir Business Case détaillé', 'Active', NOW()),
+(@id_project_type_prince2, 'ip', 'projet', 6, 'pr2-006', 'Mettre en place registres (risks, issues, quality)', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'projet', 7, 'pr2-007', 'Soumettre stage plan au Project Board', 'Active', NOW()),
+(@id_project_type_prince2, 'dp', 'projet', 8, 'pr2-008', 'Obtenir autorisation de démarrage de stage', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'projet', 9, 'pr2-009', 'Suivre avancement et écarts du stage', 'Active', NOW()),
+(@id_project_type_prince2, 'cs', 'projet', 10, 'pr2-010', 'Gérer risques et issues du stage', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'technologie', 11, 'pr2-011', 'Accepter work package', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'technologie', 12, 'pr2-012', 'Produire et vérifier produits', 'Active', NOW()),
+(@id_project_type_prince2, 'mp', 'metier', 13, 'pr2-013', 'Livrer produits complétés au Project Manager', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'projet', 14, 'pr2-014', 'Préparer End Stage Report', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'projet', 15, 'pr2-015', 'Préparer plan du stage suivant', 'Active', NOW()),
+(@id_project_type_prince2, 'sb', 'metier', 16, 'pr2-016', 'Mettre à jour Business Case pour décision', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'projet', 17, 'pr2-017', 'Préparer End Project Report', 'Active', NOW()),
+(@id_project_type_prince2, 'cp', 'changement', 18, 'pr2-018', 'Planifier revue post-projet et transfert en BAU', 'Active', NOW()),
 (@id_project_type_prince2, 'su', 'changement', 101, 'prc-101', 'Évaluer les impacts organisationnels et les parties prenantes', 'Active', NOW()),
 (@id_project_type_prince2, 'ip', 'changement', 102, 'prc-102', 'Intégrer la stratégie changement dans le PID', 'Active', NOW()),
 (@id_project_type_prince2, 'cs', 'changement', 103, 'prc-103', 'Suivre l''adoption, escalader résistances et actions correctives', 'Active', NOW()),
@@ -1363,6 +1717,46 @@ SET @sql := IF(@admin_exists = 0,
       'VALUES (''eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'', ''admin'', MD5(''admin''), ''Administrateur'', ''admin@local'', 1)'
     ),
     'INSERT INTO `users` (`username`, `password_hash`, `full_name`, `email`, `is_active`) VALUES (''admin'', MD5(''admin''), ''Administrateur'', ''admin@local'', 1)'
+  ),
+  'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Affecter tous les projets existants au user admin avec le rôle sysAdmin
+SET @sql := IF(@users_pk_col IS NOT NULL,
+  CONCAT(
+    'SET @admin_user_id := (',
+    'SELECT `', @users_pk_col, '` ',
+    'FROM `users` ',
+    'WHERE LOWER(`username`) = ''admin'' ',
+    'ORDER BY `', @users_pk_col, '` ASC ',
+    'LIMIT 1',
+    ')'
+  ),
+  'SET @admin_user_id := NULL'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(@roles_pk_col IS NOT NULL,
+  CONCAT(
+    'SET @sysadmin_role_id := (',
+    'SELECT `', @roles_pk_col, '` ',
+    'FROM `roles` ',
+    'WHERE LOWER(COALESCE(`name`, '''')) = ''sysadmin'' ',
+    'ORDER BY `', @roles_pk_col, '` ASC ',
+    'LIMIT 1',
+    ')'
+  ),
+  'SET @sysadmin_role_id := NULL'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := IF(@projects_pk_col IS NOT NULL,
+  CONCAT(
+    'INSERT IGNORE INTO `users_roles_projects` (`user_id`, `role_id`, `project_id`, `status`) ',
+    'SELECT @admin_user_id, @sysadmin_role_id, p.`', @projects_pk_col, '`, ''active'' ',
+    'FROM `projects` p ',
+    'WHERE @admin_user_id IS NOT NULL AND @sysadmin_role_id IS NOT NULL'
   ),
   'SELECT 1'
 );
