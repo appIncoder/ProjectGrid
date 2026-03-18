@@ -285,6 +285,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
       createdBy?: string;
       projectManager?: string;
       projectTypeId?: string;
+      memberRoles?: Record<string, string[]>;
       risks?: unknown[];
       budgetSummary?: {
         initial: number;
@@ -307,6 +308,11 @@ export class ProjectsPage implements OnInit, OnDestroy {
       createdBy: owner,
       projectManager: owner,
       projectTypeId,
+      memberRoles: this.auth.user?.id
+        ? {
+            [String(this.auth.user.id).trim()]: ['projectAdmin'],
+          }
+        : {},
       risks: [],
       budgetSummary: {
         initial: 0,

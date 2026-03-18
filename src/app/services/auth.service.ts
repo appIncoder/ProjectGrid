@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { inject, Injectable } from '@angular/core';
 import { environment } from '../environments/environment';
+import type { AuthBackend } from './auth-backend';
+import { FirebaseAuthBackendService } from './firebase-auth-backend.service';
+import { RestAuthBackendService } from './rest-auth-backend.service';
 
 const AUTH_STORAGE_KEY = 'pg_auth_session';
 
@@ -18,9 +19,15 @@ type AuthSession = {
 export class AuthService {
   private _isAuthenticated = false;
   private _user: AuthSession['user'] | null = null;
+  private readonly readyPromise: Promise<void>;
+  private readonly backend: AuthBackend =
+    environment.backendProvider === 'firebase'
+      ? inject(FirebaseAuthBackendService)
+      : inject(RestAuthBackendService);
 
-  constructor(private http: HttpClient) {
+  constructor() {
     this.restoreFromStorage();
+    this.readyPromise = this.initializeSession();
   }
 
   get isAuthenticated(): boolean {
@@ -31,34 +38,56 @@ export class AuthService {
     return this._user;
   }
 
+  whenReady(): Promise<void> {
+    return this.readyPromise;
+  }
+
   async login(username: string, password: string): Promise<boolean> {
-    const u = username.trim();
-    if (!u || !password) return false;
-
-    const url = `${environment.apiBaseUrl}/auth/login`;
-    const res = await firstValueFrom(
-      this.http.post<{ ok?: boolean; user?: { id?: string; username?: string; label?: string } }>(url, {
-        username: u,
-        password,
-      })
-    );
-
-    if (!res?.ok || !res.user?.id) {
+    await this.readyPromise;
+    const user = await this.backend.login(username, password);
+    if (!user?.id) {
       this.logout();
       return false;
     }
 
     this._isAuthenticated = true;
     this._user = {
-      id: String(res.user.id),
-      username: String(res.user.username ?? u),
-      label: String(res.user.label ?? res.user.username ?? u),
+      id: String(user.id),
+      username: String(user.username),
+      label: String(user.label),
     };
     this.persistToStorage();
     return true;
   }
 
+  private async initializeSession(): Promise<void> {
+    if (!this.backend.restoreSession) return;
+
+    try {
+      const user = await this.backend.restoreSession();
+      if (!user?.id) {
+        this._isAuthenticated = false;
+        this._user = null;
+        this.clearStorage();
+        return;
+      }
+
+      this._isAuthenticated = true;
+      this._user = {
+        id: String(user.id),
+        username: String(user.username),
+        label: String(user.label),
+      };
+      this.persistToStorage();
+    } catch {
+      this._isAuthenticated = false;
+      this._user = null;
+      this.clearStorage();
+    }
+  }
+
   logout(): void {
+    void this.backend.logout();
     this._isAuthenticated = false;
     this._user = null;
     this.clearStorage();

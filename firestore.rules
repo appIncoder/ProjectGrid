@@ -1,0 +1,78 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function globalRoles() {
+      return signedIn() && userDoc().data.globalRoles is list
+        ? userDoc().data.globalRoles
+        : [];
+    }
+
+    function isSysAdmin() {
+      return signedIn() && globalRoles().hasAny(['sysAdmin', 'sysadmin']);
+    }
+
+    function projectRolesFrom(data) {
+      return signedIn() && data.memberRoles is map && data.memberRoles[request.auth.uid] is list
+        ? data.memberRoles[request.auth.uid]
+        : [];
+    }
+
+    function isProjectMember(data) {
+      return signedIn() && (
+        isSysAdmin() ||
+        (data.memberIds is list && data.memberIds.hasAny([request.auth.uid])) ||
+        projectRolesFrom(data).size() > 0
+      );
+    }
+
+    function canManageProject(data) {
+      return signedIn() && (
+        isSysAdmin() ||
+        projectRolesFrom(data).hasAny([
+          'projectAdmin',
+          'businessAdmin',
+          'changeAdmin',
+          'technoAdmin',
+          'projectTeamMember'
+        ])
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update: if signedIn() && (isSysAdmin() || request.auth.uid == userId);
+      allow delete: if isSysAdmin();
+    }
+
+    match /healthDefaults/{healthId} {
+      allow read: if signedIn();
+      allow write: if isSysAdmin();
+    }
+
+    match /projectTypes/{projectTypeId} {
+      allow read: if signedIn();
+      allow write: if isSysAdmin();
+    }
+
+    match /projects/{projectId} {
+      allow read: if isProjectMember(resource.data);
+
+      allow create: if signedIn() && (
+        isSysAdmin() ||
+        projectRolesFrom(request.resource.data).hasAny(['projectAdmin', 'sysAdmin', 'sysadmin'])
+      );
+
+      allow update, delete: if canManageProject(resource.data) || canManageProject(request.resource.data);
+    }
+  }
+}
