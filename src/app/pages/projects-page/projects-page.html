@@ -86,8 +86,8 @@
           </thead>
           <tbody>
             <tr *ngFor="let project of filteredProjects">
-              <td class="project-name-cell">
-                <a [routerLink]="['/project', project.id]">
+              <td class="project-name-cell" (dblclick)="onOpen(project)">
+                <a href="javascript:void(0)" (click)="onOpen(project)">
                   {{ project.name }}
                 </a>
               </td>
@@ -116,7 +116,7 @@
                   </button>
                   <ul ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
                     <li>
-                      <button ngbDropdownItem [routerLink]="['/project', project.id]">
+                      <button ngbDropdownItem (click)="onOpen(project)">
                         <span class="me-2">👁️</span> Ouvrir
                       </button>
                     </li>

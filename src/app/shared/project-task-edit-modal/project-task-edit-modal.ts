@@ -6,9 +6,9 @@ import type {
   ActivityStatus,
   DependencyType,
   EditableDependencyRow,
+  Item,
+  ItemCategory,
   PhaseId,
-  Task,
-  TaskCategory,
   UserRef,
 } from '../../models';
 
@@ -28,11 +28,11 @@ export class ProjectTaskEditModal {
   @Input() editError: string | null = null;
   @Input() isCreateMode = false;
 
-  @Input() editedTaskLabel = '';
-  @Output() editedTaskLabelChange = new EventEmitter<string>();
+  @Input() editedItemLabel = '';
+  @Output() editedItemLabelChange = new EventEmitter<string>();
 
-  @Input() editedTaskStatus: ActivityStatus = 'todo';
-  @Output() editedTaskStatusChange = new EventEmitter<ActivityStatus>();
+  @Input() editedItemStatus: ActivityStatus = 'todo';
+  @Output() editedItemStatusChange = new EventEmitter<ActivityStatus>();
 
   @Input() editedStartDate = '';
   @Output() editedStartDateChange = new EventEmitter<string>();
@@ -40,8 +40,8 @@ export class ProjectTaskEditModal {
   @Input() editedEndDate = '';
   @Output() editedEndDateChange = new EventEmitter<string>();
 
-  @Input() editedCategory: TaskCategory = 'projectManagement';
-  @Output() editedCategoryChange = new EventEmitter<TaskCategory>();
+  @Input() editedCategory: ItemCategory = 'projectManagement';
+  @Output() editedCategoryChange = new EventEmitter<ItemCategory>();
 
   @Input() editedPhase: PhaseId | null = null;
   @Output() editedPhaseChange = new EventEmitter<PhaseId | null>();
@@ -55,14 +55,15 @@ export class ProjectTaskEditModal {
   @Input() editedResponsibleId = '';
   @Output() editedResponsibleIdChange = new EventEmitter<string>();
 
-  @Input() taskStatusOptions: { value: ActivityStatus; label: string }[] = [];
-  @Input() taskCategoryOptions: { value: TaskCategory; label: string }[] = [];
+  @Input() itemStatusOptions: { value: ActivityStatus; label: string }[] = [];
+  @Input() itemCategoryOptions: { value: ItemCategory; label: string }[] = [];
   @Input() dependencyTypeOptions: { value: DependencyType; label: string }[] = [];
 
   @Input() phases: PhaseId[] = [];
   @Input() users: UserRef[] = [];
   @Input() editedDependencies: EditableDependencyRow[] = [];
-  @Input() linkableTasks: Task[] = [];
+  @Input() linkableTasks: Item[] = [];
+  @Input() childItems: Item[] = [];
 
   @Output() addDependency = new EventEmitter<void>();
   @Output() removeDependency = new EventEmitter<number>();
@@ -78,7 +79,7 @@ export class ProjectTaskEditModal {
     if (this.isCreateMode) {
       return "Champs obligatoires : nom, phase, type d'activité, début, fin.";
     }
-    return this.editedTaskLabel || 'Activité sans titre';
+    return this.editedItemLabel || 'Activité sans titre';
   }
 
   openAssignPopover(field: 'reporter' | 'accountant' | 'responsible'): void {
@@ -169,11 +170,23 @@ export class ProjectTaskEditModal {
     return `${role} : ${this.getUserLabel(value)}`;
   }
 
-  getCategoryHint(value: TaskCategory): string {
+  getCategoryHint(value: ItemCategory): string {
     if (value === 'projectManagement') return 'Pilotage, coordination et suivi global';
     if (value === 'businessManagement') return 'Besoins, priorisation et validation métier';
     if (value === 'changeManagement') return 'Communication, adoption et accompagnement';
     return 'Architecture, build, tests et déploiement';
+  }
+
+  getStatusLabel(status: ActivityStatus): string {
+    const labels: Record<ActivityStatus, string> = {
+      todo:          'To Do',
+      inprogress:    'In Progress',
+      onhold:        'On Hold',
+      done:          'Done',
+      notdone:       'Not Done',
+      notapplicable: 'N/A',
+    };
+    return labels[status] ?? status;
   }
 
   getDependencyTypeShort(type: DependencyType | undefined): string {
@@ -182,8 +195,8 @@ export class ProjectTaskEditModal {
     return 'FS';
   }
 
-  getTaskLabel(taskId: string): string {
-    const id = (taskId ?? '').trim();
+  getItemLabel(itemId: string): string {
+    const id = (itemId ?? '').trim();
     if (!id) return 'Activité non définie';
     const found = this.linkableTasks.find((t) => t.id === id);
     return found?.label || id;

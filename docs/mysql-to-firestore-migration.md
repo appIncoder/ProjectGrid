@@ -10,6 +10,7 @@ Move the current MariaDB data set into Firestore using the Firebase schema alrea
 - `users` -> `users/{userId}`
 - `project_health_default` -> `healthDefaults/{healthId}`
 - `project_type*` defaults -> `projectTypes/{projectTypeId}`
+- `project_type_activities_default` rows -> `projectTypes/{projectTypeId}/activityDefaults/{activityDefaultId}`
 - `projects` -> `projects/{projectId}`
 
 For each project document, the migration embeds:
@@ -76,3 +77,5 @@ node scripts/migrate-mysql-to-firestore.mjs
 - Access is now indexed in both directions:
   - `projects/{id}.memberIds`
   - `users/{uid}.projectIds`
+- Project type task defaults are stored separately under:
+  - `projectTypes/{projectTypeId}/activityDefaults/{activityDefaultId}`

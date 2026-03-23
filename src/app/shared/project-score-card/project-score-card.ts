@@ -53,16 +53,16 @@ export class ProjectScorecard implements OnChanges {
     status: string;
   } | null = null;
 
-  taskStatusOptions: { value: ActivityStatus; label: string }[] = [
-    { value: 'todo',          label: 'À faire (blanc)' },
-    { value: 'inprogress',    label: 'En cours (orange)' },
-    { value: 'onhold',        label: 'En attente (bleu)' },
-    { value: 'done',          label: 'Fait (vert)' },
-    { value: 'notdone',       label: 'Non fait (rouge)' },
-    { value: 'notapplicable', label: 'Non applicable (gris)' },
+  itemStatusOptions: { value: ActivityStatus; label: string }[] = [
+    { value: 'todo',          label: 'To Do' },
+    { value: 'inprogress',    label: 'In Progress' },
+    { value: 'onhold',        label: 'On Hold' },
+    { value: 'done',          label: 'Done' },
+    { value: 'notdone',       label: 'Not Done' },
+    { value: 'notapplicable', label: 'N/A' },
   ];
 
-  taskCategoryOptions: { value: TaskCategory; label: string }[] = [
+  itemCategoryOptions: { value: TaskCategory; label: string }[] = [
     { value: 'projectManagement',    label: 'Gestion du projet' },
     { value: 'businessManagement',   label: 'Gestion du métier' },
     { value: 'changeManagement',     label: 'Gestion du changement' },
@@ -75,8 +75,8 @@ export class ProjectScorecard implements OnChanges {
   private taskBeingEdited: Task | null = null;
   isCreateMode = false;
 
-  editedTaskLabel = '';
-  editedTaskStatus: ActivityStatus = 'todo';
+  editedItemLabel = '';
+  editedItemStatus: ActivityStatus = 'todo';
   editedStartDate = '';
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
@@ -424,6 +424,12 @@ export class ProjectScorecard implements OnChanges {
     return all.filter(t => t.id !== curId);
   }
 
+  getChildItems(): Task[] {
+    if (!this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return [];
+    const matrix = (this.project as any)?.projectTasksMatrix;
+    return matrix?.[this.editingActivityId]?.[this.editingPhase]?.[this.taskBeingEdited.id] ?? [];
+  }
+
   addDependencyRow(): void {
     // défaut: F2S + aucune cible
     this.editedDependencies.push({ toId: '', type: 'F2S' });
@@ -450,8 +456,8 @@ export class ProjectScorecard implements OnChanges {
     this.editingActivityId = activityId;
     this.editingPhase = phase;
 
-    this.editedTaskLabel = task.label ?? '';
-    this.editedTaskStatus = task.status;
+    this.editedItemLabel = task.label ?? '';
+    this.editedItemStatus = task.status;
 
     this.editedStartDate = task.startDate ?? '';
     this.editedEndDate = task.endDate ?? '';
@@ -485,8 +491,8 @@ export class ProjectScorecard implements OnChanges {
     this.editingActivityId = defaultActivityId;
     this.editingPhase = defaultPhase;
 
-    this.editedTaskLabel = '';
-    this.editedTaskStatus = 'todo';
+    this.editedItemLabel = '';
+    this.editedItemStatus = 'todo';
     this.editedStartDate = '';
     this.editedEndDate = '';
     this.editedCategory = this.mapActivityToCategory(defaultActivityId);
@@ -522,7 +528,7 @@ export class ProjectScorecard implements OnChanges {
 
     this.editError = null;
 
-    const label = (this.editedTaskLabel ?? '').trim();
+    const label = (this.editedItemLabel ?? '').trim();
     if (!label) {
       this.editError = "Le nom de l’activité ne peut pas être vide.";
       return;
@@ -595,7 +601,7 @@ export class ProjectScorecard implements OnChanges {
         activityId,
         phase: targetPhase,
         label,
-        status: this.editedTaskStatus,
+        status: this.editedItemStatus,
         startDate: this.editedStartDate,
         endDate: this.editedEndDate,
         category: this.editedCategory,
@@ -639,7 +645,7 @@ export class ProjectScorecard implements OnChanges {
         toPhase: this.editedPhase || undefined,
         taskId: this.taskBeingEdited.id,
         label,
-        status: this.editedTaskStatus,
+        status: this.editedItemStatus,
         startDate: this.editedStartDate,
         endDate: this.editedEndDate,
         category: this.editedCategory,

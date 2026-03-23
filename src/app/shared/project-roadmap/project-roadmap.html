@@ -1,588 +1,508 @@
-<div class="card flex-fill">
-  <div class="card-body roadmap-card-body">
-    <app-project-task-edit-modal *ngIf="false"></app-project-task-edit-modal>
+<div class="roadmap-root">
+  <!-- Side-effect import (ne pas supprimer) -->
+  <app-project-task-edit-modal *ngIf="false"></app-project-task-edit-modal>
 
-    <!-- Header + contrôles période -->
-    <div class="d-flex align-items-center justify-content-between mb-2 gap-2 flex-wrap roadmap-toolbar">
-      <div>
-        <h3 class="h6 mb-1">Roadmap – Diagramme de Gantt ({{ getPeriodLabel() }})</h3>
-        <div class="roadmap-kpis">
-          <span class="roadmap-kpi">Activités: {{ getTotalLeafTaskCount() }}</span>
-          <span class="roadmap-kpi">Types d'activité: {{ getActivityGroupCount() }}</span>
-          <span class="roadmap-kpi">Types repliés: {{ getCollapsedGroupCount() }}</span>
-        </div>
-        <div class="roadmap-add-task-hint">Info: nom, phase, type d'activité, date de début et date de fin sont obligatoires.</div>
-      </div>
-
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button class="btn roadmap-add-task-btn" (click)="openCreateTaskModal()">
-          <span class="roadmap-add-task-btn__plus">+</span>
-          <span>Ajouter une activité</span>
-        </button>
-
-        <!-- Modes d’affichage (Split supprimé) -->
-        <div class="btn-group btn-group-sm">
-          <button
-            class="btn roadmap-chip-btn"
-            (click)="setViewMode('focusLeft')"
-            [class.active]="viewMode==='focusLeft'"
-          >
-            Agrandir table
-          </button>
-          <button
-            class="btn roadmap-chip-btn"
-            (click)="setViewMode('focusRight')"
-            [class.active]="viewMode==='focusRight'"
-          >
-            Agrandir Gantt
-          </button>
-        </div>
-
-        <select
-          class="form-select form-select-sm"
-          style="width: 170px;"
-          [ngModel]="periodPreset"
-          (ngModelChange)="onPeriodPresetChange($event)"
-        >
-          <option value="3m">3 mois</option>
-          <option value="6m">6 mois</option>
-          <option value="12m">1 an</option>
-          <option value="custom">Période custom</option>
-        </select>
-
-        <div *ngIf="periodPreset === 'custom'" class="d-flex align-items-center gap-2 flex-wrap">
-          <input
-            type="date"
-            class="form-control form-control-sm"
-            style="width: 165px;"
-            [(ngModel)]="customStartIso"
-          />
-          <input
-            type="number"
-            class="form-control form-control-sm"
-            style="width: 110px;"
-            min="1"
-            max="60"
-            [(ngModel)]="customMonths"
-            placeholder="Mois"
-          />
-          <button class="btn roadmap-chip-btn roadmap-chip-btn--primary" (click)="applyCustomPeriod()">
-            Appliquer
-          </button>
-        </div>
-
-        <button class="btn roadmap-chip-btn roadmap-chip-btn--primary" (click)="centerOnToday()">
-          Centrer sur aujourd&apos;hui
-        </button>
-
-        <!-- ✅ Recalcul dépendances + contraintes -->
-        <button class="btn roadmap-chip-btn roadmap-chip-btn--success" (click)="recalculateSchedule()">
-          Recalculer
-        </button>
-
-        <span *ngIf="isSaving" class="badge text-bg-light border">
-          Enregistrement...
-        </span>
-        <span *ngIf="!isSaving && !saveError" class="badge text-bg-success-subtle border border-success-subtle text-success-emphasis">
-          Synchro OK
-        </span>
-        <span *ngIf="saveError" class="badge text-bg-danger">
-          Erreur de sauvegarde
-        </span>
-      </div>
+  <!-- ── Toolbar (ruban MS Project) ─────────────────────────────────────── -->
+  <div class="card mb-3">
+    <div class="card-body roadmap-card-body">
+  <div class="roadmap-toolbar">
+    <div class="roadmap-toolbar-info">
+      <span class="roadmap-title">Roadmap – Diagramme de Gantt</span>
     </div>
 
-    <!-- Scroll VERTICAL global uniquement -->
+    <div class="roadmap-toolbar-actions">
+      <div class="roadmap-btn-group">
+      <select
+        class="roadmap-select"
+        [ngModel]="periodPreset"
+        (ngModelChange)="onPeriodPresetChange($event)"
+      >
+        <option value="3m">3 mois</option>
+        <option value="6m">6 mois</option>
+        <option value="12m">1 an</option>
+        <option value="custom">Période personnalisée</option>
+      </select>
+
+      @if (periodPreset === 'custom') {
+        <input type="date" class="roadmap-input" style="width:150px;" [(ngModel)]="customStartIso" />
+        <input type="number" class="roadmap-input" style="width:90px;" min="1" max="60"
+          [(ngModel)]="customMonths" placeholder="Mois" />
+        <button class="roadmap-btn roadmap-btn--accent" (click)="applyCustomPeriod()">Appliquer</button>
+      }
+
+      <div class="roadmap-toolbar-sep"></div>
+
+      <button class="roadmap-btn" (click)="centerOnToday()">Aujourd'hui</button>
+      <button class="roadmap-btn roadmap-btn--success" (click)="recalculateSchedule()">↻ Recalculer</button>
+
+      <button class="btn btn-add" (click)="openCreateTaskModal()">
+        + Ajouter une activité
+      </button>
+    </div>
+  </div>
+    </div>
+  </div>
+
+  <!-- ── Cadre scrollable vertical ─────────────────────────────────────── -->
+  <div
+    class="roadmap-scroll-frame"
+  >
+    <!-- Layout principal : tableau + divider + gantt -->
     <div
-      class="roadmap-scroll-frame"
+      class="roadmap-main-grid"
       style="
-        max-height: 560px;
-        overflow-y: auto;
-        overflow-x: auto;
-        border: 1px solid #e9ecef;
-        border-radius: 10px;
-        background: #fff;
+        display: grid;
+        grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px 1fr;
+        width: 100%;
+        align-items: start;
+        font-size: 0.72rem;
+        line-height: 1.12;
+        flex: 1;
+        min-width: 0;
       "
     >
-      <!-- Layout principal : tableau + divider + gantt -->
-      <div
-        class="roadmap-main-grid"
-        style="
-          display: grid;
-          grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px {{ganttViewportWidth}}px;
-          width: max-content;
-          align-items: start;
-          background: #fff;
-          font-size: 0.72rem;
-          line-height: 1.12;
-        "
-      >
-        <!-- =======================
-             PANNEAU TABLEAU (scroll X indépendant)
-             ======================= -->
-        <div class="roadmap-left-pane" style="width: {{tablePanelWidthPx}}px; overflow: hidden;">
-          <div
-            class="roadmap-table-grid"
-            [style.gridTemplateColumns]="tableInnerGridTemplate"
-            style="display: grid; width: 100%;"
-          >
-            <!-- ROW 1 tableau vide -->
-            <div [style.gridColumn]="'1 / span 7'" style="height: 44px;"></div>
+      <!-- ══════════════════════════════
+           PANNEAU TABLEAU
+           ══════════════════════════════ -->
+      <div class="roadmap-left-pane" [style.width.px]="tablePanelWidthPx">
+        <div
+          class="roadmap-table-grid"
+          [style.gridTemplateColumns]="tableInnerGridTemplate"
+        >
+          <!-- Espaceur ligne 1 (hauteur milestones) -->
+          <div [style.gridColumn]="'1 / span 7'" class="roadmap-table-spacer"></div>
 
-            <!-- ROW 2 : titres -->
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 220px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Activités
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'task')"></span>
-            </div>
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 120px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Début
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'start')"></span>
-            </div>
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 120px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Fin
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'end')"></span>
-            </div>
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 300px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Phase
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'phase')"></span>
-            </div>
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 120px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Progression
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'progress')"></span>
-            </div>
+          <!-- En-têtes de colonnes -->
+          <div class="roadmap-th roadmap-col-resizable">
+            Activités
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'task')"></span>
+          </div>
+          <div class="roadmap-th roadmap-col-resizable">
+            Début
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'start')"></span>
+          </div>
+          <div class="roadmap-th roadmap-col-resizable">
+            Fin
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'end')"></span>
+          </div>
+          <div class="roadmap-th roadmap-col-resizable">
+            Phase
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'phase')"></span>
+          </div>
+          <div class="roadmap-th roadmap-col-resizable">
+            Progression
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'progress')"></span>
+          </div>
+          <div class="roadmap-th roadmap-col-resizable">
+            Type de lien
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'linkType')"></span>
+          </div>
+          <div class="roadmap-th roadmap-col-resizable">
+            Activité liée
+            <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'linkedTask')"></span>
+          </div>
 
-            <!-- Toujours affichées -->
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 170px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Type de lien
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'linkType')"></span>
-            </div>
-            <div class="roadmap-table-head-cell roadmap-col-resizable" style="height: 32px; display:flex; align-items:center; min-width: 280px; padding:0 8px; font-weight:600; background:#f8f9fa; border-top:1px solid #f1f3f5;">
-              Activité liée
-              <span class="roadmap-col-resize-handle" (pointerdown)="onColumnResizePointerDown($event, 'linkedTask')"></span>
-            </div>
-
-            <!-- BODY -->
-            <ng-container *ngFor="let row of ganttActivityRows">
-              <!-- Col1 -->
-              <div
-                [class]="row.isHeader ? 'roadmap-row-cell roadmap-row-header-cell ' + getActivityCssClass(row.activityId) : 'roadmap-row-cell roadmap-row-task-cell'"
-                style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;"
-                [style.fontWeight]="row.isHeader ? '600' : '400'"
-              >
-                <button *ngIf="row.isHeader" type="button" class="roadmap-row-header-btn" (click)="onRowLabelClick(row)">
-                  <span class="roadmap-row-toggle-indicator">{{ activityCollapse[row.activityId] ? '+' : '-' }}</span>
+          <!-- Corps du tableau -->
+          @for (row of ganttActivityRows; track row.rowIndex) {
+            <!-- Col 1 : Libellé / groupe -->
+            <div
+              [class]="row.isHeader
+                ? 'roadmap-row-cell roadmap-row-header-cell ' + getActivityCssClass(row.activityId)
+                : 'roadmap-row-cell roadmap-row-task-cell'"
+              [style.fontWeight]="row.isHeader ? '600' : '400'"
+            >
+              @if (row.isHeader) {
+                <button type="button" class="roadmap-row-header-btn" (click)="onRowLabelClick(row)">
+                  <span class="roadmap-row-toggle-indicator">{{ activityCollapse[row.activityId] ? '▶' : '▼' }}</span>
                   <span class="roadmap-row-code">{{ getActivityCode(row.activityId) }}</span>
                   <span class="roadmap-row-title">{{ row.label }}</span>
                   <span class="roadmap-row-count">{{ getActivityTaskCount(row.activityId) }}</span>
                   <span class="roadmap-row-progress">{{ getActivityProgressPercent(row.activityId) }}%</span>
                 </button>
-
-                <span *ngIf="!row.isHeader" class="roadmap-row-task-label" style="padding-left: 12px;">
+              }
+              @if (!row.isHeader) {
+                <span class="roadmap-row-task-label" (click)="onRowDblClick(row)">
                   <span class="roadmap-task-dot"></span>
-                  <span>{{ getRowTask(row.rowIndex)?.label ?? '' }}</span>
-                  <span class="roadmap-task-status" *ngIf="getRowTask(row.rowIndex) as t">{{ getTaskStatusText(t) }}</span>
+                  <span class="roadmap-task-label-text">{{ getRowTask(row.rowIndex)?.label ?? '' }}</span>
+                  @if (getRowTask(row.rowIndex); as t) {
+                    <span class="roadmap-task-status">{{ getTaskStatusText(t) }}</span>
+                  }
                 </span>
-              </div>
+              }
+            </div>
 
-              <!-- Col2 : Début -->
-              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
-                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash1">
-                  <div style="display:flex; flex-direction:column;">
-                    <input
-                      type="date"
-                      class="form-control form-control-sm"
-                      style="width: 100%;"
-                      [class.is-invalid]="!!tableDateErrors[t.id]"
-                      [value]="getTaskStartIsoForTable(t)"
-                      (change)="onTableStartDateChange(t, ($any($event.target).value))"
-                    />
-                    <div *ngIf="tableDateErrors[t.id]" class="invalid-feedback d-block">
-                      {{ tableDateErrors[t.id] }}
-                    </div>
+            <!-- Col 2 : Début -->
+            <div class="roadmap-td">
+              @if (getRowTask(row.rowIndex); as t) {
+                <div class="roadmap-date-cell">
+                  <input
+                    type="date"
+                    class="roadmap-input roadmap-input--date"
+                    [class.roadmap-input--error]="!!tableDateErrors[t.id]"
+                    [value]="getTaskStartIsoForTable(t)"
+                    (change)="onTableStartDateChange(t, ($any($event.target).value))"
+                  />
+                  @if (tableDateErrors[t.id]) {
+                    <div class="roadmap-field-error">{{ tableDateErrors[t.id] }}</div>
+                  }
+                </div>
+              } @else {
+                <span class="roadmap-dash">—</span>
+              }
+            </div>
+
+            <!-- Col 3 : Fin -->
+            <div class="roadmap-td">
+              @if (getRowTask(row.rowIndex); as t) {
+                <div class="roadmap-date-cell">
+                  <input
+                    type="date"
+                    class="roadmap-input roadmap-input--date"
+                    [class.roadmap-input--error]="!!tableDateErrors[t.id]"
+                    [value]="getTaskEndIsoForTable(t)"
+                    (change)="onTableEndDateChange(t, ($any($event.target).value))"
+                  />
+                  @if (tableDateErrors[t.id]) {
+                    <div class="roadmap-field-error">{{ tableDateErrors[t.id] }}</div>
+                  }
+                </div>
+              } @else {
+                <span class="roadmap-dash">—</span>
+              }
+            </div>
+
+            <!-- Col 4 : Phase -->
+            <div class="roadmap-td">
+              @if (getRowTask(row.rowIndex); as t) {
+                <span [attr.title]="getPhaseLongName(t.phase)" class="roadmap-phase-chip">{{ t.phase }}</span>
+              } @else {
+                <span class="roadmap-dash">—</span>
+              }
+            </div>
+
+            <!-- Col 5 : Progression -->
+            <div class="roadmap-td">
+              @if (getRowTask(row.rowIndex); as t) {
+                <div class="roadmap-progress-cell">
+                  <div class="roadmap-progress">
+                    <div
+                      class="roadmap-progress-bar"
+                      role="progressbar"
+                      [style.width.%]="getTaskProgressPercent(t)"
+                      [attr.aria-valuenow]="getTaskProgressPercent(t)"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                    ></div>
                   </div>
-                </ng-container>
-                <ng-template #dash1><span class="text-muted">—</span></ng-template>
-              </div>
+                  <span class="roadmap-progress-pct">{{ getTaskProgressPercent(t) }}%</span>
+                </div>
+              } @else {
+                <span class="roadmap-dash">—</span>
+              }
+            </div>
 
-              <!-- Col3 : Fin -->
-              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5; overflow:hidden;">
-                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash2">
-                  <div style="display:flex; flex-direction:column;">
-                    <input
-                      type="date"
-                      class="form-control form-control-sm"
-                      style="width: 100%;"
-                      [class.is-invalid]="!!tableDateErrors[t.id]"
-                      [value]="getTaskEndIsoForTable(t)"
-                      (change)="onTableEndDateChange(t, ($any($event.target).value))"
-                    />
-                    <div *ngIf="tableDateErrors[t.id]" class="invalid-feedback d-block">
-                      {{ tableDateErrors[t.id] }}
-                    </div>
-                  </div>
-                </ng-container>
-                <ng-template #dash2><span class="text-muted">—</span></ng-template>
-              </div>
+            <!-- Col 6 : Type de lien -->
+            <div class="roadmap-td">
+              @if (getRowTask(row.rowIndex); as t) {
+                <select
+                  class="roadmap-select roadmap-select--sm"
+                  [ngModel]="getInlineDepType(t)"
+                  (ngModelChange)="onInlineDepTypeChange(t, $event)"
+                >
+                  @for (opt of dependencyTypeOptions; track opt.value) {
+                    <option [ngValue]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              } @else {
+                <span class="roadmap-dash">—</span>
+              }
+            </div>
 
-              <!-- Col4 -->
-              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <span *ngIf="getRowTask(row.rowIndex) as t; else dash3" [attr.title]="getPhaseLongName(t.phase)">{{ t.phase }}</span>
-                <ng-template #dash3><span class="text-muted">—</span></ng-template>
-              </div>
-
-              <!-- Col5 -->
-              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash4">
-                  <div class="d-flex align-items-center gap-2 w-100">
-                    <div class="progress flex-grow-1" style="height: 8px; min-width: 70px;">
-                      <div
-                        class="progress-bar"
-                        role="progressbar"
-                        [style.width.%]="getTaskProgressPercent(t)"
-                        [attr.aria-valuenow]="getTaskProgressPercent(t)"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
-                      ></div>
-                    </div>
-                    <span class="small text-muted" style="min-width: 3ch; text-align:right;">
-                      {{ getTaskProgressPercent(t) }}%
-                    </span>
-                  </div>
-                </ng-container>
-                <ng-template #dash4><span class="text-muted">—</span></ng-template>
-              </div>
-
-              <!-- Col6 : Type de lien -->
-              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash5">
-                  <select
-                    class="form-select form-select-sm"
-                    style="width: 100%;"
-                    [ngModel]="getInlineDepType(t)"
-                    (ngModelChange)="onInlineDepTypeChange(t, $event)"
-                  >
-                    <option *ngFor="let opt of dependencyTypeOptions" [ngValue]="opt.value">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </ng-container>
-                <ng-template #dash5><span class="text-muted">—</span></ng-template>
-              </div>
-
-              <!-- Col7 : Activité liée -->
-              <div style="height: 36px; padding:0 8px; display:flex; align-items:center; border-top:1px solid #f1f3f5;">
-                <ng-container *ngIf="getRowTask(row.rowIndex) as t; else dash6">
-                  <select
-                    class="form-select form-select-sm"
-                    style="width: 100%;"
-                    [ngModel]="getInlineDepToId(t)"
-                    (ngModelChange)="onInlineDepToChange(t, $event)"
-                  >
-                    <option value="">—</option>
-                    <option *ngFor="let x of getLinkableTasksFor(t.id)" [value]="x.id">
-                      {{ x.label }}
-                    </option>
-                  </select>
-                </ng-container>
-                <ng-template #dash6><span class="text-muted">—</span></ng-template>
-              </div>
-
-            </ng-container>
-          </div>
+            <!-- Col 7 : Activité liée -->
+            <div class="roadmap-td">
+              @if (getRowTask(row.rowIndex); as t) {
+                <select
+                  class="roadmap-select roadmap-select--sm"
+                  [ngModel]="getInlineDepToId(t)"
+                  (ngModelChange)="onInlineDepToChange(t, $event)"
+                >
+                  <option value="">—</option>
+                  @for (x of getLinkableTasksFor(t.id); track x.id) {
+                    <option [value]="x.id">{{ x.label }}</option>
+                  }
+                </select>
+              } @else {
+                <span class="roadmap-dash">—</span>
+              }
+            </div>
+          }
         </div>
+      </div>
 
-        <!-- =======================
-             DIVIDER (draggable) - toujours visible
-             ======================= -->
-        <div style="position: relative; height: 100%; background:#fff;">
-          <div style="position:absolute; left: 4px; top:0; bottom:0; width:1px; background:#e9ecef;"></div>
-          <div
-            title="Glisser (min = 25% écran). Ensuite, scrolle le tableau."
-            (pointerdown)="onResizeHandlePointerDown($event)"
-            style="
-              position:absolute;
-              left: 0;
-              top: 0;
-              bottom: 0;
-              width: 10px;
-              cursor: col-resize;
-              background: rgba(13,110,253,0.06);
-            "
-          ></div>
-        </div>
+      <!-- ══════════════════════════════
+           DIVIDER (redimensionnable)
+           ══════════════════════════════ -->
+      <div style="position: relative; height: 100%;">
+        <div class="roadmap-divider-line"></div>
+        <div
+          class="roadmap-divider-handle"
+          title="Glisser pour redimensionner"
+          (pointerdown)="onResizeHandlePointerDown($event)"
+        ></div>
+      </div>
 
-        <!-- =======================
-             PANNEAU GANTT (inchangé)
-             ======================= -->
-        <div #ganttScroll class="roadmap-right-pane" style="width: {{ganttViewportWidth}}px; overflow: hidden;">
-          <div class="roadmap-gantt-content" style="width: 100%; min-width: 0;">
+      <!-- ══════════════════════════════
+           PANNEAU GANTT
+           ══════════════════════════════ -->
+      <div #ganttScroll class="roadmap-right-pane" style="flex: 1; overflow-x: auto; overflow-y: hidden; position: relative;">
+        <div class="roadmap-gantt-content" style="width: {{ganttWidth}}px; min-width: 0;">
 
-            <!-- Row 1 : milestones -->
-            <svg class="gantt-svg" [attr.width]="ganttViewportWidth" [attr.height]="headerRow1Height" style="display:block;">
-              <defs>
-                <marker id="ganttArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                  <path d="M 0 0 L 10 5 L 0 10 z"></path>
-                </marker>
-              </defs>
+          <!-- Ligne 1 : Jalons (milestones) -->
+          <svg class="gantt-svg gantt-svg--milestones" [attr.width]="ganttWidth" [attr.height]="headerRow1Height" style="display:block;">
+            <defs>
+              <marker id="ganttArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z"></path>
+              </marker>
+            </defs>
+            <g *ngFor="let ms of ganttMilestones">
+              <circle
+                class="gantt-milestone-dot"
+                [attr.cx]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
+                [attr.cy]="18"
+                r="4"
+              ></circle>
+              <text
+                class="gantt-milestone-text"
+                [attr.x]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
+                [attr.y]="12"
+              >{{ ms.label }}</text>
+            </g>
+          </svg>
 
-              <g *ngFor="let ms of ganttMilestones">
+          <!-- Ligne 2 : En-têtes de mois -->
+          <svg class="gantt-svg gantt-svg--months" [attr.width]="ganttWidth" [attr.height]="headerRow2Height" style="display:block;">
+            <rect x="0" y="0" [attr.width]="ganttWidth" [attr.height]="headerRow2Height" class="gantt-month-header-bg"></rect>
+            <g *ngFor="let month of ganttMonths; index as i">
+              <!-- Séparateur vertical de mois -->
+              <line
+                class="gantt-month-sep"
+                [attr.x1]="ganttLeftPadding + i * ganttColWidth"
+                [attr.y1]="0"
+                [attr.x2]="ganttLeftPadding + i * ganttColWidth"
+                [attr.y2]="headerRow2Height"
+              ></line>
+              <text
+                class="gantt-month-text"
+                [attr.x]="ganttLeftPadding + i * ganttColWidth + ganttColWidth / 2"
+                [attr.y]="18"
+              >{{ month }}</text>
+            </g>
+          </svg>
+
+          <!-- Corps Gantt -->
+          <svg
+            class="gantt-svg"
+            [attr.width]="ganttWidth"
+            [attr.height]="ganttBodyHeight"
+            style="display:block;"
+            (mousemove)="onGanttMouseMove($event)"
+            (mouseup)="onGanttMouseUp($event)"
+            (mouseleave)="onGanttMouseUp($event)"
+          >
+            <defs>
+              <marker id="ganttArrowBody" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z"></path>
+              </marker>
+            </defs>
+
+            <!-- Bandes horizontales alternées (zebra) -->
+            <g *ngFor="let r of ganttActivityRows; index as ri">
+              <rect
+                [attr.class]="'gantt-row-stripe ' + (ri % 2 === 0 ? 'gantt-row-stripe--even' : 'gantt-row-stripe--odd')"
+                x="0"
+                [attr.y]="getRowCenterY(r.rowIndex) - 18"
+                [attr.width]="ganttWidth"
+                height="36"
+              ></rect>
+            </g>
+
+            <!-- Grille verticale (séparateurs de mois) -->
+            <g *ngFor="let m of ganttMonths; index as colIndex">
+              <line
+                class="gantt-grid-line"
+                [attr.x1]="ganttLeftPadding + colIndex * ganttColWidth"
+                [attr.y1]="0"
+                [attr.x2]="ganttLeftPadding + colIndex * ganttColWidth"
+                [attr.y2]="ganttBodyHeight"
+              ></line>
+            </g>
+
+            <!-- Grille horizontale (lignes de séparation de lignes) -->
+            <g *ngFor="let r of ganttActivityRows">
+              <line
+                class="gantt-row-line"
+                [attr.x1]="0"
+                [attr.y1]="getRowCenterY(r.rowIndex)"
+                [attr.x2]="ganttWidth"
+                [attr.y2]="getRowCenterY(r.rowIndex)"
+              ></line>
+            </g>
+
+            <!-- Ligne Aujourd'hui -->
+            <g *ngIf="todayDayIndex !== null">
+              <line
+                class="gantt-today-line"
+                [attr.x1]="ganttLeftPadding + todayDayIndex * dayWidth"
+                [attr.y1]="0"
+                [attr.x2]="ganttLeftPadding + todayDayIndex * dayWidth"
+                [attr.y2]="ganttBodyHeight"
+              ></line>
+              <rect
+                class="gantt-today-label-bg"
+                [attr.x]="ganttLeftPadding + todayDayIndex * dayWidth + 2"
+                [attr.y]="2"
+                width="38"
+                height="14"
+                rx="2"
+              ></rect>
+              <text
+                class="gantt-today-label"
+                [attr.x]="ganttLeftPadding + todayDayIndex * dayWidth + 6"
+                [attr.y]="13"
+              >Auj.</text>
+            </g>
+
+            <!-- Liens de dépendance -->
+            <g *ngFor="let link of ganttLinksView">
+              <path
+                [attr.class]="getLinkCssClass(link)"
+                [attr.d]="link.path"
+                marker-end="url(#ganttArrowBody)"
+                (mouseenter)="onLinkMouseEnter(link)"
+                (mouseleave)="onLinkMouseLeave()"
+              ></path>
+            </g>
+
+            <!-- Prévisualisation création de lien -->
+            <g *ngIf="linkDraft as ld">
+              <path
+                class="gantt-link gantt-link--draft"
+                [attr.d]="getLinkDraftPath()"
+                marker-end="url(#ganttArrowBody)"
+              ></path>
+              <circle
+                *ngIf="ld.targetTaskId"
+                class="gantt-link-target-anchor"
+                [attr.cx]="ld.toX"
+                [attr.cy]="ld.toY"
+                r="5"
+              ></circle>
+            </g>
+
+            <!-- Tooltip lien -->
+            <g *ngIf="linkTooltip as lt">
+              <rect
+                class="gantt-link-tooltip-bg"
+                [attr.x]="lt.x - 160"
+                [attr.y]="lt.y - 18"
+                rx="4"
+                ry="4"
+                width="320"
+                height="24"
+              ></rect>
+              <text
+                class="gantt-link-tooltip-text"
+                [attr.x]="lt.x - 152"
+                [attr.y]="lt.y - 2"
+              >{{ lt.text }}</text>
+            </g>
+
+            <!-- Barres de tâches -->
+            <g *ngFor="let task of ganttTasksView">
+              <rect
+                [attr.class]="getTaskBarClass(task)"
+                [attr.x]="task.x"
+                [attr.y]="task.y"
+                [attr.width]="task.width"
+                [attr.height]="task.height"
+                (mousedown)="onGanttBarMouseDown($event, task)"
+                (mouseenter)="showTaskHoverCard(task)"
+                (mouseleave)="hideTaskHoverCard()"
+              ></rect>
+
+              <circle
+                [attr.class]="getTaskBulletClass(task, 'start')"
+                [attr.cx]="task.x"
+                [attr.cy]="task.y + task.height / 2"
+                r="4"
+                (mousedown)="onGanttBarMouseDown($event, task)"
+                (mouseenter)="showHintForTask(task, 'start')"
+                (mouseleave)="hideHints()"
+              ></circle>
+
+              <circle
+                [attr.class]="getTaskBulletClass(task, 'end')"
+                [attr.cx]="task.x + task.width"
+                [attr.cy]="task.y + task.height / 2"
+                r="4"
+                (mousedown)="onGanttBarResizeEndMouseDown($event, task)"
+                (mouseenter)="showHintForTask(task, 'end')"
+                (mouseleave)="hideHints()"
+              ></circle>
+
+              <text
+                class="gantt-bar-label"
+                [attr.x]="task.x + 5"
+                [attr.y]="task.y + task.height / 2 + 4"
+              >{{ task.label }}</text>
+
+              <g *ngIf="hoveredTaskId === task.id && !task.id.startsWith('summary-')" class="gantt-click-hint">
                 <circle
-                  class="gantt-milestone-dot"
-                  [attr.cx]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
-                  [attr.cy]="18"
-                  r="4"
+                  [attr.cx]="task.x + task.width - 8"
+                  [attr.cy]="task.y + 8"
+                  r="7"
                 ></circle>
                 <text
-                  class="gantt-milestone-text"
-                  [attr.x]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
-                  [attr.y]="12"
-                  style="font-size: 0.58rem;"
-                >
-                  {{ ms.label }}
-                </text>
+                  [attr.x]="task.x + task.width - 10.5"
+                  [attr.y]="task.y + 10.5"
+                >✎</text>
               </g>
-            </svg>
+            </g>
 
-            <!-- Row 2 : mois -->
-            <svg class="gantt-svg" [attr.width]="ganttViewportWidth" [attr.height]="headerRow2Height" style="display:block;">
-              <g *ngFor="let month of ganttMonths; index as i">
-                <text
-                  class="gantt-month-text"
-                  [attr.x]="ganttLeftPadding + i * ganttColWidth + ganttColWidth / 2"
-                  [attr.y]="20"
-                  style="font-size: 0.60rem; font-weight:600;"
-                >
-                  {{ month }}
-                </text>
-              </g>
-            </svg>
+            <!-- Hints dates (survol bullets) -->
+            <g *ngIf="hoverHints.start as hs">
+              <rect class="gantt-hint-bg" [attr.x]="hs.x" [attr.y]="hs.y - 18" rx="3" ry="3" width="90" height="20"></rect>
+              <text class="gantt-hint-text" [attr.x]="hs.x + 4" [attr.y]="hs.y - 5">{{ hs.text }}</text>
+            </g>
+            <g *ngIf="hoverHints.end as he">
+              <rect class="gantt-hint-bg" [attr.x]="he.x" [attr.y]="he.y - 18" rx="3" ry="3" width="90" height="20"></rect>
+              <text class="gantt-hint-text" [attr.x]="he.x + 4" [attr.y]="he.y - 5">{{ he.text }}</text>
+            </g>
+          </svg>
 
-            <!-- Body -->
-            <svg
-              class="gantt-svg"
-              [attr.width]="ganttViewportWidth"
-              [attr.height]="ganttBodyHeight"
-              style="display:block;"
-              (mousemove)="onGanttMouseMove($event)"
-              (mouseup)="onGanttMouseUp($event)"
-              (mouseleave)="onGanttMouseUp($event)"
-            >
-              <defs>
-                <marker id="ganttArrowBody" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-                  <path d="M 0 0 L 10 5 L 0 10 z"></path>
-                </marker>
-              </defs>
-
-              <!-- Grille verticale (mois) -->
-              <g *ngFor="let m of ganttMonths; index as colIndex">
-                <line
-                  class="gantt-grid-line"
-                  [attr.x1]="ganttLeftPadding + colIndex * ganttColWidth"
-                  [attr.y1]="0"
-                  [attr.x2]="ganttLeftPadding + colIndex * ganttColWidth"
-                  [attr.y2]="ganttBodyHeight"
-                ></line>
-              </g>
-
-              <!-- Grille horizontale (lignes) -->
-              <g *ngFor="let r of ganttActivityRows">
-                <line
-                  class="gantt-row-line"
-                  [attr.x1]="0"
-                  [attr.y1]="getRowCenterY(r.rowIndex)"
-                  [attr.x2]="ganttViewportWidth"
-                  [attr.y2]="getRowCenterY(r.rowIndex)"
-                ></line>
-              </g>
-
-              <!-- Ligne Today -->
-              <g *ngIf="todayDayIndex !== null">
-                <line
-                  [attr.x1]="ganttLeftPadding + todayDayIndex * dayWidth"
-                  [attr.y1]="0"
-                  [attr.x2]="ganttLeftPadding + todayDayIndex * dayWidth"
-                  [attr.y2]="ganttBodyHeight"
-                  style="stroke: #0d6efd; stroke-width: 1; stroke-dasharray: 4 4;"
-                ></line>
-                <text
-                  [attr.x]="ganttLeftPadding + todayDayIndex * dayWidth + 6"
-                  [attr.y]="14"
-                  style="font-size: 0.62rem; font-weight: 600; fill: #0d6efd;"
-                >
-                  Today
-                </text>
-              </g>
-
-              <!-- Liens -->
-              <g *ngFor="let link of ganttLinksView">
-                <path
-                  [attr.class]="getLinkCssClass(link)"
-                  [attr.d]="link.path"
-                  marker-end="url(#ganttArrowBody)"
-                  (mouseenter)="onLinkMouseEnter(link)"
-                  (mouseleave)="onLinkMouseLeave()"
-                ></path>
-              </g>
-
-              <!-- Prévisualisation création de lien (drag depuis extrémité droite) -->
-              <g *ngIf="linkDraft as ld">
-                <path
-                  class="gantt-link gantt-link--draft"
-                  [attr.d]="getLinkDraftPath()"
-                  marker-end="url(#ganttArrowBody)"
-                ></path>
-                <circle
-                  *ngIf="ld.targetTaskId"
-                  class="gantt-link-target-anchor"
-                  [attr.cx]="ld.toX"
-                  [attr.cy]="ld.toY"
-                  r="5"
-                ></circle>
-              </g>
-
-              <!-- Tooltip lien -->
-              <g *ngIf="linkTooltip as lt">
-                <rect
-                  class="gantt-link-tooltip-bg"
-                  [attr.x]="lt.x - 160"
-                  [attr.y]="lt.y - 18"
-                  rx="6"
-                  ry="6"
-                  width="320"
-                  height="24"
-                ></rect>
-                <text
-                  class="gantt-link-tooltip-text"
-                  [attr.x]="lt.x - 152"
-                  [attr.y]="lt.y - 2"
-                >
-                  {{ lt.text }}
-                </text>
-              </g>
-
-              <!-- Tâches -->
-              <g *ngFor="let task of ganttTasksView">
-                <rect
-                  [attr.class]="getTaskBarClass(task)"
-                  [attr.x]="task.x"
-                  [attr.y]="task.y"
-                  [attr.width]="task.width"
-                  [attr.height]="task.height"
-                  (mousedown)="onGanttBarMouseDown($event, task)"
-                  (mouseenter)="showTaskHoverCard(task)"
-                  (mouseleave)="hideTaskHoverCard()"
-                ></rect>
-
-                <circle
-                  [attr.class]="getTaskBulletClass(task, 'start')"
-                  [attr.cx]="task.x"
-                  [attr.cy]="task.y + task.height / 2"
-                  r="4"
-                  (mousedown)="onGanttBarMouseDown($event, task)"
-                  (mouseenter)="showHintForTask(task, 'start')"
-                  (mouseleave)="hideHints()"
-                ></circle>
-
-                <circle
-                  [attr.class]="getTaskBulletClass(task, 'end')"
-                  [attr.cx]="task.x + task.width"
-                  [attr.cy]="task.y + task.height / 2"
-                  r="4"
-                  (mousedown)="onGanttBarResizeEndMouseDown($event, task)"
-                  (mouseenter)="showHintForTask(task, 'end')"
-                  (mouseleave)="hideHints()"
-                ></circle>
-
-                <text
-                  class="gantt-bar-label"
-                  [attr.x]="task.x + 4"
-                  [attr.y]="task.y + task.height / 2 + 4"
-                  style="font-size: 0.60rem;"
-                >
-                  {{ task.label }}
-                </text>
-
-                <g *ngIf="hoveredTaskId === task.id && !task.id.startsWith('summary-')" class="gantt-click-hint">
-                  <circle
-                    [attr.cx]="task.x + task.width - 8"
-                    [attr.cy]="task.y + 8"
-                    r="7"
-                  ></circle>
-                  <text
-                    [attr.x]="task.x + task.width - 10.5"
-                    [attr.y]="task.y + 10.5"
-                  >
-                    ✎
-                  </text>
-                </g>
-              </g>
-
-              <!-- hints -->
-              <g *ngIf="hoverHints.start as hs">
-                <rect
-                  class="gantt-hint-bg"
-                  [attr.x]="hs.x"
-                  [attr.y]="hs.y - 18"
-                  rx="3"
-                  ry="3"
-                  width="90"
-                  height="20"
-                ></rect>
-                <text
-                  class="gantt-hint-text"
-                  [attr.x]="hs.x + 4"
-                  [attr.y]="hs.y - 5"
-                  style="font-size: 0.60rem;"
-                >
-                  {{ hs.text }}
-                </text>
-              </g>
-
-              <g *ngIf="hoverHints.end as he">
-                <rect
-                  class="gantt-hint-bg"
-                  [attr.x]="he.x"
-                  [attr.y]="he.y - 18"
-                  rx="3"
-                  ry="3"
-                  width="90"
-                  height="20"
-                ></rect>
-                <text
-                  class="gantt-hint-text"
-                  [attr.x]="he.x + 4"
-                  [attr.y]="he.y - 5"
-                  style="font-size: 0.60rem;"
-                >
-                  {{ he.text }}
-                </text>
-              </g>
-            </svg>
-
-            <app-task-hover-tooltip
-              *ngIf="taskHoverCard as hc"
-              [visible]="true"
-              [x]="hc.x"
-              [y]="hc.y"
-              [title]="hc.label"
-              [start]="hc.start"
-              [end]="hc.end"
-              [status]="hc.status"
-            ></app-task-hover-tooltip>
-          </div>
+          <app-task-hover-tooltip
+            *ngIf="taskHoverCard as hc"
+            [visible]="true"
+            [x]="hc.x"
+            [y]="hc.y"
+            [title]="hc.label"
+            [start]="hc.start"
+            [end]="hc.end"
+            [status]="hc.status"
+          ></app-task-hover-tooltip>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ✅ Modal Roadmap -->
+<!-- ── Modal édition de tâche ──────────────────────────────────────────── -->
 <ng-template #taskEditModal let-modal>
   <app-project-task-edit-modal
     [isCreateMode]="isCreateMode"
     [editError]="editError"
-    [(editedTaskLabel)]="editedTaskLabel"
-    [(editedTaskStatus)]="editedTaskStatus"
+    [(editedItemLabel)]="editedItemLabel"
+    [(editedItemStatus)]="editedItemStatus"
     [(editedStartDate)]="editedStartDate"
     [(editedEndDate)]="editedEndDate"
     [(editedCategory)]="editedCategory"
@@ -590,13 +510,14 @@
     [(editedReporterId)]="editedReporterId"
     [(editedAccountantId)]="editedAccountantId"
     [(editedResponsibleId)]="editedResponsibleId"
-    [taskStatusOptions]="taskStatusOptions"
-    [taskCategoryOptions]="taskCategoryOptions"
+    [itemStatusOptions]="itemStatusOptions"
+    [itemCategoryOptions]="itemCategoryOptions"
     [dependencyTypeOptions]="dependencyTypeOptions"
     [phases]="project?.phases ?? []"
     [users]="users"
     [editedDependencies]="editedDependencies"
     [linkableTasks]="getLinkableTasks()"
+    [childItems]="getChildItems()"
     (addDependency)="addDependencyRow()"
     (removeDependency)="removeDependencyRow($event)"
     (cancel)="modal.dismiss()"

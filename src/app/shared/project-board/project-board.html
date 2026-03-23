@@ -1,119 +1,188 @@
-<div class="card project-board">
+<div class="project-board">
 
-  <!-- En-tête Sprint -->
-  <div class="card-body board-card-body pb-2">
-    <div class="board-toolbar mb-3">
-      <div class="board-toolbar-left">
-        <h3 class="h6 mb-1">Sprint : {{ sprint.name }}</h3>
-        <div class="board-kpis">
-          <span class="board-kpi" *ngFor="let st of statuses; trackBy: trackByStatusId">
-            {{ st.label }}: {{ getTicketCountByStatus(st.id) }}
-          </span>
+  <!-- ── Toolbar ─────────────────────────────────────────────────────────── -->
+  <div class="card mb-3">
+    <div class="card-body board-card-body">
+      <div class="board-toolbar">
+        <div class="board-toolbar-left">
+          <span class="board-sprint-label">{{ sprint.name }}</span>
+          <span class="board-sprint-goal" *ngIf="sprint.goal">{{ sprint.goal }}</span>
         </div>
-        <div class="board-add-task-hint">Info: nom, phase, type d'activité, début et fin sont obligatoires.</div>
-        <div class="text-muted small" *ngIf="sprint.goal">
-          <strong>Goal :</strong> {{ sprint.goal }}
-        </div>
-      </div>
 
-      <div class="board-header-actions">
-        <button type="button" class="btn board-add-task-btn" (click)="openCreateTaskModal(taskEditModal)">
-          <span class="board-add-task-btn__plus">+</span>
-          <span>Ajouter une activité</span>
-        </button>
+        <div class="board-header-actions">
+          <button type="button" class="btn btn-add" (click)="openCreateTaskModal(taskEditModal)">
+            + Ajouter une activité
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div #boardWrap class="card-body pt-2 board-wrap" (scroll)="hideTaskHoverCard()">
-    <!-- Lanes -->
-<div class="lane" *ngFor="let lane of lanes; trackBy: trackByLaneId">
-  <!-- Lane header -->
-  <div class="lane-header">
-    <div class="d-flex align-items-center justify-content-between gap-2">
-      <div class="fw-semibold">{{ lane.label }}</div>
+  <!-- ── Filtre de phases ────────────────────────────────────────────────── -->
+  <div class="phase-filter" *ngIf="project?.phases?.length">
+    <button
+      type="button"
+      class="phase-filter-active-btn"
+      [class.is-active]="activePhase && selectedPhases.size === 1 && isPhaseSelected(activePhase)"
+      (click)="selectActivePhase()"
+      title="Afficher uniquement la phase en cours">
+      Phase en cours
+    </button>
 
+    <span class="phase-filter-divider"></span>
+
+    <button type="button" class="phase-filter-action" (click)="selectAllPhases()">Toutes</button>
+    <span class="phase-filter-sep">·</span>
+    <button type="button" class="phase-filter-action" (click)="deselectAllPhases()">Aucune</button>
+
+    <span class="phase-filter-divider"></span>
+
+    <div class="phase-chips">
       <button
+        *ngFor="let phase of project?.phases"
         type="button"
-        class="btn lane-toggle board-chip-btn"
-        (click)="toggleLane(lane.id)"
-        [attr.aria-expanded]="!isLaneCollapsed(lane.id)">
-        <span *ngIf="isLaneCollapsed(lane.id)">▸ Ouvrir</span>
-        <span *ngIf="!isLaneCollapsed(lane.id)">▾ Fermer</span>
+        class="phase-chip"
+        [class.phase-chip--selected]="isPhaseSelected(phase)"
+        [class.phase-chip--active]="phase === activePhase"
+        [title]="phase"
+        (click)="togglePhase(phase)">
+        {{ getPhaseLabel(phase) }}
       </button>
     </div>
   </div>
 
-  <!-- 4 colonnes (masquées si lane repliée) -->
-  <div class="lane-grid" *ngIf="!isLaneCollapsed(lane.id)">
-    <div class="col" *ngFor="let st of statuses; trackBy: trackByStatusId">
-      <div class="col-header">
-        <span class="col-title">{{ st.label }}</span>
-        <span class="badge text-bg-light">{{ laneBuckets[lane.id]?.[st.id]?.length ?? 0 }}</span>
+  <!-- ── Board ──────────────────────────────────────────────────────────── -->
+  <div #boardWrap class="board-wrap" (scroll)="hideTaskHoverCard()">
+
+    <!-- En-têtes de colonnes sticky -->
+    <div class="board-columns-header">
+      <div
+        class="board-col-header"
+        *ngFor="let st of statuses; trackBy: trackByStatusId"
+        [class]="'bch-' + st.id">
+        <span class="bch-dot"></span>
+        <span class="bch-label">{{ st.label }}</span>
+        <span class="bch-count">{{ getTicketCountByStatus(st.id) }}</span>
+      </div>
+    </div>
+
+    <!-- Swimlanes -->
+    <div class="lane" *ngFor="let lane of lanes; trackBy: trackByLaneId">
+
+      <!-- Lane header -->
+      <div class="lane-header" (click)="toggleLane(lane.id)">
+        <span class="lane-chevron">{{ isLaneCollapsed(lane.id) ? '▶' : '▼' }}</span>
+        <span class="lane-title">{{ lane.label }}</span>
+        <span class="lane-count">
+          {{ (laneBuckets[lane.id]?.todo?.length ?? 0) +
+             (laneBuckets[lane.id]?.inprogress?.length ?? 0) +
+             (laneBuckets[lane.id]?.waiting?.length ?? 0) +
+             (laneBuckets[lane.id]?.done?.length ?? 0) }}
+        </span>
       </div>
 
-      <div
-        class="dropzone"
-        cdkDropList
-        [id]="dropListId(lane.id, st.id)"
-        [cdkDropListData]="laneBuckets[lane.id][st.id]"
-        [cdkDropListConnectedTo]="connectedListsForLane(lane.id)"
-        (cdkDropListDropped)="onDrop(lane.id, st.id, $event)">
-
+      <!-- Grille 4 colonnes -->
+      <div class="lane-grid" *ngIf="!isLaneCollapsed(lane.id)">
         <div
-          class="kanban-card"
-          *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
-          cdkDrag
-          [cdkDragPreviewContainer]="'parent'"
-          (mouseenter)="showTaskHoverCard($event, c)"
-          (mouseleave)="hideTaskHoverCard()"
-          (click)="openTaskEditModal(taskEditModal, c)">
+          class="dropzone"
+          *ngFor="let st of statuses; trackBy: trackByStatusId"
+          cdkDropList
+          [id]="dropListId(lane.id, st.id)"
+          [cdkDropListData]="laneBuckets[lane.id][st.id]"
+          [cdkDropListConnectedTo]="connectedListsForLane(lane.id)"
+          (cdkDropListDropped)="onDrop(lane.id, st.id, $event)">
 
-          <div class="kanban-card-title">{{ c.title }}</div>
+          <!-- Cartes -->
+          <div
+            class="kanban-card"
+            [class]="'kc-' + st.id"
+            *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
+            cdkDrag
+            [cdkDragPreviewContainer]="'parent'"
+            (mouseenter)="showTaskHoverCard($event, c)"
+            (mouseleave)="hideTaskHoverCard()"
+            (click)="openTaskEditModal(taskEditModal, c)">
 
-          <div class="assignees" *ngIf="c.assignees?.length">
-            <div class="avatar" *ngFor="let a of c.assignees">
-              <img *ngIf="a.avatarUrl" [src]="a.avatarUrl" [alt]="a.name" />
-              <span *ngIf="!a.avatarUrl">{{ initials(a.name) }}</span>
+            <!-- Avatars coin supérieur droit -->
+            <div class="kc-roles-corner">
+              <span
+                class="kc-avatar"
+                [class.kc-avatar--res]="cardRoles[c.id]?.res"
+                [class.kc-avatar--empty]="!cardRoles[c.id]?.res"
+                [title]="cardRoles[c.id]?.res ? ('Assigné : ' + cardRoles[c.id]!.res) : 'Non assigné'">
+                {{ cardRoles[c.id]?.res ? initials(cardRoles[c.id]!.res!) : '' }}
+              </span>
+              <span
+                class="kc-avatar"
+                [class.kc-avatar--rep]="cardRoles[c.id]?.rep"
+                [class.kc-avatar--empty]="!cardRoles[c.id]?.rep"
+                [title]="cardRoles[c.id]?.rep ? ('Reporter : ' + cardRoles[c.id]!.rep) : 'Reporter non défini'">
+                {{ cardRoles[c.id]?.rep ? initials(cardRoles[c.id]!.rep!) : '' }}
+              </span>
+              <span
+                class="kc-avatar"
+                [class.kc-avatar--acc]="cardRoles[c.id]?.acc"
+                [class.kc-avatar--empty]="!cardRoles[c.id]?.acc"
+                [title]="cardRoles[c.id]?.acc ? ('Suiveur : ' + cardRoles[c.id]!.acc) : 'Suiveur non défini'">
+                {{ cardRoles[c.id]?.acc ? initials(cardRoles[c.id]!.acc!) : '' }}
+              </span>
             </div>
-          </div>
 
-          <div class="kanban-card-desc text-muted" *ngIf="c.description">
-            {{ c.description }}
-          </div>
+            <!-- Corps -->
+            <div class="kc-body">
+              <p class="kc-title">{{ c.title }}</p>
+            </div>
 
-          <ng-template cdkDragPreview>
-            <div class="kanban-card drag-preview-card">
-              <div class="kanban-card-title">{{ c.title }}</div>
+            <!-- Pied de carte -->
+            <div class="kc-footer">
+              <span class="kc-phase-tag" *ngIf="c.description">{{ c.description }}</span>
+              <span class="kc-status-tag" [class]="'kc-status-tag--' + st.id">{{ st.label }}</span>
+            </div>
 
-              <div class="assignees" *ngIf="c.assignees?.length">
-                <div class="avatar" *ngFor="let a of c.assignees">
-                  <img *ngIf="a.avatarUrl" [src]="a.avatarUrl" [alt]="a.name" />
-                  <span *ngIf="!a.avatarUrl">{{ initials(a.name) }}</span>
+            <ng-template cdkDragPreview>
+              <div class="kanban-card kc-drag-preview" [class]="'kc-' + st.id">
+                <div class="kc-roles-corner">
+                  <span class="kc-avatar"
+                    [class.kc-avatar--res]="cardRoles[c.id]?.res"
+                    [class.kc-avatar--empty]="!cardRoles[c.id]?.res">
+                    {{ cardRoles[c.id]?.res ? initials(cardRoles[c.id]!.res!) : '' }}
+                  </span>
+                  <span class="kc-avatar"
+                    [class.kc-avatar--rep]="cardRoles[c.id]?.rep"
+                    [class.kc-avatar--empty]="!cardRoles[c.id]?.rep">
+                    {{ cardRoles[c.id]?.rep ? initials(cardRoles[c.id]!.rep!) : '' }}
+                  </span>
+                  <span class="kc-avatar"
+                    [class.kc-avatar--acc]="cardRoles[c.id]?.acc"
+                    [class.kc-avatar--empty]="!cardRoles[c.id]?.acc">
+                    {{ cardRoles[c.id]?.acc ? initials(cardRoles[c.id]!.acc!) : '' }}
+                  </span>
+                </div>
+                <div class="kc-body">
+                  <p class="kc-title">{{ c.title }}</p>
                 </div>
               </div>
+            </ng-template>
+          </div>
 
-              <div class="kanban-card-desc text-muted" *ngIf="c.description">
-                {{ c.description }}
-              </div>
-            </div>
-          </ng-template>
-        </div>
-
-        <div class="empty-hint text-muted small" *ngIf="(laneBuckets[lane.id][st.id]?.length ?? 0) === 0">
-          Déposer ici…
+          <!-- Placeholder zone vide -->
+          <div class="drop-placeholder" *ngIf="(laneBuckets[lane.id][st.id]?.length ?? 0) === 0">
+            Déposer ici
+          </div>
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
+<!-- Modal édition tâche -->
 <ng-template #taskEditModal let-modal>
   <app-project-task-edit-modal
     [isCreateMode]="isCreateMode"
     [editError]="editError"
-    [(editedTaskLabel)]="editedTaskLabel"
-    [(editedTaskStatus)]="editedTaskStatus"
+    [(editedItemLabel)]="editedItemLabel"
+    [(editedItemStatus)]="editedItemStatus"
     [(editedStartDate)]="editedStartDate"
     [(editedEndDate)]="editedEndDate"
     [(editedCategory)]="editedCategory"
@@ -121,13 +190,14 @@
     [(editedReporterId)]="editedReporterId"
     [(editedAccountantId)]="editedAccountantId"
     [(editedResponsibleId)]="editedResponsibleId"
-    [taskStatusOptions]="taskStatusOptions"
-    [taskCategoryOptions]="taskCategoryOptions"
+    [itemStatusOptions]="itemStatusOptions"
+    [itemCategoryOptions]="itemCategoryOptions"
     [dependencyTypeOptions]="dependencyTypeOptions"
     [phases]="project?.phases ?? []"
     [users]="users"
     [editedDependencies]="editedDependencies"
     [linkableTasks]="getLinkableTasks()"
+    [childItems]="getChildItems()"
     (addDependency)="addDependencyRow()"
     (removeDependency)="removeDependencyRow($event)"
     (cancel)="modal.dismiss()"
@@ -145,6 +215,3 @@
   [end]="hc.end"
   [status]="hc.status"
 ></app-task-hover-tooltip>
-
-  </div>
-</div>

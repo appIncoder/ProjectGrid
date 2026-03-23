@@ -33,23 +33,65 @@
   color: #4f5f76;
 }
 
-.scorecard-add-task-btn,
-.roadmap-add-task-btn,
-.project-board .board-add-task-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid #56a47f;
-  border-radius: 999px;
-  background: #e9f7ef;
-  color: #198754;
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 0.34rem 0.95rem;
+/* =========================================================
+   Shared Button — Add action
+   ========================================================= */
+
+// Always used with Bootstrap's .btn base class.
+// Only defines overrides: colors, sizing, and nowrap.
+.btn-add {
+  background: #0d6efd;
+  color: #fff;
+  border-color: #0d6efd;
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: #0b5ed7;
+    border-color: #0a58ca;
+    color: #fff;
+  }
 }
 
-.scorecard-add-task-btn:hover,
-.roadmap-add-task-btn:hover,
-.project-board .board-add-task-btn:hover {
-  background: #dff3e8;
+/* =========================================================
+   Shared Status Colors
+   ========================================================= */
+
+.status-done {
+  background: #28a745;
+  border-color: #28a745;
+  color: #fff;
+}
+
+.status-todo {
+  background: #fff;
+  border-color: #000;
+  color: #000;
+}
+
+.status-inprogress {
+  background: #fd7e14;
+  border-color: #fd7e14;
+  color: #fff;
+}
+
+.status-onhold {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
+}
+
+.status-notdone {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+.status-notapplicable {
+  background: #adb5bd;
+  border-color: #adb5bd;
+  color: #fff;
 }

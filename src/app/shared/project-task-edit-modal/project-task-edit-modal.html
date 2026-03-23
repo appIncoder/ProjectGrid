@@ -70,30 +70,51 @@
     <label class="form-label form-label-sm">Nom de l’activité</label>
     <input
       class="form-control form-control-sm"
-      [ngModel]="editedTaskLabel"
-      (ngModelChange)="editedTaskLabelChange.emit($event)"
+      [ngModel]="editedItemLabel"
+      (ngModelChange)="editedItemLabelChange.emit($event)"
     />
   </section>
 
   <section class="visual-panel mb-3">
-    <div class="visual-label">Statut</div>
-    <div class="segmented-grid">
-      <button
-        type="button"
-        class="segment-btn segment-btn--status"
-        *ngFor="let opt of taskStatusOptions"
-        [class.is-active]="editedTaskStatus === opt.value"
-        [class.status-todo]="opt.value === 'todo'"
-        [class.status-inprogress]="opt.value === 'inprogress'"
-        [class.status-onhold]="opt.value === 'onhold'"
-        [class.status-done]="opt.value === 'done'"
-        [class.status-notdone]="opt.value === 'notdone'"
-        [class.status-notapplicable]="opt.value === 'notapplicable'"
-        (click)="editedTaskStatusChange.emit(opt.value)"
-      >
-        <span class="segment-dot"></span>
-        <span>{{ opt.label }}</span>
-      </button>
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="form-label form-label-sm visual-label">Statut</label>
+        <select
+          class="form-select form-select-sm"
+          [ngModel]="editedItemStatus"
+          (ngModelChange)="editedItemStatusChange.emit($event)"
+        >
+          @for (opt of itemStatusOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="col-6">
+        <label class="form-label form-label-sm visual-label">Phase</label>
+        <select
+          class="form-select form-select-sm"
+          [ngModel]="editedPhase"
+          (ngModelChange)="editedPhaseChange.emit($event)"
+        >
+          @for (p of phases; track p) {
+            <option [value]="p">{{ p }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div class="row g-2 mt-1">
+      <div class="col-12">
+        <label class="form-label form-label-sm visual-label">Catégorie</label>
+        <select
+          class="form-select form-select-sm"
+          [ngModel]="editedCategory"
+          (ngModelChange)="editedCategoryChange.emit($event)"
+        >
+          @for (opt of itemCategoryOptions; track opt.value) {
+            <option [value]="opt.value">{{ opt.label }} — {{ getCategoryHint(opt.value) }}</option>
+          }
+        </select>
+      </div>
     </div>
   </section>
 
@@ -121,54 +142,29 @@
     </div>
   </section>
 
-  <section class="visual-panel mb-3">
-    <div class="visual-label">Catégorie</div>
-    <div class="segmented-grid segmented-grid--2cols">
-      <button
-        type="button"
-        class="segment-btn segment-btn--category"
-        *ngFor="let opt of taskCategoryOptions"
-        [class.is-active]="editedCategory === opt.value"
-        (click)="editedCategoryChange.emit(opt.value)"
-      >
-        <span class="segment-top">{{ opt.label }}</span>
-        <span class="segment-sub">{{ getCategoryHint(opt.value) }}</span>
-      </button>
-    </div>
-  </section>
-
-  <section class="visual-panel mb-3">
-    <div class="visual-label">Phase</div>
-    <div class="phase-pills">
-      <button
-        type="button"
-        class="phase-pill"
-        *ngFor="let p of phases"
-        [class.is-active]="editedPhase === p"
-        (click)="editedPhaseChange.emit(p)"
-      >
-        {{ p }}
-      </button>
-    </div>
-    <div class="form-text small mt-2">
-      Changer la phase déplacera l’activité vers la cellule correspondante.
-    </div>
-  </section>
-
-  <div class="form-text small mb-3">
-    Clique sur les avatars en haut à droite pour initialiser, changer ou supprimer les assignations.
-  </div>
+  @if (!isCreateMode) {
+    <section class="visual-panel child-tasks-panel mb-3">
+      <div class="visual-label">Items fils</div>
+      @if (childItems.length === 0) {
+        <div class="empty-state small">Aucun item fils.</div>
+      }
+      @for (t of childItems; track t.id) {
+        <div class="child-task-row">
+          <span class="child-task-dot" [class]="'status-dot--' + t.status"></span>
+          <span class="child-task-label">{{ t.label }}</span>
+          <span class="child-task-status-badge child-task-status-badge--{{ t.status }}">{{ getStatusLabel(t.status) }}</span>
+        </div>
+      }
+    </section>
+  }
 
   <section class="visual-panel dependencies-panel mt-3">
     <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
       <div>
         <div class="fw-semibold" style="font-size: 0.92rem;">Dépendances</div>
-        <div class="text-muted small">
-          Les liens créés ici sont affichés dans le Gantt.
-        </div>
       </div>
 
-      <button type="button" class="btn btn-sm btn-outline-primary" (click)="addDependency.emit()">
+      <button type="button" class="btn btn-sm btn-add" (click)="addDependency.emit()">
         + Ajouter
       </button>
     </div>
@@ -213,12 +209,8 @@
       <div class="dependency-preview">
         <span class="dep-chip">{{ getDependencyTypeShort(dep.type) }}</span>
         <span class="dep-arrow">→</span>
-        <span class="dep-target">{{ getTaskLabel(dep.toId) }}</span>
+        <span class="dep-target">{{ getItemLabel(dep.toId) }}</span>
       </div>
-    </div>
-
-    <div class="form-text small mt-2">
-      Astuce : laisse une ligne vide si tu veux la supprimer automatiquement (elle ne sera pas enregistrée).
     </div>
   </section>
 </div>
@@ -228,6 +220,6 @@
     Annuler
   </button>
   <button type="button" class="btn btn-sm btn-primary" (click)="save.emit()">
-    {{ isCreateMode ? 'Creer la tache' : 'Enregistrer' }}
+    {{ isCreateMode ? 'Créer l\'item' : 'Enregistrer' }}
   </button>
 </div>

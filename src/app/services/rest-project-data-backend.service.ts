@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import type { ProjectDetail, UserRef } from '../models';
+import type { ProjectDetail, ProjectMember, ProjectWorkflow, UserRef } from '../models';
 import { environment } from '../environments/environment';
 import type { ProjectDataBackend } from './project-data-backend';
 import type {
@@ -257,5 +257,44 @@ export class RestProjectDataBackendService implements ProjectDataBackend {
     };
 
     await firstValueFrom(this.http.post(url, { procedure, payload: normalizedPayload }));
+  }
+
+  async listProjectMembers(projectId: string): Promise<ProjectMember[]> {
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/members`;
+    try {
+      return await firstValueFrom(this.http.get<ProjectMember[]>(url));
+    } catch {
+      return [];
+    }
+  }
+
+  async setProjectMembers(projectId: string, members: ProjectMember[]): Promise<void> {
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/members`;
+    await firstValueFrom(this.http.put(url, { members }));
+  }
+
+  async saveProjectTypeWorkflow(projectTypeId: string, workflow: ProjectWorkflow): Promise<void> {
+    const url = `${this.baseUrl}/project-types/${encodeURIComponent(projectTypeId)}/workflow`;
+    await firstValueFrom(this.http.put(url, workflow));
+  }
+
+  async saveProjectWorkflow(projectId: string, workflow: ProjectWorkflow): Promise<void> {
+    const url = `${this.baseUrl}/projects/${encodeURIComponent(projectId)}/workflow`;
+    await firstValueFrom(this.http.put(url, workflow));
+  }
+
+  async getCurrentProjectId(): Promise<string | null> {
+    try {
+      const url = this.withNoCache(`${this.baseUrl}/user-preferences/current-project`);
+      const res = await firstValueFrom(this.http.get<{ projectId?: string }>(url));
+      return res?.projectId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async setCurrentProjectId(projectId: string): Promise<void> {
+    const url = `${this.baseUrl}/user-preferences/current-project`;
+    await firstValueFrom(this.http.put(url, { projectId }));
   }
 }

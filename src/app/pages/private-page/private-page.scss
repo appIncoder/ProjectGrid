@@ -139,28 +139,10 @@
   border-radius: 50%;
 }
 
-.status-done {
-  background-color: #198754;
-}
-
-.status-inprogress {
-  background-color: #fd7e14;
-}
-
+// Override for dot-only indicator: canonical status-todo is white (pill with border),
+// but here it's used as a filled circle where white would be invisible.
 .status-todo {
   background-color: #adb5bd;
-}
-
-.status-notdone {
-  background-color: #dc3545;
-}
-
-.status-onhold {
-  background-color: #0d6efd;
-}
-
-.status-notapplicable {
-  background-color: #ced4da;
 }
 
 .dashboard-columns {
@@ -345,6 +327,17 @@
 
 .text-muted.small {
   font-size: 0.85rem;
+}
+
+.dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #6c757d;
 }
 
 .dashboard-layout {

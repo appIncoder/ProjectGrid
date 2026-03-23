@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgIf } from '@angular/common';
 import { AuthService } from './services/auth.service';
+import { ProjectService } from './services/project.service';
 
 @Component({
   selector: 'app-root',
@@ -13,7 +14,7 @@ import { AuthService } from './services/auth.service';
 export class App {
   title = 'ProjectManagementApp';
 
-  constructor(public auth: AuthService) { }
+  constructor(public auth: AuthService, public projectService: ProjectService) { }
 
   logout() {
     this.auth.logout();

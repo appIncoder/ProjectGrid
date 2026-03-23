@@ -177,7 +177,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   // ===== Timeline (Gantt)
-  ganttMonthsCount = 6;
+  ganttMonthsCount = 12;
   private ganttStartDateOverride: Date | null = null;
 
   readonly ganttColWidth = 140;
@@ -298,7 +298,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   readonly linkSnapDistancePx = 18;
 
   // ===== Période
-  periodPreset: PeriodPreset = '6m';
+  periodPreset: PeriodPreset = '12m';
   customMonths = 6;
   customStartIso = '';
 
@@ -306,16 +306,16 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   showMoreInfos = false;
 
   // ===== Options UI
-  taskStatusOptions: { value: ActivityStatus; label: string }[] = [
-    { value: 'todo', label: 'À faire (blanc)' },
-    { value: 'inprogress', label: 'En cours (orange)' },
-    { value: 'onhold', label: 'En attente (bleu)' },
-    { value: 'done', label: 'Fait (vert)' },
-    { value: 'notdone', label: 'Non fait (rouge)' },
-    { value: 'notapplicable', label: 'Non applicable (gris)' },
+  itemStatusOptions: { value: ActivityStatus; label: string }[] = [
+    { value: 'todo',          label: 'To Do' },
+    { value: 'inprogress',    label: 'In Progress' },
+    { value: 'onhold',        label: 'On Hold' },
+    { value: 'done',          label: 'Done' },
+    { value: 'notdone',       label: 'Not Done' },
+    { value: 'notapplicable', label: 'N/A' },
   ];
 
-  taskCategoryOptions: { value: TaskCategory; label: string }[] = [
+  itemCategoryOptions: { value: TaskCategory; label: string }[] = [
     { value: 'projectManagement', label: 'Gestion du projet' },
     { value: 'businessManagement', label: 'Gestion du métier' },
     { value: 'changeManagement', label: 'Gestion du changement' },
@@ -333,8 +333,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   private taskBeingEdited: Task | null = null;
   isCreateMode = false;
 
-  editedTaskLabel = '';
-  editedTaskStatus: ActivityStatus = 'todo';
+  editedItemLabel = '';
+  editedItemStatus: ActivityStatus = 'todo';
   editedStartDate = '';
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
@@ -1889,6 +1889,12 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.rebuildGanttFromBase();
   }
 
+  onRowDblClick(row: GanttActivityRow): void {
+    if (row.isHeader) return;
+    const taskView = this.getRowTask(row.rowIndex);
+    if (taskView) this.openTaskEditModalFromRoadmap(taskView);
+  }
+
   getRowTask(rowIndex: number): GanttTaskView | null {
     return this.taskByRowIndex[rowIndex] ?? null;
   }
@@ -2527,8 +2533,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.editingActivityId = ctx.activityId;
     this.editingPhase = ctx.phase;
 
-    this.editedTaskLabel = ctx.task.label ?? '';
-    this.editedTaskStatus = ctx.task.status;
+    this.editedItemLabel = ctx.task.label ?? '';
+    this.editedItemStatus = ctx.task.status;
 
     this.editedStartDate = (ctx.task as any).startDate ?? '';
     this.editedEndDate = (ctx.task as any).endDate ?? '';
@@ -2567,8 +2573,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.editingActivityId = defaultActivityId;
     this.editingPhase = defaultPhase;
 
-    this.editedTaskLabel = '';
-    this.editedTaskStatus = 'todo';
+    this.editedItemLabel = '';
+    this.editedItemStatus = 'todo';
     this.editedStartDate = '';
     this.editedEndDate = '';
     this.editedCategory = this.mapActivityToCategory(defaultActivityId);
@@ -2631,6 +2637,12 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     return all.filter(t => t.id !== curId);
   }
 
+  getChildItems(): Task[] {
+    if (!this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return [];
+    const matrix = (this.project as any)?.projectTasksMatrix;
+    return matrix?.[this.editingActivityId]?.[this.editingPhase]?.[this.taskBeingEdited.id] ?? [];
+  }
+
   addDependencyRow(): void {
     this.editedDependencies.push({ toId: '', type: 'F2S' });
   }
@@ -2651,7 +2663,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     this.editError = null;
 
-    const label = (this.editedTaskLabel ?? '').trim();
+    const label = (this.editedItemLabel ?? '').trim();
     if (!label) {
       this.editError = "Le nom de l’activité ne peut pas être vide.";
       return;
@@ -2723,7 +2735,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
         activityId,
         phase: targetPhase,
         label,
-        status: this.editedTaskStatus,
+        status: this.editedItemStatus,
         startDate: this.editedStartDate,
         endDate: this.editedEndDate,
         category: this.editedCategory,
@@ -2767,7 +2779,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
         toPhase: this.editedPhase || undefined,
         taskId: this.taskBeingEdited.id,
         label,
-        status: this.editedTaskStatus,
+        status: this.editedItemStatus,
         startDate: this.editedStartDate,
         endDate: this.editedEndDate,
         category: this.editedCategory,

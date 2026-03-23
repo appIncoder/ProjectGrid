@@ -5,10 +5,14 @@ import type {
   ActivityId,
   PhaseId,
   ProjectDetail,
-  Task,
-  TaskCategory,
+  Item,
+  ItemCategory,
   ActivityStatus,
 } from '../models';
+
+// Backward-compat aliases
+type Task = Item;
+type TaskCategory = ItemCategory;
 import { ProjectDataService } from './project-data.service';
 
 export interface ProjectActionPayload {
@@ -16,7 +20,7 @@ export interface ProjectActionPayload {
   reason?: string;
 }
 
-export interface UpdateTaskPayload {
+export interface UpdateItemPayload {
   projectId: string;
   activityId: ActivityId;
   fromPhase: PhaseId;
@@ -27,7 +31,7 @@ export interface UpdateTaskPayload {
   status?: ActivityStatus;
   startDate?: string; // "YYYY-MM-DD"
   endDate?: string; // "YYYY-MM-DD"
-  category?: TaskCategory;
+  category?: ItemCategory;
   reporterId?: string;
   accountantId?: string;
   responsibleId?: string;
@@ -36,7 +40,10 @@ export interface UpdateTaskPayload {
   phase?: PhaseId;   // cohérence (optionnel)
 }
 
-export interface CreateTaskPayload {
+/** @deprecated Use UpdateItemPayload instead */
+export type UpdateTaskPayload = UpdateItemPayload;
+
+export interface CreateItemPayload {
   projectId: string;
   activityId: ActivityId;
   phase: PhaseId;
@@ -44,20 +51,26 @@ export interface CreateTaskPayload {
   status: ActivityStatus;
   startDate: string; // "YYYY-MM-DD"
   endDate: string; // "YYYY-MM-DD"
-  category: TaskCategory;
+  category: ItemCategory;
   reporterId?: string;
   accountantId?: string;
   responsibleId?: string;
 }
 
+/** @deprecated Use CreateItemPayload instead */
+export type CreateTaskPayload = CreateItemPayload;
+
 export interface ProjectMutationEvent {
-  type: 'task_updated' | 'schedule_updated' | 'dependencies_updated';
+  type: 'item_updated' | 'schedule_updated' | 'dependencies_updated';
   projectId: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
   private readonly mutationsSubject = new Subject<ProjectMutationEvent>();
+
+  /** ID du projet actuellement ouvert (mis à jour par project-page). */
+  currentProjectId: string | null = null;
 
   // Règles planning
   readonly daysPerMonth = 30;
@@ -68,7 +81,7 @@ export class ProjectService {
     return this.mutationsSubject.asObservable();
   }
 
-  markProjectMutated(projectId: string, type: ProjectMutationEvent['type'] = 'task_updated'): void {
+  markProjectMutated(projectId: string, type: ProjectMutationEvent['type'] = 'item_updated'): void {
     if (!projectId) return;
     this.mutationsSubject.next({ type, projectId });
   }
@@ -243,7 +256,7 @@ export class ProjectService {
   // -----------------------------
   // Task CRUD (centralisé)
   // -----------------------------
-  createTask(payload: CreateTaskPayload): Task | null {
+  createItem(payload: CreateItemPayload): Item | null {
     const project = this.getProject(payload.projectId);
     if (!project) return null;
 
@@ -258,7 +271,7 @@ export class ProjectService {
     }
 
     const taskId = this.generateTaskId(project);
-    const task: Task = {
+    const item: Item = {
       id: taskId,
       label: payload.label,
       status: payload.status,
@@ -271,12 +284,17 @@ export class ProjectService {
       responsibleId: payload.responsibleId || undefined,
     };
 
-    matrix[payload.activityId][payload.phase].push(task);
-    this.markProjectMutated(payload.projectId, 'task_updated');
-    return task;
+    matrix[payload.activityId][payload.phase].push(item);
+    this.markProjectMutated(payload.projectId, 'item_updated');
+    return item;
   }
 
-  updateTask(payload: UpdateTaskPayload): void {
+  /** @deprecated Use createItem instead */
+  createTask(payload: CreateItemPayload): Item | null {
+    return this.createItem(payload);
+  }
+
+  updateItem(payload: UpdateItemPayload): void {
     const project = this.getProject(payload.projectId);
     if (!project) return;
 
@@ -324,11 +342,16 @@ export class ProjectService {
       (task as any).phase = (task as any).phase ?? payload.fromPhase;
     }
 
-    this.mutationsSubject.next({ type: 'task_updated', projectId: payload.projectId });
+    this.mutationsSubject.next({ type: 'item_updated', projectId: payload.projectId });
+  }
+
+  /** @deprecated Use updateItem instead */
+  updateTask(payload: UpdateItemPayload): void {
+    return this.updateItem(payload);
   }
 
   // -----------------------------
-  // Gantt -> Task (dates)
+  // Gantt -> Item (dates)
   // -----------------------------
   syncGanttDayIndexesToTask(params: {
     projectId: string;

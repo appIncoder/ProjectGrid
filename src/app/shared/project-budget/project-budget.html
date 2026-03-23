@@ -1,8 +1,10 @@
 <div class="card flex-fill">
   <div class="card-body">
-    <h3 class="h6 mb-3">Synthèse budgétaire</h3>
+    <div class="card mb-3">
+      <div class="card-body roadmap-card-body">
+        <h3 class="h6 mb-3">Synthèse budgétaire</h3>
 
-    <div class="row g-3 mb-3">
+        <div class="row g-3">
       <div class="col-12 col-md-6 col-lg-3">
         <div class="budget-summary-item">
           <div class="label">Budget initial</div>
@@ -42,6 +44,8 @@
               ({{ getPercent(budgetSummary.forecast, budgetSummary.initial) }} %)
             </span>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>

@@ -38,6 +38,12 @@ service cloud.firestore {
       return signedIn() && (
         isSysAdmin() ||
         projectRolesFrom(data).hasAny([
+          // Nouveaux rôles
+          'projectManager',
+          'businessManager',
+          'changeManager',
+          'technologyManager',
+          // Rôles legacy (rétrocompatibilité)
           'projectAdmin',
           'businessAdmin',
           'changeAdmin',
@@ -62,6 +68,11 @@ service cloud.firestore {
     match /projectTypes/{projectTypeId} {
       allow read: if signedIn();
       allow write: if isSysAdmin();
+
+      match /activityDefaults/{activityDefaultId} {
+        allow read: if signedIn();
+        allow write: if isSysAdmin();
+      }
     }
 
     match /projects/{projectId} {
@@ -69,7 +80,7 @@ service cloud.firestore {
 
       allow create: if signedIn() && (
         isSysAdmin() ||
-        projectRolesFrom(request.resource.data).hasAny(['projectAdmin', 'sysAdmin', 'sysadmin'])
+        projectRolesFrom(request.resource.data).hasAny(['projectManager', 'projectAdmin', 'sysAdmin', 'sysadmin'])
       );
 
       allow update, delete: if canManageProject(resource.data) || canManageProject(request.resource.data);

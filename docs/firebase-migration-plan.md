@@ -102,7 +102,15 @@ The frontend consumes that backend through REST in:
 - `description`
 - `phases`
 - `activities`
-- `activitiesDefault`
+- `activityDefaultsCount`
+
+`projectTypes/{projectTypeId}/activityDefaults/{activityDefaultId}`
+
+- `label`
+- `phaseId`
+- `activityId`
+- `sequence`
+- `projectTypeId`
 
 ### Access model
 

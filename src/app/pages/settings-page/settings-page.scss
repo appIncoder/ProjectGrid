@@ -1,0 +1,471 @@
+/* ══════════════════════════════════════════════════════════
+   Settings Page
+   ══════════════════════════════════════════════════════════ */
+
+.settings-page {
+  padding: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-header {
+  h2 { margin: 0 0 4px; }
+}
+
+.settings-subtitle {
+  color: #555;
+  font-size: 0.88rem;
+  &.warning { color: #a35; }
+}
+
+.project-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.project-select {
+  min-width: 260px;
+}
+
+.loading-hint {
+  font-size: 0.83rem;
+  color: #888;
+  margin-top: 6px;
+}
+
+.settings-empty {
+  color: #888;
+  font-size: 0.88rem;
+  padding: 20px 0;
+}
+
+.mb-2 { margin-bottom: 8px; }
+
+/* ── Barre d'onglets ──────────────────────────────────────── */
+
+.settings-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #6c757d;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 100ms, background 100ms, border-color 100ms;
+
+  &:hover:not(.is-active) {
+    background: #f8f9fa;
+    color: #343a40;
+  }
+
+  &.is-active {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+    font-weight: 600;
+    background: transparent;
+  }
+}
+
+.settings-tab-icon {
+  font-size: 0.92rem;
+}
+
+.settings-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+/* ── Sections ─────────────────────────────────────────────── */
+
+.settings-section.card {
+  border: 1px solid #e6e6e6;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fff;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+}
+
+.section-badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f2f2f2;
+  color: #555;
+  border: 1px solid #e5e5e5;
+
+  &.firestore {
+    background: #fff3e0;
+    color: #e65100;
+    border-color: #ffcc80;
+  }
+}
+
+.section-hint {
+  font-size: 0.82rem;
+  color: #666;
+  margin: 0 0 12px;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* ── Champs de formulaire ─────────────────────────────────── */
+
+.settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  gap: 12px;
+
+  &.align-start {
+    align-items: start;
+  }
+}
+
+.field-label {
+  font-size: 0.85rem;
+  color: #333;
+}
+
+.field-control {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #dcdcdc;
+  background: #fff;
+  font-size: 0.85rem;
+}
+
+/* ── Toggle ──────────────────────────────────────────────── */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .toggle-track {
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    background: #ccc;
+    position: relative;
+    transition: background 0.18s;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      transition: left 0.18s;
+    }
+  }
+
+  input:checked + .toggle-track {
+    background: #0d6efd;
+    &::after { left: 19px; }
+  }
+}
+
+/* ── Boutons ──────────────────────────────────────────────── */
+
+.btn {
+  border: 1px solid #d0d0d0;
+  background: #fff;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  line-height: 1.2;
+
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  &.btn-primary {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+  }
+
+  &.btn-ghost {
+    background: transparent;
+    border-color: #d0d0d0;
+    color: #444;
+  }
+
+  &.btn-xs {
+    padding: 3px 8px;
+    font-size: 0.78rem;
+  }
+
+  &.btn-danger-ghost {
+    background: transparent;
+    border-color: #f5c6cb;
+    color: #c0392b;
+    &:hover { background: #fff0f0; }
+  }
+}
+
+.save-status {
+  font-size: 0.82rem;
+  &.ok { color: #198754; }
+  &.err { color: #a35; }
+}
+
+/* ── Légende des rôles ────────────────────────────────────── */
+
+.roles-legend {
+  background: #f8fafc;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+
+.roles-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 6px 16px;
+}
+
+.role-desc {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.role-desc-text {
+  color: #666;
+  font-size: 0.78rem;
+}
+
+/* ── Chips de rôle ────────────────────────────────────────── */
+
+.role-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e8f0fe;
+  color: #1a56db;
+  border: 1px solid #c3d9fd;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Tableau des membres ─────────────────────────────────── */
+
+.members-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.members-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+
+  th {
+    padding: 8px 12px;
+    background: #f8f9fa;
+    font-weight: 600;
+    text-align: left;
+    border-bottom: 1px solid #e9ecef;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f3f5;
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: 0;
+  }
+}
+
+.member-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.member-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.member-roles-edit {
+  vertical-align: top !important;
+}
+
+.col-actions {
+  text-align: right;
+  white-space: nowrap;
+
+  .btn + .btn { margin-left: 4px; }
+}
+
+.members-loading {
+  font-size: 0.84rem;
+  color: #666;
+  padding: 8px 0;
+}
+
+/* ── Formulaire d'ajout de membre ────────────────────────── */
+
+.add-member-form {
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fafbfc;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.add-member-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.role-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.role-check {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.83rem;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+}
+
+/* ── Workflow des statuts ────────────────────────────────── */
+
+.workflow-statuses {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.workflow-status-row {
+  display: grid;
+  grid-template-columns: 16px 130px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.workflow-status-id {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #42526E;
+  font-family: monospace;
+}
+
+.workflow-label-input {
+  max-width: 280px;
+}
+
+.ws-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &--todo          { background: #6B778C; }
+  &--inprogress    { background: #0052CC; }
+  &--onhold        { background: #FF8B00; }
+  &--done          { background: #00875A; }
+  &--notdone       { background: #DE350B; }
+  &--notapplicable { background: #97A0AF; }
+}
+
+/* ── Utilitaires ─────────────────────────────────────────── */
+
+.alert-danger {
+  padding: 6px 10px;
+  background: #fff0f0;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  color: #c0392b;
+}
+
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 14px; }
+.pt-1 { padding-top: 4px; }
+.ml-1 { margin-left: 4px; }
+
+.text-muted { color: #6c757d; }
+.small { font-size: 0.82rem; }
+
+@media (max-width: 600px) {
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+}

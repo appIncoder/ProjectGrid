@@ -1,245 +1,434 @@
 .project-board {
-  --board-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  --board-font-size: 0.86rem;
-  --lane-dropzone-height: 11.5rem;
+  --col-min-width: 220px;
   --lane-gap: 8px;
+  --board-bg: #F4F5F7;
+  --card-radius: 3px;
 
-  font-family: var(--board-font-family);
-  font-size: var(--board-font-size);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
+  font-size: 0.86rem;
 
-  .card-body,
-  .lane,
-  .lane-header,
-  .lane-grid,
-  .col-header,
-  .col-title,
-  .dropzone,
-  .kanban-card,
-  .kanban-card-title,
-  .kanban-card-desc,
-  .empty-hint,
-  .badge,
-  .btn,
-  .avatar,
-  .avatar span {
-    font-family: inherit;
-    font-size: inherit;
-    line-height: 1.25;
+  * {
+    box-sizing: border-box;
+    line-height: 1.3;
   }
 
-  .lanes {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
+  // ── Toolbar ────────────────────────────────────────────────────────────────
   .board-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     flex-wrap: wrap;
-    border: 1px solid #dde5f1;
-    border-radius: 0.8rem;
-    padding: 0.65rem 0.75rem;
-    background: #ffffff;
   }
 
   .board-toolbar-left {
-    margin-bottom: 0.25rem !important;
-    font-size: 1rem;
-    line-height: 1.2;
-    font-weight: 600;
-    color: inherit;
-  }
-
-  .board-kpis {
     display: flex;
+    align-items: baseline;
+    gap: 10px;
     flex-wrap: wrap;
-    gap: 0.45rem;
   }
 
-  .board-wrap {
-    position: relative;
-  }
-
-  .lane {
-    display: flex;
-    flex-direction: column;
-    border: 1px solid rgba(0,0,0,.08);
-    border-radius: 10px;
-    overflow: hidden;
-    background: #fff;
-  }
-
-  .lane-header {
-    padding: 10px 12px;
-    min-height: 44px;
-    background: rgba(0,0,0,.03);
-    border-bottom: 1px solid rgba(0,0,0,.08);
-    user-select: none;
-  }
-
-  .lane-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(210px, 1fr));
-    gap: var(--lane-gap);
-    padding: var(--lane-gap);
-    overflow-x: auto;
-  }
-
-  .col {
-    min-width: 210px;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .col-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 8px;
-    border: 1px solid rgba(0,0,0,.08);
-    border-radius: 8px;
-    background: rgba(0,0,0,.02);
-    margin-bottom: 6px;
-  }
-
-  .col-title {
+  .board-sprint-label {
+    font-size: 1rem;
     font-weight: 600;
+    color: #172B4D;
   }
 
-  .dropzone {
-    flex: 0 0 var(--lane-dropzone-height);
-    min-height: var(--lane-dropzone-height);
-    max-height: var(--lane-dropzone-height);
-    border: 1px dashed rgba(0,0,0,.18);
-    border-radius: 10px;
-    padding: 7px;
-    background: rgba(0,0,0,.01);
-    overflow-y: auto;
+  .board-sprint-goal {
+    font-size: 0.82rem;
+    color: #5E6C84;
   }
 
-  .kanban-card {
-    position: relative;
-    border: 1px solid rgba(0,0,0,.10);
-    border-radius: 10px;
-    padding: 8px 26px 8px 8px;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(0,0,0,.06);
-    margin-bottom: 6px;
-    cursor: pointer;
-  }
-
-  .kanban-card::after {
-    content: '\270E';
-    position: absolute;
-    right: 8px;
-    top: 8px;
-    font-size: 0.84rem;
-    line-height: 1;
-    opacity: 0;
-    transition: opacity 120ms ease, transform 120ms ease;
-    transform: scale(0.92);
-  }
-
-  .kanban-card:hover::after {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-
-  .kanban-card:last-child {
-    margin-bottom: 0;
-  }
-
-  .kanban-card:active {
-    cursor: pointer;
-  }
-
-  .drag-preview-card {
-    transform: rotate(10deg);
-    box-shadow: 0 10px 24px rgba(0,0,0,.18);
-  }
-
-  .kanban-card-title {
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-
-  .assignees {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 4px;
-  }
-
-  .avatar {
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
-    overflow: hidden;
-    border: 1px solid rgba(0,0,0,.12);
+  .board-create-btn {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    font-size: inherit;
-    font-weight: 700;
-    background: rgba(0,0,0,.06);
+    background: #0052CC;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 100ms;
 
-    img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
+    &:hover { background: #0065FF; }
+    &:active { background: #003D99; }
+  }
+
+  // ── Filtre de phases ───────────────────────────────────────────────────────
+  .phase-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 10px;
+    padding: 4px 0;
+  }
+
+  .phase-filter-active-btn {
+    display: inline-flex;
+    align-items: center;
+    border: none;
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: #EBECF0;
+    color: #42526E;
+    transition: background 100ms, color 100ms;
+
+    &:hover { background: #DFE1E6; }
+
+    &.is-active {
+      background: #0052CC;
+      color: #fff;
+      &:hover { background: #0065FF; }
     }
   }
 
-  .kanban-card-desc {
-    line-height: 1.25;
+  .phase-filter-divider {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    background: #C1C7D0;
+    margin: 0 4px;
+    flex-shrink: 0;
   }
 
-  .empty-hint {
-    padding: 4px 2px;
+  .phase-filter-sep {
+    color: #C1C7D0;
+    font-size: 0.85rem;
+    user-select: none;
   }
 
-  .board-header-actions {
+  .phase-filter-action {
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    font-size: 0.78rem;
+    color: #42526E;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 100ms;
+    &:hover { background: #EBECF0; }
+  }
+
+  .phase-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .phase-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 3px;
+    border: none;
+    background: #EBECF0;
+    color: #42526E;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 100ms, color 100ms;
+
+    &:hover { background: #DFE1E6; }
+
+    &.phase-chip--selected {
+      background: #0052CC;
+      color: #fff;
+      &:hover { background: #0065FF; }
+    }
+
+    &.phase-chip--active {
+      outline: 2px solid #0052CC;
+      outline-offset: 1px;
+    }
+
+    &.phase-chip--selected.phase-chip--active {
+      outline-color: #003D99;
+    }
+  }
+
+  // ── Board wrap ─────────────────────────────────────────────────────────────
+  .board-wrap {
+    position: relative;
+    overflow-x: auto;
+    background: var(--board-bg);
+    border-radius: 4px;
+    padding: 0 0 16px;
+    min-height: 300px;
+  }
+
+  // ── Column headers (sticky) ────────────────────────────────────────────────
+  .board-columns-header {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(var(--col-min-width), 1fr));
+    gap: var(--lane-gap);
+    padding: 12px var(--lane-gap) 8px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--board-bg);
+  }
+
+  .board-col-header {
     display: flex;
     align-items: center;
-    margin-left: auto;
+    gap: 7px;
+    padding: 4px 6px;
+
+    .bch-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .bch-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #42526E;
+      flex: 1;
+    }
+
+    .bch-count {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #42526E;
+      background: #DFE1E6;
+      border-radius: 999px;
+      padding: 1px 7px;
+      min-width: 22px;
+      text-align: center;
+    }
+
+    // Status-specific dot colors
+    &.bch-todo      .bch-dot { background: #6B778C; }
+    &.bch-inprogress .bch-dot { background: #0052CC; }
+    &.bch-waiting   .bch-dot { background: #FF8B00; }
+    &.bch-done      .bch-dot { background: #00875A; }
   }
 
-  .board-add-task-btn__plus {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1rem;
-    height: 1rem;
-    border-radius: 999px;
-    background: #198754;
-    color: #fff;
-    line-height: 1;
+  // ── Swimlane ───────────────────────────────────────────────────────────────
+  .lane {
+    margin: 0 var(--lane-gap) var(--lane-gap);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid #DFE1E6;
   }
 
-  .board-chip-btn {
-    display: inline-flex;
+  .lane-header {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    border: 1px solid #c8d6ea;
-    border-radius: 999px;
-    background: #f7faff;
-    color: #334a68;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #EBECF0;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid #DFE1E6;
+    transition: background 100ms;
+
+    &:hover { background: #DFE1E6; }
+  }
+
+  .lane-chevron {
+    font-size: 0.65rem;
+    color: #42526E;
+    flex-shrink: 0;
+  }
+
+  .lane-title {
+    flex: 1;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #172B4D;
+  }
+
+  .lane-count {
     font-size: 0.72rem;
     font-weight: 700;
-    line-height: 1.1;
-    padding: 0.28rem 0.72rem;
+    color: #42526E;
+    background: #C1C7D0;
+    border-radius: 999px;
+    padding: 1px 7px;
+    min-width: 22px;
+    text-align: center;
   }
 
-  .board-chip-btn:hover {
-    background: #edf3ff;
-    color: #233a57;
+  // ── 4-column grid ─────────────────────────────────────────────────────────
+  .lane-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(var(--col-min-width), 1fr));
+    gap: var(--lane-gap);
+    padding: var(--lane-gap);
+    background: #F4F5F7;
+    align-items: start;
   }
 
-  @media (max-width: 991.98px) {
-    --lane-dropzone-height: 10rem;
+  // ── Dropzone ──────────────────────────────────────────────────────────────
+  .dropzone {
+    min-height: 60px;
+    border-radius: 4px;
+    padding: 4px;
+    background: transparent;
+    transition: background 100ms;
+
+    &.cdk-drop-list-dragging {
+      background: #DEEBFF;
+    }
+  }
+
+  // ── Kanban card ───────────────────────────────────────────────────────────
+  .kanban-card {
+    position: relative;
+    border-radius: var(--card-radius);
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(9, 30, 66, 0.25);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: box-shadow 100ms, transform 100ms;
+    border-left: 3px solid transparent;
+    min-height: 90px;
+
+    &:last-child { margin-bottom: 0; }
+
+    &:hover {
+      box-shadow: 0 4px 10px rgba(9, 30, 66, 0.28);
+      transform: translateY(-1px);
+    }
+
+    // Status accent border-left
+    &.kc-todo       { border-left-color: #6B778C; }
+    &.kc-inprogress { border-left-color: #0052CC; }
+    &.kc-waiting    { border-left-color: #FF8B00; }
+    &.kc-done       { border-left-color: #00875A; }
+
+    &.cdk-drag-placeholder {
+      background: #DEEBFF;
+      border: 2px dashed #4C9AFF;
+      box-shadow: none;
+      opacity: 0.6;
+    }
+  }
+
+  // ── Avatars coin supérieur droit ──────────────────────────────────────────
+  .kc-roles-corner {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .kc-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.62rem;
+    font-weight: 700;
+    cursor: default;
+    flex-shrink: 0;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(9, 30, 66, 0.2);
+
+    &.kc-avatar--res   { background: #22C55E; color: #fff; }
+    &.kc-avatar--rep   { background: #0097A7; color: #fff; }
+    &.kc-avatar--acc   { background: #F59E0B; color: #fff; }
+    &.kc-avatar--empty {
+      background: #F4F5F7;
+      color: #B3BAC5;
+      border: 2px dashed #C1C7D0;
+      font-size: 0.75rem;
+      font-weight: 400;
+
+      // Icône personne vide via pseudo-element
+      &::before {
+        content: '○';
+        font-size: 0.7rem;
+        line-height: 1;
+      }
+    }
+  }
+
+  // ── Corps ─────────────────────────────────────────────────────────────────
+  .kc-body {
+    padding: 36px 12px 8px 12px; // top padding pour laisser place aux avatars en haut à droite
+  }
+
+  .kc-title {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #172B4D;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+
+  // ── Pied de carte ─────────────────────────────────────────────────────────
+  .kc-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .kc-phase-tag {
+    font-size: 0.72rem;
+    color: #6B778C;
+    background: #F4F5F7;
+    border-radius: 3px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+
+  .kc-status-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    border-radius: 3px;
+    padding: 2px 7px;
+    white-space: nowrap;
+    text-transform: uppercase;
+
+    &.kc-status-tag--todo       { background: #F4F5F7; color: #6B778C; }
+    &.kc-status-tag--inprogress { background: #DEEBFF; color: #0052CC; }
+    &.kc-status-tag--waiting    { background: #FFF0B3; color: #974F0C; }
+    &.kc-status-tag--done       { background: #E3FCEF; color: #006644; }
+  }
+
+  // ── Drag preview ──────────────────────────────────────────────────────────
+  .kc-drag-preview {
+    box-shadow: 0 8px 20px rgba(9, 30, 66, 0.35);
+    transform: rotate(2deg);
+    cursor: grabbing;
+  }
+
+  // ── Empty dropzone placeholder ─────────────────────────────────────────────
+  .drop-placeholder {
+    padding: 16px 6px;
+    font-size: 0.76rem;
+    color: #B3BAC5;
+    text-align: center;
+    border: 2px dashed #DFE1E6;
+    border-radius: var(--card-radius);
+    pointer-events: none;
   }
 }

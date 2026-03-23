@@ -15,7 +15,7 @@ import {
   type Firestore,
   type QueryConstraint,
 } from 'firebase/firestore';
-import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, Task, TaskComment, UserRef } from '../models';
+import type { ActivityDefinition, ActivityId, Item, ItemComment, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow, UserRef } from '../models';
 import type { ProjectDataBackend } from './project-data-backend';
 import type {
   CreateProjectRiskPayload,
@@ -25,7 +25,7 @@ import type {
   ProjectTypeRef,
   UpdateProjectRiskPayload,
 } from './project-data.service';
-import { getProjectTypeFallback, PROJECT_TYPE_FALLBACKS } from './project-type-fallbacks';
+import { DEFAULT_WORKFLOW, getProjectTypeFallback, PROJECT_TYPE_FALLBACKS } from './project-type-fallbacks';
 import { FirebaseSdkService } from './firebase-sdk.service';
 import { AuthService } from './auth.service';
 
@@ -240,17 +240,17 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     return byShortName;
   }
 
-  private normalizeTask(task: unknown, fallbackId = ''): Task | null {
+  private normalizeItem(task: unknown, fallbackId = ''): Item | null {
     const raw = this.asRecord(task);
     if (!raw) return null;
 
     const id = this.asString(raw['id'], fallbackId);
     if (!id) return null;
 
-    const normalized: Task = {
+    const normalized: Item = {
       id,
       label: this.asString(raw['label'], id),
-      status: (this.asString(raw['status'], 'todo') || 'todo') as Task['status'],
+      status: (this.asString(raw['status'], 'todo') || 'todo') as Item['status'],
     };
 
     const startDate = this.asProjectDateString(raw['startDate'] ?? raw['startdate']);
@@ -268,7 +268,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     if (accountantId) normalized.accountantId = accountantId;
     if (responsibleId) normalized.responsibleId = responsibleId;
     if (parentActivityId) normalized.parentActivityId = parentActivityId;
-    if (category) normalized.category = category as Task['category'];
+    if (category) normalized.category = category as Item['category'];
     if (phase) normalized.phase = phase as PhaseId;
 
     const comments = this.asArray(raw['comments'])
@@ -282,12 +282,17 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
           authorId: this.asString(item['authorId']),
           authorName: this.asString(item['authorName']),
           createdAt: this.asDateString(item['createdAt']),
-        } as TaskComment;
+        } as ItemComment;
       })
-      .filter((item): item is TaskComment => !!item);
+      .filter((item): item is ItemComment => !!item);
 
     if (comments.length) normalized['comments'] = comments;
     return normalized;
+  }
+
+  /** @deprecated Use normalizeItem instead */
+  private normalizeTask(task: unknown, fallbackId = ''): Item | null {
+    return this.normalizeItem(task, fallbackId);
   }
 
   private normalizeActivityDefinitions(raw: unknown): Record<ActivityId, ActivityDefinition> {
@@ -337,17 +342,17 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     rawMatrix: unknown,
     activities: Record<ActivityId, ActivityDefinition>,
     phases: PhaseId[],
-  ): Record<ActivityId, Record<PhaseId, Task[]>> {
+  ): Record<ActivityId, Record<PhaseId, Item[]>> {
     const source = this.asRecord(rawMatrix) ?? {};
-    const matrix = {} as Record<ActivityId, Record<PhaseId, Task[]>>;
+    const matrix = {} as Record<ActivityId, Record<PhaseId, Item[]>>;
 
     for (const activityId of Object.keys(activities) as ActivityId[]) {
-      matrix[activityId] = {} as Record<PhaseId, Task[]>;
+      matrix[activityId] = {} as Record<PhaseId, Item[]>;
       const activityRows = this.asRecord(source[activityId]) ?? {};
       for (const phaseId of phases) {
         const rows = this.asArray(activityRows[phaseId])
-          .map((task) => this.normalizeTask(task))
-          .filter((task): task is Task => !!task);
+          .map((item) => this.normalizeItem(item))
+          .filter((item): item is Item => !!item);
         matrix[activityId][phaseId] = rows;
       }
     }
@@ -355,42 +360,42 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     return matrix;
   }
 
-  private normalizeProjectTasksMatrix(
+  private normalizeProjectItemsMatrix(
     rawMatrix: unknown,
     activities: Record<ActivityId, ActivityDefinition>,
     phases: PhaseId[],
-    activityMatrix: Record<ActivityId, Record<PhaseId, Task[]>>,
-  ): Record<ActivityId, Record<PhaseId, Record<string, Task[]>>> {
+    activityMatrix: Record<ActivityId, Record<PhaseId, Item[]>>,
+  ): Record<ActivityId, Record<PhaseId, Record<string, Item[]>>> {
     const source = this.asRecord(rawMatrix) ?? {};
-    const matrix = {} as Record<ActivityId, Record<PhaseId, Record<string, Task[]>>>;
+    const matrix = {} as Record<ActivityId, Record<PhaseId, Record<string, Item[]>>>;
 
     for (const activityId of Object.keys(activities) as ActivityId[]) {
-      matrix[activityId] = {} as Record<PhaseId, Record<string, Task[]>>;
+      matrix[activityId] = {} as Record<PhaseId, Record<string, Item[]>>;
       const activityRows = this.asRecord(source[activityId]) ?? {};
 
       for (const phaseId of phases) {
         const phaseRows = this.asRecord(activityRows[phaseId]) ?? {};
-        const normalizedPhaseRows: Record<string, Task[]> = {};
+        const normalizedPhaseRows: Record<string, Item[]> = {};
 
-        for (const [parentId, tasks] of Object.entries(phaseRows)) {
-          normalizedPhaseRows[parentId] = this.asArray(tasks)
-            .map((task) => this.normalizeTask(task, parentId))
-            .filter((task): task is Task => !!task)
-            .map((task) => ({
-              ...task,
-              parentActivityId: task.parentActivityId || parentId,
-              comments: this.asArray<TaskComment>(task.comments),
+        for (const [parentId, items] of Object.entries(phaseRows)) {
+          normalizedPhaseRows[parentId] = this.asArray(items)
+            .map((item) => this.normalizeItem(item, parentId))
+            .filter((item): item is Item => !!item)
+            .map((item) => ({
+              ...item,
+              parentActivityId: item.parentActivityId || parentId,
+              comments: this.asArray<ItemComment>(item.comments),
             }));
         }
 
         if (Object.keys(normalizedPhaseRows).length === 0) {
-          for (const parentTask of activityMatrix[activityId][phaseId]) {
-            const parentId = this.asString(parentTask['id']);
+          for (const parentItem of activityMatrix[activityId][phaseId]) {
+            const parentId = this.asString(parentItem['id']);
             if (!parentId) continue;
             normalizedPhaseRows[parentId] = [{
-              ...parentTask,
+              ...parentItem,
               parentActivityId: parentId,
-              comments: this.asArray<TaskComment>(parentTask.comments),
+              comments: this.asArray<ItemComment>(parentItem.comments),
             }];
           }
         }
@@ -532,6 +537,12 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       });
     }
 
+    const rawWorkflow = this.asRecord(data['workflow']);
+    const fallbackWorkflow = getProjectTypeFallback(normalizedProjectTypeId)?.workflow ?? DEFAULT_WORKFLOW;
+    const workflow: ProjectWorkflow = rawWorkflow
+      ? this.normalizeWorkflow(rawWorkflow, fallbackWorkflow)
+      : fallbackWorkflow;
+
     return {
       projectType: {
         id: normalizedProjectTypeId,
@@ -542,7 +553,26 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       activities: normalizedActivities.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
       activitiesDefault: mergedDefaults.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
       tasks: mergedDefaults.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
+      workflow,
     };
+  }
+
+  private normalizeWorkflow(raw: Record<string, unknown>, fallback: ProjectWorkflow): ProjectWorkflow {
+    const rawStatuses = this.asArray(raw['statuses']);
+    if (!rawStatuses.length) return fallback;
+
+    const statuses = rawStatuses
+      .map((item, idx) => {
+        const row = this.asRecord(item) ?? {};
+        return {
+          id: this.asString(row['id']) as ProjectWorkflow['statuses'][number]['id'],
+          label: this.asString(row['label']),
+          sequence: this.asNumberOrNull(row['sequence']) ?? idx + 1,
+        };
+      })
+      .filter((s) => !!s.id && !!s.label);
+
+    return statuses.length ? { statuses } : fallback;
   }
 
   private normalizeProjectDetail(docId: string, raw: unknown): ProjectDetail {
@@ -551,7 +581,17 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const { phases, phaseDefinitions } = this.normalizePhases(project);
     const activities = this.normalizeActivityDefinitions(project['activities']);
     const activityMatrix = this.normalizeActivityMatrix(project['activityMatrix'] ?? project['taskMatrix'], activities, phases);
-    const projectTasksMatrix = this.normalizeProjectTasksMatrix(project['projectTasksMatrix'], activities, phases, activityMatrix);
+    const projectItemsMatrix = this.normalizeProjectItemsMatrix(
+      project['projectItemsMatrix'] ?? project['projectTasksMatrix'],
+      activities,
+      phases,
+      activityMatrix,
+    );
+
+    const rawWorkflow = this.asRecord(project['workflow']);
+    const workflow: ProjectWorkflow | undefined = rawWorkflow
+      ? this.normalizeWorkflow(rawWorkflow, DEFAULT_WORKFLOW)
+      : undefined;
 
     return {
       ...project,
@@ -563,7 +603,9 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       activities,
       activityMatrix,
       taskMatrix: activityMatrix,
-      projectTasksMatrix,
+      projectItemsMatrix,
+      projectTasksMatrix: projectItemsMatrix,
+      ...(workflow ? { workflow } : {}),
       ganttDependencies: this.asArray(project['ganttDependencies']).map((item) => {
         const row = this.asRecord(item) ?? {};
         return {
@@ -895,7 +937,33 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     try {
       const snapshot = await getDoc(doc(this.firestore(), 'projectTypes', projectTypeId));
       if (snapshot.exists()) {
-        return this.normalizeProjectTypeDefaults(snapshot.id, snapshot.data());
+        const activityDefaultsDocs = await this.safeGetCollectionDocs(
+          ['projectTypes', projectTypeId, 'activityDefaults'],
+          orderBy('sequence', 'asc'),
+        );
+        const raw = this.asRecord(snapshot.data()) ?? {};
+        const mergedRaw = activityDefaultsDocs.length > 0
+          ? {
+              ...raw,
+              activitiesDefault: activityDefaultsDocs.map((item) => ({
+                id: this.asString(item.data['id'], item.id) || item.id,
+                label: this.asString(item.data['label'], item.id) || item.id,
+                phaseId: this.asString(item.data['phaseId']),
+                activityId: this.asString(item.data['activityId']),
+                sequence: this.asNumberOrNull(item.data['sequence']),
+                projectTypeId: this.asString(item.data['projectTypeId'], projectTypeId) || projectTypeId,
+              })),
+              tasks: activityDefaultsDocs.map((item) => ({
+                id: this.asString(item.data['id'], item.id) || item.id,
+                label: this.asString(item.data['label'], item.id) || item.id,
+                phaseId: this.asString(item.data['phaseId']),
+                activityId: this.asString(item.data['activityId']),
+                sequence: this.asNumberOrNull(item.data['sequence']),
+                projectTypeId: this.asString(item.data['projectTypeId'], projectTypeId) || projectTypeId,
+              })),
+            }
+          : raw;
+        return this.normalizeProjectTypeDefaults(snapshot.id, mergedRaw);
       }
     } catch {
       // Fall through to local defaults.
@@ -949,5 +1017,113 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       ...project,
       id: this.asString(projectId, project.id) || project.id,
     });
+  }
+
+  async listProjectMembers(projectId: string): Promise<ProjectMember[]> {
+    await this.auth.whenReady();
+    const id = this.asString(projectId);
+    if (!id) return [];
+
+    const snapshot = await getDoc(doc(this.firestore(), 'projects', id));
+    if (!snapshot.exists()) return [];
+
+    const data = this.asRecord(snapshot.data()) ?? {};
+    const memberRoles = this.asRecord(data['memberRoles']) ?? {};
+
+    if (Object.keys(memberRoles).length === 0) return [];
+
+    // Fetch user labels in one pass
+    const userDocs = await this.safeGetCollectionDocs(['users']);
+    const userLabelMap = new Map<string, string>(
+      userDocs.map((u) => [
+        this.asString(u.data['id'] ?? u.data['uid'], u.id) || u.id,
+        this.asString(u.data['label'] ?? u.data['displayName'] ?? u.data['fullName'] ?? u.data['name'] ?? u.data['email'], u.id) || u.id,
+      ])
+    );
+
+    return Object.entries(memberRoles)
+      .map(([userId, roles]): ProjectMember => ({
+        userId,
+        label: userLabelMap.get(userId) ?? userId,
+        roles: this.asArray(roles).map((r) => this.asString(r)).filter(Boolean) as ProjectRole[],
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+  }
+
+  async setProjectMembers(projectId: string, members: ProjectMember[]): Promise<void> {
+    await this.auth.whenReady();
+    const id = this.asString(projectId);
+    if (!id) throw new Error('Missing project id');
+
+    const memberRoles: Record<string, string[]> = {};
+    for (const m of members) {
+      const uid = this.asString(m.userId);
+      if (!uid) continue;
+      memberRoles[uid] = m.roles.filter(Boolean);
+    }
+    const memberIds = Object.keys(memberRoles);
+
+    await setDoc(
+      doc(this.firestore(), 'projects', id),
+      { memberRoles, memberIds, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+
+    // Update only the current user's projectIds index (other users' docs are not writable by us)
+    await this.ensureCurrentUserProjectAccess(id, memberRoles);
+  }
+
+  async saveProjectTypeWorkflow(projectTypeId: string, workflow: ProjectWorkflow): Promise<void> {
+    await this.auth.whenReady();
+    const id = this.asString(projectTypeId);
+    if (!id) throw new Error('Missing projectTypeId');
+
+    const sanitized = this.sanitizeForFirestore(workflow) as Record<string, unknown>;
+    await setDoc(
+      doc(this.firestore(), 'projectTypes', id),
+      { workflow: sanitized, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }
+
+  async saveProjectWorkflow(projectId: string, workflow: ProjectWorkflow): Promise<void> {
+    await this.auth.whenReady();
+    const id = this.asString(projectId);
+    if (!id) throw new Error('Missing projectId');
+
+    const snapshot = await getDoc(doc(this.firestore(), 'projects', id));
+    if (!snapshot.exists()) throw new Error(`Project ${id} not found`);
+
+    const data = this.asRecord(snapshot.data()) ?? {};
+    const payload = this.asRecord(data['payload']) ?? {};
+    const updatedPayload = { ...payload, workflow: this.sanitizeForFirestore(workflow) };
+
+    await setDoc(
+      doc(this.firestore(), 'projects', id),
+      { payload: updatedPayload, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  }
+
+  async getCurrentProjectId(): Promise<string | null> {
+    await this.auth.whenReady();
+    const userId = this.auth.user?.id;
+    if (!userId) return null;
+    const snap = await getDoc(doc(this.firestore(), 'users', userId));
+    if (!snap.exists()) return null;
+    const data = this.asRecord(snap.data()) ?? {};
+    const id = this.asString(data['currentProjectId'], '');
+    return id || null;
+  }
+
+  async setCurrentProjectId(projectId: string): Promise<void> {
+    await this.auth.whenReady();
+    const userId = this.auth.user?.id;
+    if (!userId) return;
+    await setDoc(
+      doc(this.firestore(), 'users', userId),
+      { currentProjectId: projectId },
+      { merge: true }
+    );
   }
 }

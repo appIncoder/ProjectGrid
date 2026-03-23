@@ -139,11 +139,35 @@ async function main() {
   for (const row of collections.projectTypes ?? []) {
     const docId = String(row?.projectType?.id ?? '').trim();
     if (!docId) continue;
+    const activityDefaults = Array.isArray(row?.activitiesDefault)
+      ? row.activitiesDefault
+      : (Array.isArray(row?.tasks) ? row.tasks : []);
+    const {
+      activitiesDefault: _activitiesDefault,
+      tasks: _tasks,
+      ...projectTypeDoc
+    } = row ?? {};
     operations.push({
       ref: db.collection('projectTypes').doc(docId),
-      data: sanitize(row),
+      data: sanitize({
+        ...projectTypeDoc,
+        activityDefaultsCount: activityDefaults.length,
+      }),
     });
     if (operations.length >= 400) await flushBatch(db, operations);
+
+    for (const item of activityDefaults) {
+      const defaultId = String(item?.id ?? '').trim();
+      if (!defaultId) continue;
+      operations.push({
+        ref: db.collection('projectTypes').doc(docId).collection('activityDefaults').doc(defaultId),
+        data: sanitize({
+          ...item,
+          projectTypeId: docId,
+        }),
+      });
+      if (operations.length >= 400) await flushBatch(db, operations);
+    }
   }
 
   for (const row of projectRows) {

@@ -1,374 +1,293 @@
 <div class="my-projects-container">
+
   <div class="my-projects-header d-flex align-items-start justify-content-between gap-2 flex-wrap">
     <div>
-      <h2>Mes projets</h2>
-      <p>Liste des projets dont l'utilisateur est membre.</p>
+      <h2>Tableau de bord</h2>
+      <p class="text-muted small mb-0" *ngIf="selectedProject">
+        Projet : <strong>{{ selectedProject.name }}</strong>
+      </p>
     </div>
 
     <div class="d-flex gap-2">
-      <button class="btn btn-sm btn-outline-secondary" (click)="refresh()" [disabled]="isLoading">
-        ↻ Rafraîchir
+      <button class="btn btn-add" (click)="goToProjects()">
+        ⇄ Changer de projet
+      </button>
+      <button class="btn btn-add" (click)="goToProject()" *ngIf="selectedProject">
+        ✏️ Éditer
       </button>
     </div>
   </div>
 
   <!-- États globaux -->
   <div *ngIf="isLoading" class="text-muted small mb-2">
-    Chargement des projets…
+    Chargement du projet…
   </div>
 
   <div *ngIf="loadError" class="alert alert-danger py-2 small mb-2">
     {{ loadError }}
   </div>
 
-  <div class="my-projects-body dashboard-layout">
-    <!-- Container Master -->
-    <section class="card dashboard-master">
-      <div class="card-body p-0">
-        <div class="master-header px-3 pt-3 pb-2">
-          <h3 class="h6 mb-0">Master · Liste des projets</h3>
-        </div>
-
-        <div *ngIf="!isLoading && !loadError && myProjects.length === 0" class="p-3 text-muted small">
-          Aucun projet pour le moment.
-        </div>
-
-        <div class="table-responsive master-table-wrap" *ngIf="myProjects.length > 0">
-          <table class="table table-sm table-hover table-striped align-middle mb-0">
-            <thead>
-              <tr>
-                <th>Projet</th>
-                <th>Mon rôle</th>
-                <th>Statut</th>
-                <th>État de santé</th>
-                <th class="text-end"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                *ngFor="let project of myProjects"
-                (click)="selectProject(project)"
-                [class.table-active]="project === selectedProject"
-              >
-                <td>{{ project.name }}</td>
-                <td>{{ project.role }}</td>
-                <td>{{ project.status }}</td>
-                <td>
-                  <span
-                    class="health-dot"
-                    [ngClass]="{
-                      'health-good': project.health === 'good',
-                      'health-warning': project.health === 'warning',
-                      'health-critical': project.health === 'critical'
-                    }"
-                    [title]="project.healthName || getHealthLabel(project.health)"
-                  ></span>
-                </td>
-                <td class="text-end" (click)="$event.stopPropagation()">
-                  <div ngbDropdown [container]="'body'" class="d-inline-block">
-                    <button
-                      class="btn btn-sm btn-link text-dark p-0"
-                      ngbDropdownToggle
-                      aria-label="Menu contextuel"
-                    >
-                      &#8226;&#8226;&#8226;
-                    </button>
-                    <ul ngbDropdownMenu class="dropdown-menu dropdown-menu-end">
-                      <li>
-                        <button ngbDropdownItem [routerLink]="['/project', project.id]">
-                          <span class="me-2">👁️</span> Voir
-                        </button>
-                      </li>
-                      <li>
-                        <button ngbDropdownItem (click)="onEdit(project)">
-                          <span class="me-2">✏️</span> Éditer
-                        </button>
-                      </li>
-                      <li>
-                        <button ngbDropdownItem (click)="onPause(project)">
-                          <span class="me-2">⏸️</span> Mettre en pause
-                        </button>
-                      </li>
-                      <li>
-                        <button ngbDropdownItem (click)="onArchive(project)">
-                          <span class="me-2">🗄️</span> Archiver
-                        </button>
-                      </li>
-                    </ul>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Container Détail -->
-    <section class="card dashboard-detail">
-      <div class="card-body">
-
-            <div *ngIf="!selectedProject && !isLoading" class="text-muted small">
-              Sélectionne un projet dans la liste pour voir le détail.
-            </div>
-
-            <ng-container *ngIf="selectedProject as p">
-              <h3 class="h5 mb-1">{{ p.name }}</h3>
-              <p class="project-description mb-3">{{ p.description }}</p>
-
-              <section class="project-general-panel mb-3">
-                <h4 class="h6 mb-3">Informations générales</h4>
-
-                <section class="project-team-panel">
-                  <h5 class="h6 mb-3">Équipe projet</h5>
-                  <div class="project-team">
-                    <div class="team-member">
-                      <span class="team-member-label">Chef de projet</span>
-                      <span class="team-member-value">{{ p.projectManager }}</span>
-                    </div>
-                    <div class="team-member">
-                      <span class="team-member-label">Praticien du changement</span>
-                      <span class="team-member-value">{{ p.changePractitioner }}</span>
-                    </div>
-                    <div class="team-member">
-                      <span class="team-member-label">Visionnaire métier</span>
-                      <span class="team-member-value">{{ p.businessVisionary }}</span>
-                    </div>
-                    <div class="team-member">
-                      <span class="team-member-label">Expert technique</span>
-                      <span class="team-member-value">{{ p.technicalExpert }}</span>
-                    </div>
-                  </div>
-                </section>
-
-                <div class="project-info-bar mt-3">
-                  <div class="info-item">
-                    <span class="info-label">Sponsor</span>
-                    <span class="info-value">{{ p.sponsor }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="info-label">Phase en cours</span>
-                    <span class="info-value">{{ p.currentPhase }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="info-label">Statut</span>
-                    <span class="info-value">{{ p.status }}</span>
-                  </div>
-                  <div class="info-item">
-                    <span class="info-label">État de santé</span>
-                    <span class="info-value">
-                      <span
-                        class="health-dot align-middle me-1"
-                        [ngClass]="{
-                          'health-good': p.health === 'good',
-                          'health-warning': p.health === 'warning',
-                          'health-critical': p.health === 'critical'
-                        }"
-                      ></span>
-                      {{ p.healthName || getHealthLabel(p.health) }}
-                    </span>
-                  </div>
-                </div>
-              </section>
-
-              <div class="dashboard-columns mb-3">
-                <div class="dashboard-column">
-                  <section class="dashboard-card">
-                    <h4 class="h6 mb-2">Scorecard synthétique</h4>
-                    <div class="table-responsive">
-                      <table class="table table-bordered table-sm activity-matrix text-center align-middle mb-0">
-                        <thead>
-                          <tr>
-                            <th class="text-start">Activités</th>
-                            <th *ngFor="let phase of getSelectedPhases()">
-                              <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let activity of getSelectedActivities()">
-                            <td class="text-start">{{ activity.label }}</td>
-                            <td *ngFor="let phase of getSelectedPhases()">
-                              <span
-                                class="status-pill"
-                                [ngClass]="getStatusClass(getSelectedCellStatus(activity.id, phase))"
-                              ></span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  <section class="dashboard-card">
-                    <h4 class="h6 mb-2">État d'avancement des activités par phase</h4>
-                    <div class="table-responsive">
-                      <table class="table table-sm align-middle mb-0 dashboard-table">
-                        <thead>
-                          <tr>
-                            <th class="text-start">Activité</th>
-                            <th *ngFor="let phase of getSelectedPhases()">
-                              <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let row of progressRows">
-                            <td class="text-start fw-semibold">{{ row.activityLabel }}</td>
-                            <td *ngFor="let cell of row.cells">
-                              <div class="progress-track">
-                                <div
-                                  class="progress-fill"
-                                  [ngClass]="getProgressBarClass(cell.percent)"
-                                  [style.width.%]="cell.percent"
-                                ></div>
-                              </div>
-                              <small class="text-muted">{{ cell.percent }}% ({{ cell.done }}/{{ cell.total }})</small>
-                            </td>
-                          </tr>
-                          <tr *ngIf="progressRows.length === 0">
-                            <td [attr.colspan]="1 + getSelectedPhases().length" class="text-muted text-center py-3">
-                              Aucune donnée d'avancement.
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </div>
-
-                <div class="dashboard-column">
-                  <section class="dashboard-card">
-                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                      <h4 class="h6 mb-0">Risques</h4>
-                      <div class="btn-group btn-group-sm" role="group" aria-label="Mode affichage risques">
-                        <button
-                          type="button"
-                          class="btn btn-outline-secondary"
-                          [class.active]="riskDisplayMode === 'table'"
-                          (click)="setRiskDisplayMode('table')">
-                          Tableau
-                        </button>
-                        <button
-                          type="button"
-                          class="btn btn-outline-secondary"
-                          [class.active]="riskDisplayMode === 'matrix'"
-                          (click)="setRiskDisplayMode('matrix')">
-                          Matrice
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="table-responsive risk-list-wrap" *ngIf="riskDisplayMode === 'table'">
-                      <table class="table table-sm align-middle mb-0 dashboard-table">
-                        <thead>
-                          <tr>
-                            <th>Risque</th>
-                            <th>Niveau</th>
-                            <th>Statut</th>
-                            <th>Responsable</th>
-                            <th>Échéance</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let risk of topRiskRows">
-                            <td>{{ risk.longName || risk.title }}</td>
-                            <td>
-                              <span class="badge" [ngClass]="getRiskLevelClass(risk.level)">
-                                {{ getRiskLevelLabel(risk.level) }}
-                              </span>
-                            </td>
-                            <td>{{ risk.status }}</td>
-                            <td>{{ risk.owner || '—' }}</td>
-                            <td>{{ risk.dueDate || '—' }}</td>
-                          </tr>
-                          <tr *ngIf="topRiskRows.length === 0">
-                            <td colspan="5" class="text-muted text-center py-3">
-                              Aucun risque disponible.
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div *ngIf="riskDisplayMode === 'matrix'" class="risk-matrix-shell">
-                      <div class="impact-axis-label">Impact</div>
-                      <div class="risk-matrix-main">
-                        <div class="prob-axis-label">Probabilité</div>
-                        <div class="table-responsive">
-                          <table class="table table-bordered table-sm text-center align-middle mb-0 risk-matrix-table">
-                            <thead>
-                              <tr>
-                                <th class="text-start"></th>
-                                <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr *ngFor="let impact of riskImpactLevels">
-                                <td class="text-start fw-semibold">{{ impact }}</td>
-                                <td *ngFor="let prob of riskProbabilityLevels">
-                                  <div class="risk-cell-dots">
-                                    <span
-                                      *ngFor="let risk of getRiskMatrixDots(impact, prob)"
-                                      class="risk-dot"
-                                      [ngClass]="'risk-dot-' + risk.level"
-                                      [title]="risk.longName || risk.title">
-                                    </span>
-                                  </div>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section class="dashboard-card">
-                    <h4 class="h6 mb-2">Échéances proches</h4>
-                    <div class="table-responsive">
-                      <table class="table table-sm align-middle mb-0 dashboard-table">
-                        <thead>
-                          <tr>
-                            <th>Activité</th>
-                            <th>Type d'activité</th>
-                            <th>Phase</th>
-                            <th>Statut</th>
-                            <th>Échéance</th>
-                            <th>Proximité</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let task of dueTaskRows">
-                            <td>{{ task.taskLabel }}</td>
-                            <td>{{ task.activityLabel }}</td>
-                            <td>{{ task.phaseLabel }}</td>
-                            <td>{{ task.status }}</td>
-                            <td>{{ task.dueDate }}</td>
-                            <td>
-                              <span class="badge" [ngClass]="getTaskDueClass(task.daysRemaining)">
-                                <ng-container *ngIf="task.daysRemaining < 0">
-                                  En retard ({{ -task.daysRemaining }}j)
-                                </ng-container>
-                                <ng-container *ngIf="task.daysRemaining === 0">Aujourd'hui</ng-container>
-                                <ng-container *ngIf="task.daysRemaining > 0">J-{{ task.daysRemaining }}</ng-container>
-                              </span>
-                            </td>
-                          </tr>
-                          <tr *ngIf="dueTaskRows.length === 0">
-                            <td colspan="6" class="text-muted text-center py-3">
-                              Aucune échéance disponible.
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </div>
-              </div>
-            </ng-container>
-
-      </div>
-    </section>
+  <div *ngIf="noProjectSelected && !isLoading && !loadError" class="dashboard-empty">
+    <p>Aucun projet sélectionné.</p>
+    <button class="btn btn-add" (click)="goToProjects()">Sélectionner un projet</button>
   </div>
+
+  <!-- Détail du projet courant -->
+  <ng-container *ngIf="selectedProject as p">
+
+    <section class="project-general-panel mb-3">
+      <h4 class="h6 mb-3">Informations générales</h4>
+
+      <p class="project-description mb-3" *ngIf="p.description">{{ p.description }}</p>
+
+      <section class="project-team-panel">
+        <h5 class="h6 mb-3">Équipe projet</h5>
+        <div class="project-team">
+          <div class="team-member">
+            <span class="team-member-label">Project Manager</span>
+            <span class="team-member-value">{{ getMemberByRole('projectManager') }}</span>
+          </div>
+          <div class="team-member">
+            <span class="team-member-label">Change Manager</span>
+            <span class="team-member-value">{{ getMemberByRole('changeManager') }}</span>
+          </div>
+          <div class="team-member">
+            <span class="team-member-label">Business Manager</span>
+            <span class="team-member-value">{{ getMemberByRole('businessManager') }}</span>
+          </div>
+          <div class="team-member">
+            <span class="team-member-label">Technology Manager</span>
+            <span class="team-member-value">{{ getMemberByRole('technologyManager') }}</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="project-info-bar mt-3">
+        <div class="info-item">
+          <span class="info-label">Sponsor</span>
+          <span class="info-value">{{ p.sponsor }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Phase en cours</span>
+          <span class="info-value">{{ p.currentPhase }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Statut</span>
+          <span class="info-value">{{ p.status }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">État de santé</span>
+          <span class="info-value">
+            <span
+              class="health-dot align-middle me-1"
+              [ngClass]="{
+                'health-good': p.health === 'good',
+                'health-warning': p.health === 'warning',
+                'health-critical': p.health === 'critical'
+              }"
+            ></span>
+            {{ p.healthName || getHealthLabel(p.health) }}
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <div class="dashboard-columns mb-3">
+      <div class="dashboard-column">
+        <section class="dashboard-card">
+          <h4 class="h6 mb-2">Scorecard synthétique</h4>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm activity-matrix text-center align-middle mb-0">
+              <thead>
+                <tr>
+                  <th class="text-start">Activités</th>
+                  <th *ngFor="let phase of getSelectedPhases()">
+                    <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let activity of getSelectedActivities()">
+                  <td class="text-start">{{ activity.label }}</td>
+                  <td *ngFor="let phase of getSelectedPhases()">
+                    <span
+                      class="status-pill"
+                      [ngClass]="getStatusClass(getSelectedCellStatus(activity.id, phase))"
+                    ></span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="dashboard-card">
+          <h4 class="h6 mb-2">État d'avancement des activités par phase</h4>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 dashboard-table">
+              <thead>
+                <tr>
+                  <th class="text-start">Activité</th>
+                  <th *ngFor="let phase of getSelectedPhases()">
+                    <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of progressRows">
+                  <td class="text-start fw-semibold">{{ row.activityLabel }}</td>
+                  <td *ngFor="let cell of row.cells">
+                    <div class="progress-track">
+                      <div
+                        class="progress-fill"
+                        [ngClass]="getProgressBarClass(cell.percent)"
+                        [style.width.%]="cell.percent"
+                      ></div>
+                    </div>
+                    <small class="text-muted">{{ cell.percent }}% ({{ cell.done }}/{{ cell.total }})</small>
+                  </td>
+                </tr>
+                <tr *ngIf="progressRows.length === 0">
+                  <td [attr.colspan]="1 + getSelectedPhases().length" class="text-muted text-center py-3">
+                    Aucune donnée d'avancement.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div class="dashboard-column">
+        <section class="dashboard-card">
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+            <h4 class="h6 mb-0">Risques</h4>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Mode affichage risques">
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                [class.active]="riskDisplayMode === 'table'"
+                (click)="setRiskDisplayMode('table')">
+                Tableau
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                [class.active]="riskDisplayMode === 'matrix'"
+                (click)="setRiskDisplayMode('matrix')">
+                Matrice
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive risk-list-wrap" *ngIf="riskDisplayMode === 'table'">
+            <table class="table table-sm align-middle mb-0 dashboard-table">
+              <thead>
+                <tr>
+                  <th>Risque</th>
+                  <th>Niveau</th>
+                  <th>Statut</th>
+                  <th>Responsable</th>
+                  <th>Échéance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let risk of topRiskRows">
+                  <td>{{ risk.longName || risk.title }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="getRiskLevelClass(risk.level)">
+                      {{ getRiskLevelLabel(risk.level) }}
+                    </span>
+                  </td>
+                  <td>{{ risk.status }}</td>
+                  <td>{{ risk.owner || '—' }}</td>
+                  <td>{{ risk.dueDate || '—' }}</td>
+                </tr>
+                <tr *ngIf="topRiskRows.length === 0">
+                  <td colspan="5" class="text-muted text-center py-3">
+                    Aucun risque disponible.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div *ngIf="riskDisplayMode === 'matrix'" class="risk-matrix-shell">
+            <div class="impact-axis-label">Impact</div>
+            <div class="risk-matrix-main">
+              <div class="prob-axis-label">Probabilité</div>
+              <div class="table-responsive">
+                <table class="table table-bordered table-sm text-center align-middle mb-0 risk-matrix-table">
+                  <thead>
+                    <tr>
+                      <th class="text-start"></th>
+                      <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let impact of riskImpactLevels">
+                      <td class="text-start fw-semibold">{{ impact }}</td>
+                      <td *ngFor="let prob of riskProbabilityLevels">
+                        <div class="risk-cell-dots">
+                          <span
+                            *ngFor="let risk of getRiskMatrixDots(impact, prob)"
+                            class="risk-dot"
+                            [ngClass]="'risk-dot-' + risk.level"
+                            [title]="risk.longName || risk.title">
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard-card">
+          <h4 class="h6 mb-2">Échéances proches</h4>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0 dashboard-table">
+              <thead>
+                <tr>
+                  <th>Activité</th>
+                  <th>Type d'activité</th>
+                  <th>Phase</th>
+                  <th>Statut</th>
+                  <th>Échéance</th>
+                  <th>Proximité</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let task of dueItemRows">
+                  <td>{{ task.taskLabel }}</td>
+                  <td>{{ task.activityLabel }}</td>
+                  <td>{{ task.phaseLabel }}</td>
+                  <td>{{ task.status }}</td>
+                  <td>{{ task.dueDate }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="getItemDueClass(task.daysRemaining)">
+                      <ng-container *ngIf="task.daysRemaining < 0">
+                        En retard ({{ -task.daysRemaining }}j)
+                      </ng-container>
+                      <ng-container *ngIf="task.daysRemaining === 0">Aujourd'hui</ng-container>
+                      <ng-container *ngIf="task.daysRemaining > 0">J-{{ task.daysRemaining }}</ng-container>
+                    </span>
+                  </td>
+                </tr>
+                <tr *ngIf="dueItemRows.length === 0">
+                  <td colspan="6" class="text-muted text-center py-3">
+                    Aucune échéance disponible.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+  </ng-container>
+
 </div>

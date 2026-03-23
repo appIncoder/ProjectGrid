@@ -1,182 +1,338 @@
 <div class="settings-page">
+
+  <!-- ══════════════════════════════════════════════════════════
+       En-tête + sélecteur de projet
+       ══════════════════════════════════════════════════════════ -->
   <header class="settings-header">
     <h2>Paramètres</h2>
 
-    <div class="settings-subtitle" *ngIf="project?.name; else noProject">
-      Projet sélectionné : <strong>{{ project?.name }}</strong>
+    <div class="project-selector-row">
+      <label class="field-label" for="projectSelect">Projet</label>
+      <select
+        id="projectSelect"
+        class="field-control project-select"
+        [(ngModel)]="selectedProjectId"
+        (ngModelChange)="onProjectSelected()"
+      >
+        <option value="">-- Sélectionner un projet --</option>
+        @for (p of projectList; track p.id) {
+          <option [value]="p.id">{{ p.name }}</option>
+        }
+      </select>
     </div>
-    <ng-template #noProject>
-      <div class="settings-subtitle warning">
-        Aucun projet sélectionné (les paramètres ne peuvent pas être sauvegardés).
-      </div>
-    </ng-template>
+
+    @if (isProjectLoading) {
+      <div class="loading-hint">Chargement du projet…</div>
+    }
+    @if (projectLoadError) {
+      <div class="alert-danger small">{{ projectLoadError }}</div>
+    }
   </header>
 
-  <form [formGroup]="form" class="settings-grid">
-    <!-- ===================== params.model.ts ===================== -->
-    <section class="card">
-      <div class="card-title">
-        <div class="badge">params.model.ts</div>
-        <h3>Affichage &amp; interactions</h3>
+  @if (project) {
+
+    <!-- ══════════════════════════════════════════════════════════
+         Barre d'onglets
+         ══════════════════════════════════════════════════════════ -->
+    <nav class="settings-tabs">
+      <button
+        type="button"
+        class="settings-tab"
+        [class.is-active]="activeTab === 'project'"
+        (click)="activeTab = 'project'"
+      >
+        <span class="settings-tab-icon">⚙</span>
+        Paramètres du projet
+      </button>
+      <button
+        type="button"
+        class="settings-tab"
+        [class.is-active]="activeTab === 'access'"
+        (click)="activeTab = 'access'"
+      >
+        <span class="settings-tab-icon">👥</span>
+        Droits d'accès
+      </button>
+    </nav>
+
+    <!-- ══════════════════════════════════════════════════════════
+         Onglet 1 : Paramètres du projet
+         ══════════════════════════════════════════════════════════ -->
+    @if (activeTab === 'project') {
+      <div class="settings-tab-panel">
+
+        <!-- Affichage & interactions -->
+        <section class="settings-section card">
+          <div class="section-header">
+            <h3>Affichage &amp; interactions</h3>
+            <span class="section-badge">Local</span>
+          </div>
+
+          <form [formGroup]="form" class="settings-fields">
+            <div class="field-row">
+              <label class="field-label" for="periodPreset">Période par défaut (Roadmap)</label>
+              <select id="periodPreset" class="field-control" formControlName="periodPreset">
+                @for (p of periodPresets; track p.value) {
+                  <option [value]="p.value">{{ p.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label class="field-label" for="viewMode">Mode d'affichage</label>
+              <select id="viewMode" class="field-control" formControlName="viewMode">
+                @for (m of viewModes; track m.value) {
+                  <option [value]="m.value">{{ m.value }} — {{ m.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label class="field-label" for="depType">Type de lien par défaut</label>
+              <select id="depType" class="field-control" formControlName="defaultDependencyType">
+                @for (t of dependencyType; track t) {
+                  <option [value]="t">{{ t }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field-row">
+              <label class="field-label">Hover hints</label>
+              <label class="toggle">
+                <input type="checkbox" formControlName="hoverHintsEnabled" />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field-label">Tooltips sur les liens</label>
+              <label class="toggle">
+                <input type="checkbox" formControlName="linkTooltipsEnabled" />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </form>
+
+          <div class="section-actions">
+            <button type="button" class="btn btn-ghost" (click)="resetToDefaults()">Réinitialiser</button>
+            <button type="button" class="btn btn-primary" (click)="save()">Enregistrer</button>
+            @if (savedState === 'saved') { <span class="save-status ok">Sauvegardé</span> }
+            @if (savedState === 'error') { <span class="save-status err">Erreur</span> }
+          </div>
+        </section>
+
+        <!-- Workflow des statuts -->
+        <section class="settings-section card">
+          <div class="section-header">
+            <h3>Workflow des statuts</h3>
+            <span class="section-badge firestore">Firestore</span>
+          </div>
+
+          <p class="section-hint">
+            Personnalisez les libellés des statuts utilisés dans les tableaux de bord du projet.
+            L'identifiant technique (<code>id</code>) ne change pas, seul l'affichage est modifié.
+          </p>
+
+          <div class="workflow-statuses">
+            @for (s of workflowStatuses; track s.id) {
+              <div class="workflow-status-row">
+                <span [class]="'ws-dot ws-dot--' + s.id"></span>
+                <span class="workflow-status-id">{{ s.id }}</span>
+                <input
+                  type="text"
+                  class="field-control workflow-label-input"
+                  [(ngModel)]="s.label"
+                  [placeholder]="s.id"
+                />
+              </div>
+            }
+          </div>
+
+          @if (workflowError) {
+            <div class="alert-danger small mt-2">{{ workflowError }}</div>
+          }
+
+          <div class="section-actions mt-3">
+            <button type="button" class="btn btn-ghost" (click)="resetWorkflowToDefault()">Réinitialiser</button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="saveWorkflow()"
+              [disabled]="workflowSaveState === 'saving'"
+            >
+              {{ workflowSaveState === 'saving' ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+            @if (workflowSaveState === 'saved') { <span class="save-status ok">Sauvegardé</span> }
+            @if (workflowSaveState === 'error') { <span class="save-status err">Erreur</span> }
+          </div>
+        </section>
+
       </div>
+    }
 
-      <label class="row">
-        <span class="label">Période par défaut (Roadmap)</span>
-        <select class="control" formControlName="periodPreset">
-          <option *ngFor="let p of periodPresets" [value]="p.value">{{ p.label }}</option>
-        </select>
-      </label>
+    <!-- ══════════════════════════════════════════════════════════
+         Onglet 2 : Droits d'accès
+         ══════════════════════════════════════════════════════════ -->
+    @if (activeTab === 'access') {
+      <div class="settings-tab-panel">
 
-      <label class="row">
-        <span class="label">Hover hints (info au survol)</span>
-        <input type="checkbox" formControlName="hoverHintsEnabled" />
-      </label>
+        <section class="settings-section card">
+          <div class="section-header">
+            <h3>Membres &amp; rôles</h3>
+            <span class="section-badge firestore">Firestore</span>
+          </div>
 
-      <label class="row">
-        <span class="label">Tooltips sur les liens</span>
-        <input type="checkbox" formControlName="linkTooltipsEnabled" />
-      </label>
-    </section>
+          <p class="section-hint">
+            Les droits sont définis par les rôles. Tout accès non listé est <strong>readonly</strong> par défaut.
+          </p>
 
-    <!-- ===================== gantt.model.ts ===================== -->
-    <section class="card">
-      <div class="card-title">
-        <div class="badge">gantt.model.ts</div>
-        <h3>Gantt &amp; dépendances</h3>
+          <!-- Légende des rôles -->
+          <div class="roles-legend">
+            <div class="roles-legend-grid">
+              @for (r of roleOptions; track r.value) {
+                <div class="role-desc">
+                  <span class="role-chip">{{ r.label }}</span>
+                  <span class="role-desc-text">{{ r.description }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (isMembersLoading) {
+            <div class="loading-hint">Chargement des membres…</div>
+          }
+          @if (membersError) {
+            <div class="alert-danger small">{{ membersError }}</div>
+          }
+
+          <!-- Tableau des membres -->
+          @if (!isMembersLoading && members.length > 0) {
+            <div class="members-table-wrap">
+              <table class="members-table">
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th>
+                    <th>Rôles</th>
+                    <th class="col-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (m of members; track m.userId) {
+                    <tr>
+                      @if (editingMemberId !== m.userId) {
+                        <td class="member-name">{{ m.label }}</td>
+                        <td class="member-roles">
+                          @for (r of m.roles; track r) {
+                            <span class="role-chip">{{ getRoleLabel(r) }}</span>
+                          }
+                          @if (m.roles.length === 0) {
+                            <span class="text-muted small">Aucun rôle</span>
+                          }
+                        </td>
+                        <td class="col-actions">
+                          <button type="button" class="btn btn-xs btn-ghost" (click)="startEditMember(m)" title="Modifier les rôles">✏️</button>
+                          <button type="button" class="btn btn-xs btn-danger-ghost" (click)="removeMember(m)" title="Retirer du projet">✕</button>
+                        </td>
+                      }
+                      @if (editingMemberId === m.userId) {
+                        <td class="member-name">{{ m.label }}</td>
+                        <td class="member-roles-edit">
+                          <div class="role-checkboxes">
+                            @for (r of roleOptions; track r.value) {
+                              <label class="role-check">
+                                <input type="checkbox" [checked]="isRoleSelectedForEdit(r.value)" (change)="toggleRoleForEdit(r.value)" />
+                                {{ r.label }}
+                              </label>
+                            }
+                          </div>
+                        </td>
+                        <td class="col-actions">
+                          <button
+                            type="button"
+                            class="btn btn-xs btn-primary"
+                            (click)="saveEditMember()"
+                            [disabled]="editingRoles.length === 0 || membersSaveState === 'saving'"
+                          >{{ membersSaveState === 'saving' ? '…' : 'OK' }}</button>
+                          <button type="button" class="btn btn-xs btn-ghost" (click)="cancelEditMember()">Annuler</button>
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (!isMembersLoading && members.length === 0 && !membersError) {
+            <p class="text-muted small mt-2">Aucun membre pour le moment.</p>
+          }
+
+          @if (membersSaveState === 'saved' || membersSaveState === 'error') {
+            <div class="section-actions">
+              @if (membersSaveState === 'saved') { <span class="save-status ok">Membres mis à jour</span> }
+              @if (membersSaveState === 'error') { <span class="save-status err">Erreur d'enregistrement</span> }
+            </div>
+          }
+
+          <!-- Formulaire d'ajout de membre -->
+          <div class="add-member-form mt-3">
+            <h4 class="add-member-title">Ajouter un membre</h4>
+
+            @if (addError) {
+              <div class="alert-danger small mb-2">{{ addError }}</div>
+            }
+
+            <div class="field-row">
+              <label class="field-label">Utilisateur</label>
+              <select class="field-control" [(ngModel)]="addForm.userId">
+                <option value="">-- Sélectionner --</option>
+                @for (u of availableUsersForAdd; track u.id) {
+                  <option [value]="u.id">{{ u.label }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="field-row align-start">
+              <label class="field-label pt-1">Rôles</label>
+              <div class="role-checkboxes">
+                @for (r of roleOptions; track r.value) {
+                  <label class="role-check">
+                    <input
+                      type="checkbox"
+                      [checked]="isRoleSelectedForAdd(r.value)"
+                      (change)="toggleRoleForAdd(r.value)"
+                    />
+                    <span>
+                      <strong>{{ r.label }}</strong>
+                      <span class="role-desc-text"> — {{ r.description }}</span>
+                    </span>
+                  </label>
+                }
+              </div>
+            </div>
+
+            <div class="section-actions mt-2">
+              <button
+                type="button"
+                class="btn btn-primary"
+                (click)="addMember()"
+                [disabled]="!addForm.userId || addForm.roles.length === 0 || membersSaveState === 'saving'"
+              >
+                {{ membersSaveState === 'saving' ? 'Ajout en cours…' : 'Ajouter' }}
+              </button>
+            </div>
+          </div>
+        </section>
+
       </div>
+    }
 
-      <label class="row">
-        <span class="label">Mode d’affichage</span>
-        <select class="control" formControlName="viewMode">
-          <option *ngFor="let m of viewModes" [value]="m.value">
-            {{ m.value }} — {{ m.label }}
-          </option>
-        </select>
-      </label>
+  }
 
-      <label class="row">
-        <span class="label">Type de lien par défaut</span>
-        <select class="control" formControlName="defaultDependencyType">
-          <option *ngFor="let t of dependencyType" [value]="t">{{ t }}</option>
-        </select>
-      </label> 
+  @if (!project && !isProjectLoading && !projectLoadError) {
+    <div class="settings-empty">
+      Sélectionnez un projet pour gérer ses paramètres et ses membres.
+    </div>
+  }
 
-      <p class="hint">
-        Conseil : ce type par défaut sert lors de la création d’un lien (si tu n’imposes pas un choix).
-      </p>
-    </section>
-
-    <!-- ===================== project.model.ts ===================== -->
-    <section class="card">
-      <div class="card-title">
-        <div class="badge">project.model.ts</div>
-        <h3>Données du projet</h3>
-      </div>
-
-      <label class="row">
-        <span class="label">Nom</span>
-        <input class="control" type="text" formControlName="projectName" />
-      </label>
-
-      <label class="row">
-        <span class="label">Description</span>
-        <textarea class="control" rows="4" formControlName="projectDescription"></textarea>
-      </label>
-
-      <p class="hint">
-        Ici c’est “local-only” dans cette version. La persistance Firebase se ferait via ton service.
-      </p>
-    </section>
-  </form>
-
-  <footer class="actions">
-    <button type="button" class="btn" (click)="resetToDefaults()">
-      Réinitialiser
-    </button>
-
-    <button type="button" class="btn primary" (click)="save()" [disabled]="!project?.id">
-      Enregistrer
-    </button>
-
-    <span class="status ok" *ngIf="savedState === 'saved'">✅ Sauvegardé</span>
-    <span class="status err" *ngIf="savedState === 'error'">⚠️ Impossible de sauvegarder</span>
-  </footer>
 </div>
-
-<style>
-  .settings-page { padding: 16px; max-width: 1100px; margin: 0 auto; }
-  .settings-header h2 { margin: 0 0 6px 0; }
-  .settings-subtitle { color: #555; margin-bottom: 14px; }
-  .settings-subtitle.warning { color: #a35; }
-
-  .settings-grid {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 12px;
-  }
-  .card {
-    grid-column: span 12;
-    border: 1px solid #e6e6e6;
-    border-radius: 12px;
-    padding: 14px;
-    background: #fff;
-  }
-  @media (min-width: 900px) {
-    .card { grid-column: span 4; }
-  }
-
-  .card-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-  .card-title h3 { margin: 0; font-size: 16px; }
-  .badge {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: #f2f2f2;
-    color: #444;
-    border: 1px solid #e5e5e5;
-    white-space: nowrap;
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: center;
-    gap: 10px;
-    margin: 10px 0;
-  }
-  .label { color: #333; }
-  .control {
-    width: 100%;
-    padding: 8px 10px;
-    border-radius: 10px;
-    border: 1px solid #dcdcdc;
-    background: #fff;
-  }
-  textarea.control { resize: vertical; }
-  input[type="checkbox"] { transform: scale(1.1); justify-self: start; }
-
-  .hint { margin: 8px 0 0 0; color: #666; font-size: 12px; }
-
-  .actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 14px;
-  }
-  .btn {
-    border: 1px solid #d0d0d0;
-    background: #fff;
-    padding: 8px 12px;
-    border-radius: 10px;
-    cursor: pointer;
-  }
-  .btn.primary {
-    border-color: #2a6;
-    background: #2a6;
-    color: #fff;
-  }
-  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-  .status { margin-left: 6px; font-size: 13px; }
-  .status.ok { color: #2a6; }
-  .status.err { color: #a35; }
-</style>

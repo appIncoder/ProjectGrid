@@ -8,12 +8,10 @@
           <span class="scorecard-kpi">Types d'activité: {{ getActivityCount() }}</span>
           <span class="scorecard-kpi">Phases: {{ getPhaseCount() }}</span>
         </div>
-        <div class="scorecard-toolbar-hint">Info: créez une activité avec phase, type d'activité et planning obligatoires.</div>
       </div>
       <div class="scorecard-toolbar-actions">
-        <button type="button" class="btn scorecard-add-task-btn" (click)="openCreateTaskModal(taskEditModal)">
-          <span class="scorecard-add-task-btn__plus">+</span>
-          <span>Ajouter une activité</span>
+        <button type="button" class="btn btn-add" (click)="openCreateTaskModal(taskEditModal)">
+          + Ajouter une activité
         </button>
       </div>
     </div>
@@ -96,7 +94,7 @@
       >
         <div class="task-context-menu__title">Changer le statut</div>
         <button
-          *ngFor="let opt of taskStatusOptions"
+          *ngFor="let opt of itemStatusOptions"
           type="button"
           class="task-context-menu__item"
           [class.is-active]="opt.value === cm.currentStatus"
@@ -115,8 +113,8 @@
   <app-project-task-edit-modal
     [isCreateMode]="isCreateMode"
     [editError]="editError"
-    [(editedTaskLabel)]="editedTaskLabel"
-    [(editedTaskStatus)]="editedTaskStatus"
+    [(editedItemLabel)]="editedItemLabel"
+    [(editedItemStatus)]="editedItemStatus"
     [(editedStartDate)]="editedStartDate"
     [(editedEndDate)]="editedEndDate"
     [(editedCategory)]="editedCategory"
@@ -124,13 +122,14 @@
     [(editedReporterId)]="editedReporterId"
     [(editedAccountantId)]="editedAccountantId"
     [(editedResponsibleId)]="editedResponsibleId"
-    [taskStatusOptions]="taskStatusOptions"
-    [taskCategoryOptions]="taskCategoryOptions"
+    [itemStatusOptions]="itemStatusOptions"
+    [itemCategoryOptions]="itemCategoryOptions"
     [dependencyTypeOptions]="dependencyTypeOptions"
     [phases]="getPhases()"
     [users]="users"
     [editedDependencies]="editedDependencies"
     [linkableTasks]="getLinkableTasks()"
+    [childItems]="getChildItems()"
     (addDependency)="addDependencyRow()"
     (removeDependency)="removeDependencyRow($event)"
     (cancel)="modal.dismiss()"

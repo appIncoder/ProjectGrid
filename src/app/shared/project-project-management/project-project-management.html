@@ -1,120 +1,111 @@
-<div class="card pm-detail-card">
-  <div class="card-body">
-    <div class="pm-head">
-      <h3>Gestion du projet - Kanban des activites et taches</h3>
-      <app-project-add-task-button
-        label="Ajouter une tache"
-        [disabled]="isSaving"
-        (action)="openCreateTaskModal()"
-      ></app-project-add-task-button>
-    </div>
+<div class="pm-detail-card">
+  <div class="pm-head">
+    <span class="pm-board-title">Gestion du projet – Kanban</span>
+    <app-project-add-task-button
+      label="Ajouter un item"
+      [disabled]="isSaving"
+      (action)="openCreateTaskModal()"
+    ></app-project-add-task-button>
+  </div>
 
-    <div class="pm-phase-filters">
+  <div class="pm-phase-filters">
+    <button
+      type="button"
+      class="pm-filter-chip pm-filter-chip--primary"
+      [class.is-active]="showCurrentPhaseOnly"
+      (click)="toggleCurrentPhaseFilter()"
+    >
+      Phase en cours
+    </button>
+    <button type="button" class="pm-filter-chip" [disabled]="showCurrentPhaseOnly" (click)="selectAllPhases()">Toutes</button>
+    <button type="button" class="pm-filter-chip" [disabled]="showCurrentPhaseOnly" (click)="deselectAllPhases()">Aucune</button>
+    @for (phase of phaseFilters; track phase.id) {
       <button
         type="button"
-        class="pm-filter-chip"
-        [class.pm-filter-chip--active]="showCurrentPhaseOnly"
-        (click)="toggleCurrentPhaseFilter()"
-      >
-        Phase en cours
-      </button>
-
-      <button
-        type="button"
-        class="pm-filter-chip"
-        [disabled]="showCurrentPhaseOnly"
-        (click)="selectAllPhases()"
-      >
-        Selectionner toutes les phases
-      </button>
-
-      <button
-        type="button"
-        class="pm-filter-chip"
-        [disabled]="showCurrentPhaseOnly"
-        (click)="deselectAllPhases()"
-      >
-        Deselectionner toutes les phases
-      </button>
-
-      <button
-        type="button"
-        *ngFor="let phase of phaseFilters; trackBy: trackByPhase"
         class="pm-filter-chip"
         [class.pm-filter-chip--active]="phase.selected"
         [disabled]="showCurrentPhaseOnly"
         (click)="togglePhase(phase.id)"
-      >
-        {{ phase.label }}
-      </button>
-    </div>
+      >{{ phase.label }}</button>
+    }
+  </div>
 
-    <div class="pm-save-state" *ngIf="isSaving">Enregistrement...</div>
-    <div class="pm-save-error" *ngIf="saveError">{{ saveError }}</div>
+  @if (isSaving) { <div class="pm-save-state">Enregistrement...</div> }
+  @if (saveError) { <div class="pm-save-error">{{ saveError }}</div> }
 
+  <div class="pm-board-wrap">
     <div class="pm-board-head">
-      <div class="pm-board-head-label">Swimlane (activite mere)</div>
+      <div class="pm-board-head-label">Activité parente</div>
       <div class="pm-board-columns">
-        <div class="pm-board-col-title" *ngFor="let col of statusColumns">
-          <span>{{ col.label }}</span>
-          <small>{{ getColumnTaskCount(col.id) }}</small>
-        </div>
+        @for (col of statusColumns; track col.id) {
+          <div [class]="'pm-board-col-title pm-col-' + col.id">
+            <span class="pm-col-dot"></span>
+            <span class="pm-col-label">{{ col.label }}</span>
+            <span class="pm-col-count">{{ getColumnTaskCount(col.id) }}</span>
+          </div>
+        }
       </div>
     </div>
 
-    <div class="pm-board-empty" *ngIf="!filteredLanes.length">
-      Aucune activite visible pour les filtres de phase selectionnes.
-    </div>
+    @if (!filteredLanes.length) {
+      <div class="pm-board-empty">Aucune activité visible pour les filtres de phase sélectionnés.</div>
+    }
 
-    <div class="pm-board" *ngIf="filteredLanes.length">
-      <div class="pm-lane" *ngFor="let lane of filteredLanes; trackBy: trackByLane">
-        <div class="pm-lane-meta">
-          <div class="pm-lane-phase">{{ lane.phaseLabel }}</div>
-          <div class="pm-lane-title">{{ lane.label }}</div>
-          <div class="pm-lane-id">ID: {{ lane.id }}</div>
-        </div>
+    @if (filteredLanes.length) {
+      <div class="pm-board">
+        @for (lane of filteredLanes; track lane.id) {
+          <div class="pm-lane">
+            <div class="pm-lane-meta">
+              <div class="pm-lane-phase">{{ lane.phaseLabel }}</div>
+              <div class="pm-lane-title">{{ lane.label }}</div>
+            </div>
 
-        <div class="pm-lane-columns">
-          <div
-            class="pm-lane-col"
-            *ngFor="let col of statusColumns"
-            [class.pm-lane-col--drop-target]="isDropTarget(lane, col.id)"
-            (dragover)="onStatusDragOver($event, lane, col.id)"
-            (dragleave)="onStatusDragLeave(lane, col.id)"
-            (drop)="onStatusDrop($event, lane, col.id)"
-          >
-            <div
-              class="pm-task-card"
-              *ngFor="let task of lane.groupedByStatus[col.id]; trackBy: trackByTask"
-              [ngClass]="getStatusClass(col.id)"
-              draggable="true"
-              (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
-              (dragend)="onTaskDragEnd()"
-              (click)="openTaskModal(lane, task)"
-            >
-              <div class="pm-task-title">{{ task.label }}</div>
-              <div class="pm-task-meta">{{ getStatusLabel(col.id) }}</div>
+            <div class="pm-lane-columns">
+              @for (col of statusColumns; track col.id) {
+                <div
+                  class="pm-lane-col"
+                  [class.pm-lane-col--drop-target]="isDropTarget(lane, col.id)"
+                  (dragover)="onStatusDragOver($event, lane, col.id)"
+                  (dragleave)="onStatusDragLeave(lane, col.id)"
+                  (drop)="onStatusDrop($event, lane, col.id)"
+                >
+                  @for (task of lane.groupedByStatus[col.id]; track task.id) {
+                    <div
+                      [class]="'pm-task-card ' + getStatusClass(col.id)"
+                      draggable="true"
+                      (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
+                      (dragend)="onTaskDragEnd()"
+                      (click)="openTaskModal(lane, task)"
+                    >
+                      <div class="pm-task-title">{{ task.label }}</div>
+                    </div>
+                  }
+                  @if (!lane.groupedByStatus[col.id]?.length) {
+                    <div class="pm-drop-placeholder">Déposer ici</div>
+                  }
+                </div>
+              }
             </div>
           </div>
-        </div>
+        }
       </div>
-    </div>
-
-    <app-project-kanban-task-modal
-      [open]="modalOpen"
-      [isSaving]="isSaving"
-      [error]="modalError"
-      [title]="isCreateMode ? 'Ajouter une tache' : 'Modifier la tache'"
-      [taskName]="editedTaskName"
-      [parentId]="editedTaskParentId"
-      [parentOptions]="availableParentActivities"
-      [comments]="getEditedTaskComments()"
-      [newCommentText]="newCommentText"
-      (close)="closeTaskModal()"
-      (save)="saveTaskModal()"
-      (taskNameChange)="editedTaskName = $event"
-      (parentIdChange)="editedTaskParentId = $event"
-      (newCommentTextChange)="newCommentText = $event"
-    ></app-project-kanban-task-modal>
+    }
   </div>
+
+  <app-project-kanban-task-modal
+    [open]="modalOpen"
+    [isSaving]="isSaving"
+    [error]="modalError"
+    [title]="isCreateMode ? 'Ajouter une tâche' : 'Modifier la tâche'"
+    [taskName]="editedTaskName"
+    [parentId]="editedTaskParentId"
+    [parentOptions]="availableParentActivities"
+    [comments]="getEditedTaskComments()"
+    [newCommentText]="newCommentText"
+    (close)="closeTaskModal()"
+    (save)="saveTaskModal()"
+    (taskNameChange)="editedTaskName = $event"
+    (parentIdChange)="editedTaskParentId = $event"
+    (newCommentTextChange)="newCommentText = $event"
+  ></app-project-kanban-task-modal>
 </div>

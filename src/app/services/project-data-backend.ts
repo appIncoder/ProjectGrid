@@ -1,4 +1,4 @@
-import type { ProjectDetail, UserRef } from '../models';
+import type { ProjectDetail, ProjectMember, ProjectWorkflow, UserRef } from '../models';
 import type {
   CreateProjectRiskPayload,
   ProjectHealthDefaultRef,
@@ -22,4 +22,10 @@ export interface ProjectDataBackend {
   saveProject(project: ProjectDetail): Promise<void>;
   deleteProject(projectId: string): Promise<void>;
   runProjectProcedure(projectId: string, procedure: 'save_project', payload: { project: ProjectDetail }): Promise<void>;
+  listProjectMembers(projectId: string): Promise<ProjectMember[]>;
+  setProjectMembers(projectId: string, members: ProjectMember[]): Promise<void>;
+  saveProjectTypeWorkflow(projectTypeId: string, workflow: ProjectWorkflow): Promise<void>;
+  saveProjectWorkflow(projectId: string, workflow: ProjectWorkflow): Promise<void>;
+  getCurrentProjectId(): Promise<string | null>;
+  setCurrentProjectId(projectId: string): Promise<void>;
 }

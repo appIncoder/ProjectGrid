@@ -1,7 +1,7 @@
 // src/app/services/project-data.service.ts
 import { inject, Injectable } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
-import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, UserRef } from '../models';
+import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow, UserRef } from '../models';
 import { environment } from '../environments/environment';
 import { FirebaseProjectDataBackendService } from './firebase-project-data-backend.service';
 import type { ProjectDataBackend } from './project-data-backend';
@@ -19,7 +19,10 @@ export interface ProjectTypeDefaults {
   activities: Array<{ id: string; label: string; sequence?: number | null }>;
   activitiesDefault: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
   tasks: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
+  workflow?: ProjectWorkflow;
 }
+
+export type { ProjectWorkflow };
 
 export interface ProjectHealthDefaultRef {
   healthId: string;
@@ -48,6 +51,8 @@ export interface UpdateProjectRiskPayload {
   status?: string;
   remainingRiskId?: string | null;
 }
+
+export type { ProjectMember, ProjectRole };
 
 export interface ProjectRiskRef {
   projectId: string;
@@ -229,6 +234,36 @@ export class ProjectDataService {
     }
   }
 
+  async listProjectMembers(projectId: string): Promise<ProjectMember[]> {
+    return this.backend.listProjectMembers(projectId);
+  }
+
+  async setProjectMembers(projectId: string, members: ProjectMember[]): Promise<void> {
+    await this.backend.setProjectMembers(projectId, members);
+  }
+
+  async saveProjectTypeWorkflow(projectTypeId: string, workflow: ProjectWorkflow): Promise<void> {
+    await this.backend.saveProjectTypeWorkflow(projectTypeId, workflow);
+  }
+
+  async getCurrentProjectId(): Promise<string | null> {
+    return this.backend.getCurrentProjectId();
+  }
+
+  async setCurrentProjectId(projectId: string): Promise<void> {
+    await this.backend.setCurrentProjectId(projectId);
+  }
+
+  async saveProjectWorkflow(projectId: string, workflow: ProjectWorkflow): Promise<void> {
+    const id = String(projectId ?? '').trim();
+    if (!id) throw new Error('Missing project id');
+    await this.backend.saveProjectWorkflow(id, workflow);
+    const cached = this.projectsCache.get(id);
+    if (cached) {
+      this.cacheProject({ ...cached, workflow });
+    }
+  }
+
   private normalizeProjectDetail(raw: any, fallbackId: string): ProjectDetail {
     const phases = Array.isArray(raw?.phases) && raw.phases.length
       ? (raw.phases as PhaseId[])
@@ -245,9 +280,10 @@ export class ProjectDataService {
           : {} as Record<ActivityId, Record<PhaseId, any[]>>);
     const taskMatrix = matrix;
     const activityMatrix = matrix;
-    const projectTasksMatrix = (raw?.projectTasksMatrix && typeof raw.projectTasksMatrix === 'object')
-      ? (raw.projectTasksMatrix as Record<ActivityId, Record<PhaseId, Record<string, any[]>>>)
+    const projectItemsMatrix = (raw?.projectItemsMatrix ?? raw?.projectTasksMatrix) && typeof (raw?.projectItemsMatrix ?? raw?.projectTasksMatrix) === 'object'
+      ? ((raw.projectItemsMatrix ?? raw.projectTasksMatrix) as Record<ActivityId, Record<PhaseId, Record<string, any[]>>>)
       : {} as Record<ActivityId, Record<PhaseId, Record<string, any[]>>>;
+    const projectTasksMatrix = projectItemsMatrix;
     const phaseDefinitionsRaw = (raw?.phaseDefinitions && typeof raw.phaseDefinitions === 'object')
       ? raw.phaseDefinitions
       : {};
@@ -316,6 +352,7 @@ export class ProjectDataService {
       activities,
       activityMatrix,
       taskMatrix,
+      projectItemsMatrix,
       projectTasksMatrix,
     } as ProjectDetail;
   }

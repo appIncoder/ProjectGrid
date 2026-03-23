@@ -119,6 +119,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       this.healthDefaults = (healthDefaults ?? []).filter((h) => String(h?.status ?? '').toLowerCase() === 'active');
       this.selectedHealthShortName = this.getActiveProjectHealthShortName(this.project) || 'Good';
       this.activeTab = this.activeTab || 'scorecard';
+      this.projectService.currentProjectId = this.project.id;
 
       console.log('[ProjectPage] project bound to template', {
         id: this.project.id,
@@ -187,6 +188,21 @@ export class ProjectPage implements OnInit, OnDestroy {
       this.isSaving = false;
       if (!this.destroyed) this.cdr.detectChanges();
     }
+  }
+
+  get currentPhaseName(): string | null {
+    if (!this.project) return null;
+    const defs = (this.project as any).phaseDefinitions as
+      Record<string, { isCurrent?: boolean; label?: string }> | undefined;
+    if (defs) {
+      for (const phase of this.project.phases) {
+        if (defs[phase]?.isCurrent) return defs[phase].label ?? phase;
+      }
+    }
+    // Fallback : première phase
+    const first = this.project.phases[0];
+    if (!first) return null;
+    return defs?.[first]?.label ?? first;
   }
 
   setTab(tab: ProjectTab): void {
@@ -271,6 +287,15 @@ export class ProjectPage implements OnInit, OnDestroy {
       }
     }
 
+    // Ensure at least one phase has isCurrent: true (default: first phase)
+    const rawDefs = (p as any)?.phaseDefinitions as Record<string, { isCurrent?: boolean }> | undefined;
+    const hasCurrentPhase = rawDefs && phases.some((ph: string) => rawDefs[ph]?.isCurrent === true);
+    const phaseDefinitions = rawDefs ?? {};
+    if (!hasCurrentPhase && phases.length > 0) {
+      const firstPhase = phases[0];
+      phaseDefinitions[firstPhase] = { ...phaseDefinitions[firstPhase], isCurrent: true };
+    }
+
     return {
       ...p,
       id: String((p as any)?.id ?? requestedId ?? ''),
@@ -278,6 +303,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       description: String((p as any)?.description ?? ''),
       phases,
       activities,
+      phaseDefinitions: Object.keys(phaseDefinitions).length ? phaseDefinitions : undefined,
       activityMatrix: taskMatrix,
       taskMatrix,
       projectTasksMatrix,

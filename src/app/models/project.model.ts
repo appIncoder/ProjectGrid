@@ -3,6 +3,17 @@ import type { DependencyType } from './gantt.model';
 export type PhaseId = 'Phase1' | 'Phase2' | 'Phase3' | 'Phase4' | 'Phase5' | 'Phase6';
 export type ActivityId = 'projet' | 'metier' | 'changement' | 'technologie';
 
+// ── Workflow des statuts ─────────────────────────────────────────────────────
+export interface WorkflowStatus {
+  id: ActivityStatus;
+  label: string;
+  sequence: number;
+}
+
+export interface ProjectWorkflow {
+  statuses: WorkflowStatus[];
+}
+
 export type ActivityStatus =
   | 'todo'
   | 'inprogress'
@@ -14,30 +25,58 @@ export type ActivityStatus =
 
 
 
-export type ProjectTab = 'scorecard' 
-                        | 'risks' 
+export type ProjectTab = 'scorecard'
+                        | 'risks'
                         | 'change'
                         | 'detail_project'
                         | 'detail_business'
                         | 'detail_technology'
-                        | 'budget' 
-                        | 'roadmap' 
-                        | 'board' 
-                        | 'ressources'; 
- 
-export interface TaskComment {
+                        | 'budget'
+                        | 'roadmap'
+                        | 'board'
+                        | 'ressources';
+
+export interface ItemComment {
   text: string;
   authorId?: string;
   authorName?: string;
   createdAt?: string;
 }
 
-/* ----- Scorecard / tâches ----- */
-export interface Task {
+/** @deprecated Use ItemComment instead */
+export type TaskComment = ItemComment;
+
+export type ItemCategory =
+  | 'projectManagement'
+  | 'businessManagement'
+  | 'changeManagement'
+  | 'technologyManagement';
+
+/** @deprecated Use ItemCategory instead */
+export type TaskCategory = ItemCategory;
+
+/* ----- Scorecard / items ----- */
+export interface Item {
   id: string;
   label: string;
   status: ActivityStatus;
+
+  // ✅ nouveaux champs
+  startDate?: string; // format "YYYY-MM-DD"
+  endDate?: string;   // format "YYYY-MM-DD"
+  category?: ItemCategory;
+  reporterId?: string;
+  accountantId?: string;
+  responsibleId?: string;
+  parentActivityId?: string;
+  comments?: ItemComment[];
+
+  // IMPORTANT : un item "vit" dans une phase de la matrice
+  phase?: PhaseId;
 }
+
+/** @deprecated Use Item instead */
+export type Task = Item;
 
 export interface ActivityDefinition {
   id: ActivityId;
@@ -81,14 +120,16 @@ export type ProjectDetail = {
   phaseDefinitions?: Record<PhaseId, PhaseDefinition>;
   activities: Record<ActivityId, ActivityDefinition>;
   // Canonical backend field
-  activityMatrix?: Record<ActivityId, Record<PhaseId, Task[]>>;
+  activityMatrix?: Record<ActivityId, Record<PhaseId, Item[]>>;
   // Legacy frontend field (kept for backward compatibility during migration)
-  taskMatrix: Record<ActivityId, Record<PhaseId, Task[]>>;
-  // Tâches filles par activité mère:
-  // activity -> phase -> activityId(parent) -> tasks[]
-  projectTasksMatrix?: Record<ActivityId, Record<PhaseId, Record<string, Task[]>>>;
+  taskMatrix: Record<ActivityId, Record<PhaseId, Item[]>>;
+  // Items fils par activité mère:
+  // activity -> phase -> activityId(parent) -> items[]
+  projectItemsMatrix?: Record<ActivityId, Record<PhaseId, Record<string, Item[]>>>;
+  /** @deprecated Use projectItemsMatrix instead */
+  projectTasksMatrix?: Record<ActivityId, Record<PhaseId, Record<string, Item[]>>>;
 
-  // ✅ dépendances Gantt persistées (fake aujourd’hui, API demain)
+  // ✅ dépendances Gantt persistées (fake aujourd'hui, API demain)
   ganttDependencies?: Array<{
     fromId: string;
     toId: string;
@@ -96,6 +137,9 @@ export type ProjectDetail = {
   }>;
   projectHealth?: ProjectHealthItem[];
   projectRisks?: ProjectRiskItem[];
+  memberRoles?: Record<string, ProjectRole[]>;
+  projectTypeId?: string;
+  workflow?: ProjectWorkflow;
 };
 
 
@@ -178,32 +222,6 @@ export interface BudgetLine {
   forecast: number;
 }
 
-export type TaskCategory =
-  | 'projectManagement'
-  | 'businessManagement'
-  | 'changeManagement'
-  | 'technologyManagement';
-
-/* ----- Scorecard / tâches ----- */
-export interface Task {
-  id: string;
-  label: string;
-  status: ActivityStatus;
-
-  // ✅ nouveaux champs
-  startDate?: string; // format "YYYY-MM-DD"
-  endDate?: string;   // format "YYYY-MM-DD"
-  category?: TaskCategory;
-  reporterId?: string;
-  accountantId?: string;
-  responsibleId?: string;
-  parentActivityId?: string;
-  comments?: TaskComment[];
-
-  // IMPORTANT : une tâche "vit" dans une phase de la matrice
-  phase?: PhaseId;
-}
-
 export interface PhaseDefinition {
   id: PhaseId;
   label?: string;
@@ -211,9 +229,29 @@ export interface PhaseDefinition {
   // format ISO "YYYY-MM-DD" (cohérent avec <input type="date">)
   startDate: string;
   endDate: string;
+
+  /** Phase active (en cours). Par défaut, la première phase d'un projet est active. */
+  isCurrent?: boolean;
 }
 
 export interface UserRef {
   id: string;
   label: string;
+}
+
+// ── Rôles projet ────────────────────────────────────────────────────────────
+export type ProjectRole =
+  | 'projectManager'      // Admin complet du projet
+  | 'businessManager'     // CRUD activités "gestion du métier"
+  | 'changeManager'       // CRUD activités "gestion du changement"
+  | 'technologyManager'   // CRUD activités "gestion de la technologie"
+  | 'projectMember'       // CRUD sur les activités/items qui lui sont assignés
+  | 'businessMember'      // CRUD sur les items métier assignés
+  | 'changeMember'        // CRUD sur les items changement assignés
+  | 'technologyMember';   // CRUD sur les items technologie assignés
+
+export interface ProjectMember {
+  userId: string;
+  label: string;
+  roles: ProjectRole[];
 }

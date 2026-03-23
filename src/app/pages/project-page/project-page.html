@@ -27,28 +27,28 @@
       <!-- Header du projet -->
       <div class="project-header card mb-3">
         <div class="card-body">
-          <h2 class="h5 mb-1">{{ p.name }}</h2>
-          <p class="project-description mb-2">
-            {{ p.description }}
-          </p>
-          <div class="project-meta">
-            <span class="project-meta-item">ID: {{ p.id }}</span>
-            <span class="project-meta-item">Vue détaillée active</span>
-            <span class="project-meta-item d-inline-flex align-items-center gap-2">
-              <label for="project-health-select" class="mb-0">Santé:</label>
-              <select
-                id="project-health-select"
-                class="form-select form-select-sm project-health-select"
-                style="min-width: 180px;"
-                [ngModel]="selectedHealthShortName"
-                (ngModelChange)="onProjectHealthChange($event)"
-                [disabled]="isUpdatingHealth || isSaving"
-              >
-                <option *ngFor="let h of healthDefaults" [ngValue]="h.shortName">
-                  {{ h.shortName }} - {{ h.longName }}
-                </option>
-              </select>
-            </span>
+          <div class="project-header-top">
+            <h2 class="h5 mb-0">{{ p.name }}</h2>
+            <div class="project-header-right">
+              <span class="current-phase-badge" *ngIf="currentPhaseName">
+                Phase en cours&nbsp;: <strong>{{ currentPhaseName }}</strong>
+              </span>
+              <span class="project-meta-item d-inline-flex align-items-center gap-2">
+                <label for="project-health-select" class="mb-0">Santé:</label>
+                <select
+                  id="project-health-select"
+                  class="form-select form-select-sm project-health-select"
+                  style="min-width: 180px;"
+                  [ngModel]="selectedHealthShortName"
+                  (ngModelChange)="onProjectHealthChange($event)"
+                  [disabled]="isUpdatingHealth || isSaving"
+                >
+                  <option *ngFor="let h of healthDefaults" [ngValue]="h.shortName">
+                    {{ h.shortName }} - {{ h.longName }}
+                  </option>
+                </select>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -116,25 +116,21 @@
         </div>
 
         <!-- Onglet 3 : Conduite du changement (ADKAR) -->
-        <app-project-project-management
-          *ngIf="activeTab === 'detail_project'"
-          [project]="p"
-        ></app-project-project-management>
+        <div [hidden]="activeTab !== 'detail_project'">
+          <app-project-project-management [project]="p"></app-project-project-management>
+        </div>
 
-        <app-project-business-management
-          *ngIf="activeTab === 'detail_business'"
-          [project]="p"
-        ></app-project-business-management>
+        <div [hidden]="activeTab !== 'detail_business'">
+          <app-project-business-management [project]="p"></app-project-business-management>
+        </div>
 
-        <app-project-change-management
-          *ngIf="activeTab === 'change'"
-          [project]="p"
-        ></app-project-change-management>
+        <div [hidden]="activeTab !== 'change'">
+          <app-project-change-management [project]="p"></app-project-change-management>
+        </div>
 
-        <app-project-technology-management
-          *ngIf="activeTab === 'detail_technology'"
-          [project]="p"
-        ></app-project-technology-management>
+        <div [hidden]="activeTab !== 'detail_technology'">
+          <app-project-technology-management [project]="p"></app-project-technology-management>
+        </div>
 
         <!-- Onglet 4 : Gestion du budget -->
         <app-project-budget *ngIf="activeTab === 'budget'"></app-project-budget>

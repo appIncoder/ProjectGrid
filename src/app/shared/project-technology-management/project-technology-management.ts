@@ -4,7 +4,7 @@ import { Component, Input, NgZone, OnChanges } from '@angular/core';
 import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kanban-task-modal';
 import { ProjectAddTaskButton } from '../project-add-task-button/project-add-task-button';
 import { ProjectDataService } from '../../services/project-data.service';
-import type { ActivityStatus, PhaseId, ProjectDetail, Task, TaskComment } from '../../models';
+import type { ActivityStatus, PhaseId, ProjectDetail, ProjectWorkflow, Task, TaskComment } from '../../models';
 
 interface ParentActivityLaneVm {
   id: string;
@@ -27,14 +27,24 @@ export class ProjectTechnologyManagement implements OnChanges {
 
   constructor(private projectData: ProjectDataService, private zone: NgZone) {}
 
-  readonly statusColumns: Array<{ id: ActivityStatus; label: string }> = [
-    { id: 'todo', label: 'A faire' },
-    { id: 'inprogress', label: 'En cours' },
-    { id: 'onhold', label: 'En attente' },
-    { id: 'done', label: 'Termine' },
-    { id: 'notdone', label: 'Non fait' },
-    { id: 'notapplicable', label: 'Non applicable' },
+  private readonly defaultStatusColumns: Array<{ id: ActivityStatus; label: string }> = [
+    { id: 'todo',          label: 'To Do' },
+    { id: 'inprogress',    label: 'In Progress' },
+    { id: 'onhold',        label: 'On Hold' },
+    { id: 'done',          label: 'Done' },
+    { id: 'notdone',       label: 'Not Done' },
+    { id: 'notapplicable', label: 'N/A' },
   ];
+
+  get statusColumns(): Array<{ id: ActivityStatus; label: string }> {
+    const wf = (this.project as any)?.workflow as ProjectWorkflow | undefined;
+    if (wf?.statuses?.length) {
+      return [...wf.statuses]
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((s) => ({ id: s.id, label: s.label }));
+    }
+    return this.defaultStatusColumns;
+  }
 
   phaseFilters: Array<{ id: PhaseId; label: string; selected: boolean }> = [];
   filteredLanes: ParentActivityLaneVm[] = [];

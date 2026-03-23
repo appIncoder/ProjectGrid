@@ -14,6 +14,8 @@ import type {
   ActivityStatus,
   Project,
   ProjectDetail,
+  ProjectMember,
+  ProjectRole,
   RiskLevel,
   Task,
 } from '../../models';
@@ -74,19 +76,19 @@ export class PrivatePage implements OnInit, OnDestroy {
     Phase6: 'Phase 6',
   };
 
-  myProjects: Project[] = [];
   selectedProject: Project | null = null;
   selectedProjectDetail: ProjectDetail | null = null;
+  selectedProjectMembers: ProjectMember[] = [];
   progressRows: DashboardProgressRow[] = [];
   topRiskRows: DashboardRiskRow[] = [];
-  dueTaskRows: DashboardDueTaskRow[] = [];
+  dueItemRows: DashboardDueTaskRow[] = [];
   riskDisplayMode: RiskDisplayMode = 'table';
   readonly riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
   readonly riskProbabilityLevels: string[] = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
-  private projectDetailsById = new Map<string, ProjectDetail>();
 
   isLoading = false;
   loadError: string | null = null;
+  noProjectSelected = false;
   private destroyed = false;
   private routerEventsSub: Subscription | null = null;
   private risksChangedSub: Subscription | null = null;
@@ -99,18 +101,17 @@ export class PrivatePage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // On ne bloque pas le rendu
-    void this.loadProjectsFromApi();
+    void this.loadCurrentProject();
     this.routerEventsSub = this.router.events
       .pipe(filter((evt): evt is NavigationEnd => evt instanceof NavigationEnd))
       .subscribe((evt) => {
         const url = evt.urlAfterRedirects;
         if (url === '/' || url.startsWith('/projects-overview')) {
-          void this.loadProjectsFromApi();
+          void this.loadCurrentProject();
         }
       });
     this.risksChangedSub = this.projectData.risksChanged$.subscribe((evt) => {
-      if (!evt?.projectId) return;
+      if (!evt?.projectId || evt.projectId !== this.selectedProject?.id) return;
       void this.refreshProjectRiskSnapshot(evt.projectId);
     });
   }
@@ -124,77 +125,73 @@ export class PrivatePage implements OnInit, OnDestroy {
   }
 
   async refresh(): Promise<void> {
-    await this.loadProjectsFromApi();
+    await this.loadCurrentProject();
   }
 
-  private async loadProjectsFromApi(): Promise<void> {
+  private async loadCurrentProject(): Promise<void> {
     if (this.isLoading) return;
     this.isLoading = true;
     this.loadError = null;
-
-    console.log('[PrivatePage] loadProjectsFromApi() start');
+    this.noProjectSelected = false;
 
     try {
-      // 1) liste "light" depuis l’API
-      const list = await this.projectData.listProjects();
-      console.log('[PrivatePage] listProjects()', list);
-
-      if (!list.length) {
-        this.myProjects = [];
+      const projectId = await this.projectData.getCurrentProjectId();
+      if (!projectId) {
+        this.noProjectSelected = true;
         this.selectedProject = null;
         this.selectedProjectDetail = null;
-        this.projectDetailsById.clear();
+        this.selectedProjectMembers = [];
+        this.progressRows = [];
+        this.topRiskRows = [];
+        this.dueItemRows = [];
         return;
       }
 
-      // 2) charge les détails
-      const details = await Promise.all(list.map((p) => this.projectData.getProjectById(p.id)));
-      console.log('[PrivatePage] project details loaded', details);
+      const detail = await this.projectData.getProjectById(projectId);
+      if (!detail) {
+        this.noProjectSelected = true;
+        this.selectedProject = null;
+        this.selectedProjectDetail = null;
+        return;
+      }
 
-      // 3) transforme en modèle dashboard
-      const dashboardProjects = details
-        .filter((d): d is ProjectDetail => !!d)
-        .map((d) => {
-          // ✅ register dans store + normalisation côté service
-          // (utile pour les autres écrans si tu relies plus tard)
-          this.projectService.registerProject(d);
-          this.projectDetailsById.set(d.id, d);
-          return this.toDashboardProject(d);
-        });
-
-      this.myProjects = dashboardProjects;
-      this.selectedProject = this.myProjects[0] ?? null;
-      this.selectedProjectDetail = this.selectedProject
-        ? this.projectDetailsById.get(this.selectedProject.id) ?? null
-        : null;
+      this.projectService.registerProject(detail);
+      this.selectedProjectDetail = detail;
+      this.selectedProject = this.toDashboardProject(detail);
       this.refreshDashboardData();
-
-      console.log('[PrivatePage] dashboard projects ready', {
-        count: this.myProjects.length,
-        selected: this.selectedProject?.id ?? null,
-      });
-    } catch (e: any) {
-      console.error('[PrivatePage] loadProjectsFromApi error', e);
-      this.loadError = "Impossible de charger les projets depuis l'API.";
-      this.myProjects = [];
+      void this.loadSelectedProjectMembers(projectId);
+    } catch (e) {
+      console.error('[PrivatePage] loadCurrentProject error', e);
+      this.loadError = "Impossible de charger le projet.";
       this.selectedProject = null;
       this.selectedProjectDetail = null;
       this.progressRows = [];
       this.topRiskRows = [];
-      this.dueTaskRows = [];
-      this.projectDetailsById.clear();
+      this.dueItemRows = [];
     } finally {
       this.isLoading = false;
-      console.log('[PrivatePage] loadProjectsFromApi() end');
-      if (!this.destroyed) {
-        this.cdr.detectChanges();
-      }
+      if (!this.destroyed) this.cdr.detectChanges();
     }
   }
 
-  // -------------------------
-  // Mapping ProjectDetail -> Project (dashboard)
-  // -------------------------
+  // ── Membres ────────────────────────────────────────────────────────────────
+
+  getMemberByRole(role: ProjectRole): string {
+    const member = this.selectedProjectMembers.find((m) => m.roles.includes(role));
+    return member?.label ?? '—';
+  }
+
+  private async loadSelectedProjectMembers(projectId: string): Promise<void> {
+    try {
+      this.selectedProjectMembers = await this.projectData.listProjectMembers(projectId);
+    } catch {
+      this.selectedProjectMembers = [];
+    }
+    if (!this.destroyed) this.cdr.detectChanges();
+  }
+
+  // ── Mapping ProjectDetail -> Project (dashboard) ───────────────────────────
+
   private toDashboardProject(detail: ProjectDetail): Project {
     const phases =
       Array.isArray((detail as any).phases) && (detail as any).phases.length
@@ -203,7 +200,6 @@ export class PrivatePage implements OnInit, OnDestroy {
 
     const taskMatrix: any = (detail as any).taskMatrix ?? {};
 
-    // Build activityMatrix for UI
     const activityMatrix: any = {};
     for (const actId of Object.keys(taskMatrix ?? {}) as ActivityId[]) {
       activityMatrix[actId] = {};
@@ -225,31 +221,14 @@ export class PrivatePage implements OnInit, OnDestroy {
       status: this.computeStatus(taskMatrix),
       health,
       healthName,
-      projectManager: this.extractProjectManager(detail),
-      sponsor: this.extractSponsor(detail),
+      projectManager: String((detail as any)?.projectManager ?? '—'),
+      sponsor: String((detail as any)?.sponsor ?? '—'),
       currentPhase,
-      changePractitioner: this.extractActivityOwner(detail, 'changement'),
-      businessVisionary: this.extractActivityOwner(detail, 'metier'),
-      technicalExpert: this.extractActivityOwner(detail, 'technologie'),
+      changePractitioner: '—',
+      businessVisionary: '—',
+      technicalExpert: '—',
       activityMatrix,
     } as Project;
-  }
-
-  private extractProjectManager(detail: ProjectDetail): string {
-    return String(
-      (detail as any)?.projectManager ??
-      (detail as any)?.owner ??
-      (detail as any)?.activities?.projet?.owner ??
-      '—'
-    ).trim() || '—';
-  }
-
-  private extractSponsor(detail: ProjectDetail): string {
-    return String((detail as any)?.sponsor ?? '—').trim() || '—';
-  }
-
-  private extractActivityOwner(detail: ProjectDetail, activityId: ActivityId): string {
-    return String((detail as any)?.activities?.[activityId]?.owner ?? '—').trim() || '—';
   }
 
   private computeStatus(taskMatrix: any): string {
@@ -282,7 +261,6 @@ export class PrivatePage implements OnInit, OnDestroy {
   private aggregateCellStatus(tasks: any[]): ActivityStatus {
     if (!Array.isArray(tasks) || tasks.length === 0) return 'todo';
 
-    // du "pire" au "meilleur"
     const order: ActivityStatus[] = [
       'notdone',
       'onhold',
@@ -317,7 +295,6 @@ export class PrivatePage implements OnInit, OnDestroy {
 
   private computeHealth(detail: ProjectDetail): Project['health'] {
     const shortName = this.getActiveHealthShortName(detail).toLowerCase();
-
     if (shortName === 'average') return 'warning';
     if (shortName === 'bad' || shortName === 'blocked') return 'critical';
     return 'good';
@@ -329,14 +306,7 @@ export class PrivatePage implements OnInit, OnDestroy {
     return String(active?.shortName ?? '').trim();
   }
 
-  // -------------------------
-  // UI helpers / actions
-  // -------------------------
-  selectProject(project: Project): void {
-    this.selectedProject = project;
-    this.selectedProjectDetail = this.projectDetailsById.get(project.id) ?? null;
-    this.refreshDashboardData();
-  }
+  // ── UI helpers ─────────────────────────────────────────────────────────────
 
   getSelectedPhases(): PhaseId[] {
     return this.selectedProjectDetail?.phases ?? [];
@@ -373,90 +343,57 @@ export class PrivatePage implements OnInit, OnDestroy {
 
   getHealthLabel(health: Project['health']): string {
     switch (health) {
-      case 'good':
-        return 'Tout est OK';
-      case 'warning':
-        return 'Attention';
-      case 'critical':
-        return 'Alerte';
-      default:
-        return '';
+      case 'good':    return 'Tout est OK';
+      case 'warning': return 'Attention';
+      case 'critical': return 'Alerte';
+      default:        return '';
     }
   }
 
   getStatusClass(status: ActivityStatus | undefined): string {
     switch (status) {
-      case 'done':
-        return 'status-done';
-      case 'todo':
-        return 'status-todo';
-      case 'inprogress':
-        return 'status-inprogress';
-      case 'notdone':
-        return 'status-notdone';
-      case 'onhold':
-        return 'status-onhold';
-      case 'notapplicable':
-        return 'status-notapplicable';
-      default:
-        return 'status-todo';
+      case 'done':          return 'status-done';
+      case 'todo':          return 'status-todo';
+      case 'inprogress':    return 'status-inprogress';
+      case 'notdone':       return 'status-notdone';
+      case 'onhold':        return 'status-onhold';
+      case 'notapplicable': return 'status-notapplicable';
+      default:              return 'status-todo';
     }
   }
 
-  onView(project: Project): void {
-    console.log('[PrivatePage] onView()', project);
-    this.selectProject(project);
-    this.router.navigate(['/project', project.id]);
+  goToProjects(): void {
+    this.router.navigate(['/projects']);
   }
 
-  onEdit(project: Project): void {
-    this.router.navigate(['/project', project.id, 'edit']);
+  goToProject(): void {
+    if (this.selectedProject?.id) {
+      this.router.navigate(['/project', this.selectedProject.id]);
+    }
   }
 
-  onPause(project: Project): void {
-    this.projectService.pauseProject({ projectId: project.id });
-    project.status = 'En pause';
-  }
-
-  onArchive(project: Project): void {
-    this.projectService.archiveProject({ projectId: project.id });
-    project.status = 'Archivé';
-  }
+  // ── Dashboard data ─────────────────────────────────────────────────────────
 
   private refreshDashboardData(): void {
     const detail = this.selectedProjectDetail;
     if (!detail) {
       this.progressRows = [];
       this.topRiskRows = [];
-      this.dueTaskRows = [];
+      this.dueItemRows = [];
       return;
     }
-
     this.progressRows = this.buildProgressRows(detail);
     this.topRiskRows = this.readTopRisks(detail);
-    this.dueTaskRows = this.buildDueTasksRows(detail);
+    this.dueItemRows = this.buildDueItemRows(detail);
   }
 
   private async refreshProjectRiskSnapshot(projectId: string): Promise<void> {
-    const id = String(projectId ?? '').trim();
-    if (!id) return;
-
-    const detail = await this.projectData.getProjectById(id).catch(() => null);
-    if (!detail) return;
-
-    this.projectDetailsById.set(id, detail);
-
-    const idx = this.myProjects.findIndex((p) => p.id === id);
-    if (idx >= 0) {
-      this.myProjects[idx] = this.toDashboardProject(detail);
-    }
-
-    if (this.selectedProject?.id === id) {
-      this.selectedProjectDetail = detail;
-      this.selectedProject = this.myProjects.find((p) => p.id === id) ?? this.selectedProject;
-      this.refreshDashboardData();
-      if (!this.destroyed) this.cdr.detectChanges();
-    }
+    const detail = await this.projectData.getProjectById(projectId).catch(() => null);
+    if (!detail || this.selectedProject?.id !== projectId) return;
+    this.selectedProjectDetail = detail;
+    this.selectedProject = this.toDashboardProject(detail);
+    this.refreshDashboardData();
+    if (!this.destroyed) this.cdr.detectChanges();
   }
 
   private buildProgressRows(detail: ProjectDetail): DashboardProgressRow[] {
@@ -472,11 +409,7 @@ export class PrivatePage implements OnInit, OnDestroy {
         const percent = total > 0 ? Math.round((done / total) * 100) : 0;
         return { phaseId, percent, done, total };
       });
-      rows.push({
-        activityId: activity.id,
-        activityLabel: activity.label,
-        cells,
-      });
+      rows.push({ activityId: activity.id, activityLabel: activity.label, cells });
     }
 
     return rows;
@@ -484,12 +417,7 @@ export class PrivatePage implements OnInit, OnDestroy {
 
   private readTopRisks(detail: ProjectDetail): DashboardRiskRow[] {
     const rows = Array.isArray((detail as any).projectRisks) ? (detail as any).projectRisks : [];
-    const levelRank: Record<RiskLevel, number> = {
-      critical: 4,
-      high: 3,
-      medium: 2,
-      low: 1,
-    };
+    const levelRank: Record<RiskLevel, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
     return rows
       .filter((r: any) => !!r && !!String(r.title ?? '').trim())
@@ -497,11 +425,9 @@ export class PrivatePage implements OnInit, OnDestroy {
         const aRank = levelRank[this.mapCriticityToRiskLevel(String(a.criticity ?? ''))] ?? 0;
         const bRank = levelRank[this.mapCriticityToRiskLevel(String(b.criticity ?? ''))] ?? 0;
         if (aRank !== bRank) return bRank - aRank;
-
         const aResolved = String(a.status ?? '').toLowerCase() === 'closed' ? 1 : 0;
         const bResolved = String(b.status ?? '').toLowerCase() === 'closed' ? 1 : 0;
         if (aResolved !== bResolved) return aResolved - bResolved;
-
         const aDue = Date.parse(a.dateLastUpdated ?? a.dateCreated ?? '') || Number.POSITIVE_INFINITY;
         const bDue = Date.parse(b.dateLastUpdated ?? b.dateCreated ?? '') || Number.POSITIVE_INFINITY;
         return aDue - bDue;
@@ -550,7 +476,7 @@ export class PrivatePage implements OnInit, OnDestroy {
     return this.topRiskRows.filter((risk) => risk.impact === impact && risk.probability === probability);
   }
 
-  private buildDueTasksRows(detail: ProjectDetail): DashboardDueTaskRow[] {
+  private buildDueItemRows(detail: ProjectDetail): DashboardDueTaskRow[] {
     const rows: DashboardDueTaskRow[] = [];
     const phases = detail.phases ?? [];
     const phaseLabels = phases.reduce<Record<string, string>>((acc, phaseId) => {
@@ -573,10 +499,8 @@ export class PrivatePage implements OnInit, OnDestroy {
           if (!dueRaw) continue;
           const dueTs = Date.parse(dueRaw);
           if (Number.isNaN(dueTs)) continue;
-
           const diff = dueTs - todayStart;
           const daysRemaining = Math.floor(diff / 86400000);
-
           rows.push({
             taskId: String(task.id ?? ''),
             taskLabel: String(task.label ?? ''),
@@ -614,7 +538,7 @@ export class PrivatePage implements OnInit, OnDestroy {
     return 'risk-low';
   }
 
-  getTaskDueClass(daysRemaining: number): string {
+  getItemDueClass(daysRemaining: number): string {
     if (daysRemaining < 0) return 'due-overdue';
     if (daysRemaining <= 3) return 'due-soon';
     return 'due-normal';

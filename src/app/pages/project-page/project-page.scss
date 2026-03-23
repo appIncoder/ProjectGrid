@@ -35,27 +35,45 @@
   box-shadow: 0 8px 26px rgba(12, 30, 66, 0.06);
 
   .card-body {
-    padding: clamp(0.9rem, 2vw, 1.4rem);
+    padding: clamp(0.75rem, 2vw, 1.2rem);
   }
 
   h2 {
     font-size: clamp(1.05rem, 1.2vw + 0.8rem, 1.5rem);
     font-weight: 700;
   }
+}
 
-  .project-description {
-    max-width: 92ch;
-    font-size: clamp(0.88rem, 0.45vw + 0.75rem, 1rem);
-    color: #5d6775;
-    margin-bottom: 0.65rem;
+.project-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.project-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.current-phase-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid #a8c4f0;
+  background: #e8f0fc;
+  color: #1e4080;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.76rem;
+
+  strong {
+    font-weight: 700;
   }
 }
 
-.project-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
 
 .project-meta-item {
   display: inline-flex;
@@ -226,34 +244,6 @@
   transform: translateY(-50%) scale(1);
 }
 
-/* Couleurs des tâches selon le statut */
-.status-done {
-  background-color: #28a745;
-  border-color: #28a745;
-  color: #fff;
-}
-
-.status-todo {
-  background-color: #ffffff;
-  border-color: #000000;
-  color: #000;
-}
-
-.status-inprogress {
-  background-color: #fd7e14;
-  border-color: #fd7e14;
-  color: #fff;
-}
-
-.status-onhold { background: #0d6efd; color: #fff; }        // bleu Bootstrap
-.status-notapplicable { background: #adb5bd; color: #fff; } // gris Bootstrap
-
-
-.status-notdone {
-  background-color: #dc3545;
-  border-color: #dc3545;
-  color: #fff;
-}
 
 /* Pas de tâche */
 .no-task {

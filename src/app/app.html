@@ -56,8 +56,9 @@
             <li class="nav-item">
               <a class="nav-link"
                  routerLink="/settings"
+                 [queryParams]="projectService.currentProjectId ? { projectId: projectService.currentProjectId } : {}"
                  routerLinkActive="active">
-                Mes paramètres
+                Paramètres
               </a>
             </li>
             <li class="nav-item">

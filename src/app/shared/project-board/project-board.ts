@@ -23,10 +23,10 @@ import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 // Lane type imported from models (see import above)
 
 const STATUSES: Array<{ id: KanbanStatus; label: string }> = [
-  { id: 'todo', label: 'À faire' },
-  { id: 'inprogress', label: 'En cours' },
-  { id: 'waiting', label: 'En attente' },
-  { id: 'done', label: 'Terminé' },
+  { id: 'todo',       label: 'To Do' },
+  { id: 'inprogress', label: 'In Progress' },
+  { id: 'waiting',    label: 'On Hold' },
+  { id: 'done',       label: 'Done' },
 ];
 
 @Component({
@@ -68,16 +68,16 @@ export class ProjectBoard implements OnChanges {
     status: string;
   } | null = null;
 
-  taskStatusOptions: { value: ActivityStatus; label: string }[] = [
-    { value: 'todo', label: 'À faire (blanc)' },
-    { value: 'inprogress', label: 'En cours (orange)' },
-    { value: 'onhold', label: 'En attente (bleu)' },
-    { value: 'done', label: 'Fait (vert)' },
-    { value: 'notdone', label: 'Non fait (rouge)' },
-    { value: 'notapplicable', label: 'Non applicable (gris)' },
+  itemStatusOptions: { value: ActivityStatus; label: string }[] = [
+    { value: 'todo',          label: 'To Do' },
+    { value: 'inprogress',    label: 'In Progress' },
+    { value: 'onhold',        label: 'On Hold' },
+    { value: 'done',          label: 'Done' },
+    { value: 'notdone',       label: 'Not Done' },
+    { value: 'notapplicable', label: 'N/A' },
   ];
 
-  taskCategoryOptions: { value: TaskCategory; label: string }[] = [
+  itemCategoryOptions: { value: TaskCategory; label: string }[] = [
     { value: 'projectManagement', label: 'Gestion du projet' },
     { value: 'businessManagement', label: 'Gestion du métier' },
     { value: 'changeManagement', label: 'Gestion du changement' },
@@ -95,8 +95,8 @@ export class ProjectBoard implements OnChanges {
   private taskBeingEdited: Task | null = null;
   isCreateMode = false;
 
-  editedTaskLabel = '';
-  editedTaskStatus: ActivityStatus = 'todo';
+  editedItemLabel = '';
+  editedItemStatus: ActivityStatus = 'todo';
   editedStartDate = '';
   editedEndDate = '';
   editedCategory: TaskCategory = 'projectManagement';
@@ -107,28 +107,82 @@ export class ProjectBoard implements OnChanges {
   editedDependencies: EditableDependencyRow[] = [];
   editError: string | null = null;
 
-// État ouvert/fermé des swimlanes
-laneCollapsed: Record<string, boolean> = {};
+  // État ouvert/fermé des swimlanes
+  laneCollapsed: Record<string, boolean> = {};
 
-toggleLane(laneId: string): void {
-  this.laneCollapsed[laneId] = !this.laneCollapsed[laneId];
-}
+  toggleLane(laneId: string): void {
+    this.laneCollapsed[laneId] = !this.laneCollapsed[laneId];
+  }
 
-isLaneCollapsed(laneId: string): boolean {
-  return !!this.laneCollapsed[laneId];
-}
+  isLaneCollapsed(laneId: string): boolean {
+    return !!this.laneCollapsed[laneId];
+  }
 
+  // ── Filtre de phases ────────────────────────────────────────────────────────
+  selectedPhases = new Set<PhaseId>();
+  activePhase: PhaseId | null = null;
+  private phasesInitialized = false;
+
+  private computeActivePhase(): PhaseId | null {
+    if (!this.project) return null;
+    const defs = (this.project as any).phaseDefinitions as Record<string, { isCurrent?: boolean }> | undefined;
+    if (defs) {
+      for (const phase of this.project.phases) {
+        if (defs[phase]?.isCurrent) return phase;
+      }
+    }
+    return this.project.phases[0] ?? null;
+  }
+
+  togglePhase(phase: PhaseId): void {
+    if (this.selectedPhases.has(phase)) {
+      this.selectedPhases.delete(phase);
+    } else {
+      this.selectedPhases.add(phase);
+    }
+    this.buildBoard();
+  }
+
+  selectAllPhases(): void {
+    this.selectedPhases = new Set(this.project?.phases ?? []);
+    this.buildBoard();
+  }
+
+  deselectAllPhases(): void {
+    this.selectedPhases.clear();
+    this.buildBoard();
+  }
+
+  selectActivePhase(): void {
+    if (!this.activePhase) return;
+    this.selectedPhases = new Set([this.activePhase]);
+    this.buildBoard();
+  }
+
+  isPhaseSelected(phase: PhaseId): boolean {
+    return this.selectedPhases.has(phase);
+  }
+
+  getPhaseLabel(phase: PhaseId): string {
+    const defs = (this.project as any)?.phaseDefinitions as Record<string, { label?: string }> | undefined;
+    const label = defs?.[phase]?.label ?? phase;
+    // Retourne les 2 premières lettres de chaque mot, max 3 chars
+    return label.split(/[\s\-_]+/).map((w: string) => w[0] ?? '').join('').slice(0, 3).toLowerCase() || phase;
+  }
 
   readonly statuses = STATUSES;
 
   lanes: Lane[] = [];
-  // Structure: laneId -> status -> KanbanCard[]
   laneBuckets: Record<string, Record<KanbanStatus, KanbanCard[]>> = {};
+  cardRoles: Record<string, { rep?: string; acc?: string; res?: string }> = {};
 
   constructor(private projectService: ProjectService, private modalService: NgbModal) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['project'] || changes['cards']) {
+    if (changes['project'] || changes['cards'] || changes['users']) {
+      if (changes['project']) {
+        this.phasesInitialized = false;
+      }
       if (this.project) {
         this.projectService.registerProject(this.project);
       }
@@ -139,12 +193,19 @@ isLaneCollapsed(laneId: string): boolean {
   /** Construit les lanes + bucket par statut */
   private buildBoard(): void {
     this.lanes = this.buildLanesFromProject(this.project);
-// Initialise l’état collapsed pour les lanes (sans écraser l’existant)
-for (const lane of this.lanes) {
-  if (this.laneCollapsed[lane.id] === undefined) {
-    this.laneCollapsed[lane.id] = false; // ouvert par défaut
-  }
-}
+
+    for (const lane of this.lanes) {
+      if (this.laneCollapsed[lane.id] === undefined) {
+        this.laneCollapsed[lane.id] = false;
+      }
+    }
+
+    // Init filtre de phases (une seule fois par projet)
+    if (!this.phasesInitialized) {
+      this.phasesInitialized = true;
+      this.activePhase = this.computeActivePhase();
+      this.selectedPhases = new Set(this.activePhase ? [this.activePhase] : (this.project?.phases ?? []));
+    }
 
     const data = (this.cards && this.cards.length)
       ? this.cards
@@ -167,6 +228,27 @@ for (const lane of this.lanes) {
         this.laneBuckets[laneId] = { todo: [], inprogress: [], waiting: [], done: [] };
       }
       this.laneBuckets[laneId][status].push({ ...c, laneId, status });
+    }
+
+    this.buildCardRoles();
+  }
+
+  private buildCardRoles(): void {
+    this.cardRoles = {};
+    if (!this.project) return;
+    const userMap = new Map(this.users.map(u => [u.id, u.label]));
+    const taskMatrix = (this.project as any).taskMatrix as Record<string, Record<string, any[]>> | undefined;
+    if (!taskMatrix) return;
+    for (const activityId of Object.keys(taskMatrix)) {
+      for (const phase of this.project.phases) {
+        for (const task of taskMatrix[activityId]?.[phase] ?? []) {
+          this.cardRoles[`${activityId}:${phase}:${task.id}`] = {
+            rep: task.reporterId ? (userMap.get(task.reporterId) ?? task.reporterId) : undefined,
+            acc: task.accountantId ? (userMap.get(task.accountantId) ?? task.accountantId) : undefined,
+            res: task.responsibleId ? (userMap.get(task.responsibleId) ?? task.responsibleId) : undefined,
+          };
+        }
+      }
     }
   }
 
@@ -206,6 +288,7 @@ for (const lane of this.lanes) {
     for (const laneKey of Object.keys(taskMatrix)) {
       const phases = taskMatrix[laneKey] || {};
       for (const phaseKey of Object.keys(phases)) {
+        if (this.selectedPhases.size > 0 && !this.selectedPhases.has(phaseKey as PhaseId)) continue;
         const tasks = phases[phaseKey] || [];
         for (const t of tasks) {
           cards.push({
@@ -379,8 +462,8 @@ for (const lane of this.lanes) {
     this.editingActivityId = parsed.activityId;
     this.editingPhase = parsed.phase;
 
-    this.editedTaskLabel = task.label ?? '';
-    this.editedTaskStatus = task.status;
+    this.editedItemLabel = task.label ?? '';
+    this.editedItemStatus = task.status;
     this.editedStartDate = task.startDate ?? '';
     this.editedEndDate = task.endDate ?? '';
     this.editedCategory = task.category ?? 'projectManagement';
@@ -408,8 +491,8 @@ for (const lane of this.lanes) {
     this.editingActivityId = defaultActivityId;
     this.editingPhase = defaultPhase;
 
-    this.editedTaskLabel = '';
-    this.editedTaskStatus = 'todo';
+    this.editedItemLabel = '';
+    this.editedItemStatus = 'todo';
     this.editedStartDate = '';
     this.editedEndDate = '';
     this.editedCategory = this.mapActivityToCategory(defaultActivityId);
@@ -430,7 +513,7 @@ for (const lane of this.lanes) {
     }
 
     this.editError = null;
-    const label = (this.editedTaskLabel ?? '').trim();
+    const label = (this.editedItemLabel ?? '').trim();
     if (!label) {
       this.editError = "Le nom de l’activité ne peut pas être vide.";
       return;
@@ -494,7 +577,7 @@ for (const lane of this.lanes) {
         activityId,
         phase: targetPhase,
         label,
-        status: this.editedTaskStatus,
+        status: this.editedItemStatus,
         startDate: this.editedStartDate,
         endDate: this.editedEndDate,
         category: this.editedCategory,
@@ -538,7 +621,7 @@ for (const lane of this.lanes) {
         toPhase: this.editedPhase || undefined,
         taskId: this.taskBeingEdited.id,
         label,
-        status: this.editedTaskStatus,
+        status: this.editedItemStatus,
         startDate: this.editedStartDate,
         endDate: this.editedEndDate,
         category: this.editedCategory,
@@ -598,6 +681,12 @@ for (const lane of this.lanes) {
     const all = this.getAllTasksFlat();
     const curId = this.taskBeingEdited?.id;
     return all.filter((t) => t.id !== curId);
+  }
+
+  getChildItems(): Task[] {
+    if (!this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return [];
+    const matrix = (this.project as any)?.projectTasksMatrix;
+    return matrix?.[this.editingActivityId]?.[this.editingPhase]?.[this.taskBeingEdited.id] ?? [];
   }
 
   addDependencyRow(): void {

@@ -284,7 +284,6 @@ export class ProjectsPage implements OnInit, OnDestroy {
       owner?: string;
       createdBy?: string;
       projectManager?: string;
-      projectTypeId?: string;
       memberRoles?: Record<string, string[]>;
       risks?: unknown[];
       budgetSummary?: {
@@ -308,9 +307,10 @@ export class ProjectsPage implements OnInit, OnDestroy {
       createdBy: owner,
       projectManager: owner,
       projectTypeId,
+      ...(defaults.workflow ? { workflow: defaults.workflow } : {}),
       memberRoles: this.auth.user?.id
         ? {
-            [String(this.auth.user.id).trim()]: ['projectAdmin'],
+            [String(this.auth.user.id).trim()]: ['projectManager'],
           }
         : {},
       risks: [],
@@ -344,6 +344,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
 
   // 🔹 Ouvrir la page détail du projet
   onOpen(project: ProjectListItem): void {
+    void this.projectData.setCurrentProjectId(project.id);
     this.router.navigate(['/project', project.id]);
   }
 

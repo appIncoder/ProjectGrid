@@ -1,4 +1,15 @@
-import type { ProjectTypeDefaults } from './project-data.service';
+import type { ProjectTypeDefaults, ProjectWorkflow } from './project-data.service';
+
+export const DEFAULT_WORKFLOW: ProjectWorkflow = {
+  statuses: [
+    { id: 'todo',          label: 'To Do',       sequence: 1 },
+    { id: 'inprogress',    label: 'In Progress', sequence: 2 },
+    { id: 'onhold',        label: 'On Hold',     sequence: 3 },
+    { id: 'done',          label: 'Done',        sequence: 4 },
+    { id: 'notdone',       label: 'Not Done',    sequence: 5 },
+    { id: 'notapplicable', label: 'N/A',         sequence: 6 },
+  ],
+};
 
 function derivePhases(rows: ProjectTypeDefaults['activitiesDefault']): ProjectTypeDefaults['phases'] {
   const seen = new Set<string>();
@@ -116,6 +127,7 @@ export const PROJECT_TYPE_FALLBACKS: ProjectTypeDefaults[] = [
     activities: COMMON_ACTIVITIES,
     activitiesDefault: PMBOK_DEFAULTS,
     tasks: PMBOK_DEFAULTS,
+    workflow: DEFAULT_WORKFLOW,
   },
   {
     projectType: {
@@ -127,6 +139,7 @@ export const PROJECT_TYPE_FALLBACKS: ProjectTypeDefaults[] = [
     activities: COMMON_ACTIVITIES,
     activitiesDefault: AGILE_PM_DEFAULTS,
     tasks: AGILE_PM_DEFAULTS,
+    workflow: DEFAULT_WORKFLOW,
   },
   {
     projectType: {
@@ -138,6 +151,7 @@ export const PROJECT_TYPE_FALLBACKS: ProjectTypeDefaults[] = [
     activities: COMMON_ACTIVITIES,
     activitiesDefault: PRINCE2_DEFAULTS,
     tasks: PRINCE2_DEFAULTS,
+    workflow: DEFAULT_WORKFLOW,
   },
 ];
 
