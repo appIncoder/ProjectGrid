@@ -3,7 +3,7 @@
   <!-- ══════════════════════════════════════════════════════════
        En-tête + sélecteur de projet
        ══════════════════════════════════════════════════════════ -->
-  <header class="settings-header">
+  <header class="settings-header" style="padding: 1rem 1rem 0">
     <h2>Paramètres</h2>
 
     <div class="project-selector-row">
@@ -34,7 +34,7 @@
     <!-- ══════════════════════════════════════════════════════════
          Barre d'onglets
          ══════════════════════════════════════════════════════════ -->
-    <nav class="settings-tabs">
+    <nav class="settings-tabs" style="padding: 0 1rem">
       <button
         type="button"
         class="settings-tab"
@@ -59,7 +59,7 @@
          Onglet 1 : Paramètres du projet
          ══════════════════════════════════════════════════════════ -->
     @if (activeTab === 'project') {
-      <div class="settings-tab-panel">
+      <div class="settings-tab-panel" style="padding-left: 1rem; padding-right: 1rem">
 
         <!-- Affichage & interactions -->
         <section class="settings-section card">
@@ -174,7 +174,7 @@
          Onglet 2 : Droits d'accès
          ══════════════════════════════════════════════════════════ -->
     @if (activeTab === 'access') {
-      <div class="settings-tab-panel">
+      <div class="settings-tab-panel" style="padding-left: 1rem; padding-right: 1rem">
 
         <section class="settings-section card">
           <div class="section-header">
@@ -330,7 +330,7 @@
   }
 
   @if (!project && !isProjectLoading && !projectLoadError) {
-    <div class="settings-empty">
+    <div class="settings-empty" style="padding: 1rem">
       Sélectionnez un projet pour gérer ses paramètres et ses membres.
     </div>
   }

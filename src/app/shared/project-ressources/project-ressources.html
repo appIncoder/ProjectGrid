@@ -1,1 +1,196 @@
-<p>project-ressources works!</p>
+<div class="card flex-fill">
+  <div class="card-body ressources-card-body">
+
+    <!-- Toolbar -->
+    <div class="ressources-toolbar mb-3">
+      <div class="ressources-toolbar-left">
+        <h3 class="h6 mb-1">Ressources : Disponibilités de l'équipe projet</h3>
+        <div class="ressources-kpis">
+          <span class="ressources-kpi">Membres : {{ members().length }}</span>
+        </div>
+      </div>
+    </div>
+
+    @if (isLoading()) {
+      <div class="text-muted small">Chargement des membres…</div>
+    } @else if (members().length === 0) {
+      <div class="text-muted small">Aucun membre assigné à ce projet.</div>
+    } @else {
+
+      <div class="ressources-table-wrap">
+        <table
+          class="table table-bordered table-sm ressources-table text-center align-middle mb-0"
+          [class.is-dragging]="dragState() !== null"
+        >
+          <thead>
+            <tr class="year-header-row">
+              <th class="ressources-name-col" rowspan="2">Nom / Prénom</th>
+              <th class="ressources-dispo-col" rowspan="2">Dispo (%)</th>
+              <th class="ressources-rate-col" rowspan="2">TJM (€)</th>
+              @for (span of yearSpans(); track span.year) {
+                <th class="year-cell" [attr.colspan]="span.colspan">{{ span.year }}</th>
+              }
+            </tr>
+            <tr class="week-header-row">
+              @for (week of weeks(); track week.getTime()) {
+                <th class="week-cell">{{ formatWeekHeader(week) }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (member of members(); track member.userId) {
+              <tr>
+                <td
+                  class="ressources-name-col text-start ressources-fixed-cell"
+                  (click)="openMemberEditPopup($event, member)"
+                  title="Cliquer pour modifier la disponibilité et le TJM"
+                >{{ member.label }}</td>
+                <td
+                  class="ressources-dispo-col ressources-fixed-cell"
+                  (click)="openMemberEditPopup($event, member)"
+                  title="Cliquer pour modifier la disponibilité et le TJM"
+                >{{ getAvailability(member) }}&nbsp;%</td>
+                <td
+                  class="ressources-rate-col ressources-fixed-cell"
+                  (click)="openMemberEditPopup($event, member)"
+                  title="Cliquer pour modifier la disponibilité et le TJM"
+                >{{ getDailyRate(member) }}</td>
+
+                @for (week of weeks(); track week.getTime(); let wIdx = $index) {
+                  <td
+                    class="week-cell week-data-cell"
+                    [class.week-data-cell--reduced]="hasAnyDayOff(member, week)"
+                    [class.week-data-cell--selected]="isInSelection(member.userId, wIdx)"
+                    (mousedown)="onWeekCellMouseDown(member, wIdx)"
+                    (mouseenter)="onWeekCellMouseEnter(member, wIdx)"
+                    (click)="onWeekCellClick($event, member, week)"
+                    title="Cliquer pour détailler · Glisser pour sélectionner plusieurs semaines"
+                  >{{ getWorkingDays(member, week) }}j</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+  </div>
+</div>
+
+<!-- ── Backdrop commun ────────────────────────────────────────────────────── -->
+@if (weekPopup() || memberEditPopup() || bulkPopup()) {
+  <div class="popup-backdrop" (click)="closeWeekPopup(); closeMemberEditPopup(); closeBulkPopup()"></div>
+}
+
+<!-- ── Popup bulk (multiselect) ───────────────────────────────────────────── -->
+@if (bulkPopup(); as popup) {
+  @if (bulkPopupMember(); as member) {
+    <div
+      class="bulk-popup"
+      [style.left.px]="popup.x"
+      [style.top.px]="popup.y"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="bulk-popup__header">
+        <div class="bulk-popup__title">
+          <span class="bulk-popup__name">{{ member.label }}</span>
+          <span class="bulk-popup__count">{{ popup.weekIndices.length }} semaines sélectionnées</span>
+        </div>
+        <button type="button" class="bulk-popup__close" (click)="closeBulkPopup()">✕</button>
+      </div>
+      <div class="bulk-popup__actions">
+        <button type="button" class="bulk-popup__btn bulk-popup__btn--clear" (click)="applyBulkClear(popup)">
+          <span class="bulk-popup__btn-icon">🔴</span>
+          <span>
+            <strong>Clear All</strong>
+            <small>Marquer tous les jours ouvrables Off</small>
+          </span>
+        </button>
+        <button type="button" class="bulk-popup__btn bulk-popup__btn--set" (click)="applyBulkSet(popup)">
+          <span class="bulk-popup__btn-icon">🟢</span>
+          <span>
+            <strong>Set All</strong>
+            <small>Remettre tous les jours ouvrables On</small>
+          </span>
+        </button>
+      </div>
+    </div>
+  }
+}
+
+<!-- ── Popup édition membre ──────────────────────────────────────────────── -->
+@if (memberEditPopup(); as popup) {
+  @if (memberEditPopupMember(); as member) {
+    <div
+      class="member-edit-popup"
+      [style.left.px]="popup.x"
+      [style.top.px]="popup.y"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="member-edit-popup__header">
+        <span class="member-edit-popup__title">{{ member.label }}</span>
+        <button type="button" class="member-edit-popup__close" (click)="closeMemberEditPopup()">✕</button>
+      </div>
+      <div class="member-edit-popup__body">
+        <div class="member-edit-popup__field">
+          <label class="member-edit-popup__label">Disponibilité (%)</label>
+          <div class="member-edit-popup__input-wrap">
+            <input type="number" class="form-control form-control-sm" min="0" max="100" step="5"
+              [value]="editAvailability()" (input)="onAvailabilityInput($event)" />
+            <span class="member-edit-popup__unit">%</span>
+          </div>
+        </div>
+        <div class="member-edit-popup__field">
+          <label class="member-edit-popup__label">Taux journalier (€/jour)</label>
+          <div class="member-edit-popup__input-wrap">
+            <input type="number" class="form-control form-control-sm" min="0" step="50"
+              [value]="editDailyRate() ?? ''" placeholder="–" (input)="onDailyRateInput($event)" />
+            <span class="member-edit-popup__unit">€</span>
+          </div>
+        </div>
+      </div>
+      <div class="member-edit-popup__footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeMemberEditPopup()">Annuler</button>
+        <button type="button" class="btn btn-sm btn-primary" (click)="saveMemberEdit()">Enregistrer</button>
+      </div>
+    </div>
+  }
+}
+
+<!-- ── Popup détail semaine ───────────────────────────────────────────────── -->
+@if (weekPopup(); as popup) {
+  @if (weekPopupMember(); as member) {
+    <div
+      class="week-popup"
+      [style.left.px]="popup.x"
+      [style.top.px]="popup.y"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="week-popup__header">
+        <span class="week-popup__title">{{ member.label }}</span>
+        <button type="button" class="week-popup__close" (click)="closeWeekPopup()">✕</button>
+      </div>
+      @for (day of popup.weekDays; track day.getTime()) {
+        <div class="week-popup__day" [class.week-popup__day--holiday]="isPublicHoliday(day)">
+          <span class="week-popup__day-label">
+            {{ formatDayLabel(day) }}
+            @if (isPublicHoliday(day)) {
+              <span class="week-popup__holiday-badge">Férié</span>
+            }
+          </span>
+          <div class="week-popup__day-actions">
+            @for (opt of dayOffOptions; track opt.cssClass) {
+              <button
+                type="button"
+                class="week-popup__day-btn"
+                [class]="opt.cssClass"
+                [class.is-active]="getDayOff(member, day) === opt.type"
+                (click)="setDayOff(member, day, opt.type)"
+              >{{ opt.label }}</button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+}

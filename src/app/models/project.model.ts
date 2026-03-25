@@ -250,8 +250,16 @@ export type ProjectRole =
   | 'changeMember'        // CRUD sur les items changement assignés
   | 'technologyMember';   // CRUD sur les items technologie assignés
 
+export type DayOffType = 'holiday' | 'sick' | 'off';
+
 export interface ProjectMember {
   userId: string;
   label: string;
   roles: ProjectRole[];
+  /** Disponibilité en % (0–100). Par défaut : 100. */
+  availability?: number;
+  /** Taux journalier moyen (€/jour). */
+  dailyRate?: number;
+  /** Jours non travaillés : clé = "YYYY-MM-DD", valeur = type d'absence. */
+  dayOffs?: Record<string, DayOffType>;
 }

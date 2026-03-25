@@ -1,0 +1,450 @@
+:host {
+  display: block;
+}
+
+.ressources-card-body {
+  padding: 1rem;
+}
+
+.ressources-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ressources-kpis {
+  display: flex;
+  gap: 1rem;
+}
+
+.ressources-kpi {
+  font-size: 0.82rem;
+  color: #6c757d;
+}
+
+// ── Grille ──────────────────────────────────────────────────────────────────
+
+.ressources-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100dvh - 22rem);
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+}
+
+.ressources-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
+    z-index: 2;
+    white-space: nowrap;
+    border-bottom: 2px solid #dee2e6;
+  }
+
+  .ressources-name-col {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    background: #f8f9fa;
+    min-width: 200px;
+    max-width: 200px;
+    text-align: left;
+    padding-left: 0.6rem;
+    border-right: 2px solid #dee2e6;
+  }
+
+  .ressources-dispo-col {
+    position: sticky;
+    left: 200px;
+    z-index: 3;
+    background: #f8f9fa;
+    min-width: 80px;
+  }
+
+  .ressources-rate-col {
+    position: sticky;
+    left: 280px;
+    z-index: 3;
+    background: #f8f9fa;
+    min-width: 90px;
+    border-right: 2px solid #dee2e6;
+  }
+
+  tbody tr {
+    .ressources-name-col,
+    .ressources-dispo-col,
+    .ressources-rate-col {
+      background: #fff;
+      z-index: 2;
+    }
+
+    &:hover .ressources-name-col,
+    &:hover .ressources-dispo-col,
+    &:hover .ressources-rate-col,
+    &:hover td {
+      background: #f0f4ff;
+    }
+  }
+
+  // Mode drag actif : curseur + pas de sélection de texte
+  &.is-dragging {
+    user-select: none;
+
+    .week-data-cell {
+      cursor: col-resize;
+    }
+  }
+}
+
+// ── Colonnes fixes cliquables ────────────────────────────────────────────────
+
+.ressources-fixed-cell {
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: #e8f0fe !important;
+  }
+}
+
+// ── En-têtes de semaines ─────────────────────────────────────────────────────
+
+.year-header-row .year-cell {
+  background: #e9ecef;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: #495057;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.week-header-row .week-cell {
+  min-width: 52px;
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+// ── Cellules de données ───────────────────────────────────────────────────────
+
+.week-data-cell {
+  font-size: 0.78rem;
+  color: #adb5bd;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.08s;
+
+  &:hover {
+    background: #e8f0fe !important;
+    color: #1a73e8;
+  }
+
+  &--reduced {
+    color: #fd7e14;
+    font-weight: 600;
+  }
+
+  &--selected {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+    font-weight: 600;
+    outline: 1px solid #93c5fd;
+    outline-offset: -1px;
+  }
+}
+
+// ── Backdrop commun ───────────────────────────────────────────────────────────
+
+.popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+}
+
+// ── Popup bulk ────────────────────────────────────────────────────────────────
+
+.bulk-popup {
+  position: fixed;
+  z-index: 1050;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  min-width: 280px;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.75rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  &__title {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  &__name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #212529;
+  }
+
+  &__count {
+    font-size: 0.75rem;
+    color: #6c757d;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 0.9rem;
+    padding: 0 0.2rem;
+    flex-shrink: 0;
+
+    &:hover { color: #212529; }
+  }
+
+  &__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  &__btn {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    background: #fff;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
+
+    &:last-child { border-bottom: none; }
+
+    strong {
+      display: block;
+      font-size: 0.84rem;
+      color: #212529;
+    }
+
+    small {
+      display: block;
+      font-size: 0.75rem;
+      color: #6c757d;
+    }
+
+    &--clear:hover { background: #fff5f5; }
+    &--set:hover   { background: #f0fff4; }
+  }
+
+  &__btn-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+}
+
+// ── Popup édition membre ──────────────────────────────────────────────────────
+
+.member-edit-popup {
+  position: fixed;
+  z-index: 1050;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 280px;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #212529;
+  }
+
+  &__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 0.2rem;
+    flex-shrink: 0;
+
+    &:hover { color: #212529; }
+  }
+
+  &__body {
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__label {
+    font-size: 0.78rem;
+    color: #6c757d;
+    font-weight: 500;
+  }
+
+  &__input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+
+    input { flex: 1; }
+  }
+
+  &__unit {
+    font-size: 0.82rem;
+    color: #6c757d;
+    white-space: nowrap;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid #dee2e6;
+    background: #f8f9fa;
+  }
+}
+
+// ── Popup détail semaine ──────────────────────────────────────────────────────
+
+.week-popup {
+  position: fixed;
+  z-index: 1050;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 340px;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #212529;
+  }
+
+  &__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 0.9rem;
+    padding: 0 0.2rem;
+    flex-shrink: 0;
+
+    &:hover { color: #212529; }
+  }
+
+  &__day {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid #f0f0f0;
+
+    &:last-child { border-bottom: none; }
+
+    &--holiday {
+      background: #fffbeb;
+    }
+  }
+
+  &__day-label {
+    font-size: 0.82rem;
+    min-width: 80px;
+    color: #212529;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  &__holiday-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    background: #fde68a;
+    color: #92400e;
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  &__day-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  &__day-btn {
+    font-size: 0.75rem;
+    padding: 2px 9px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    background: #fff;
+    cursor: pointer;
+    color: #495057;
+    white-space: nowrap;
+    transition: background 0.1s;
+
+    &:hover { background: #e9ecef; }
+
+    &.type-work.is-active    { background: #d1e7dd; border-color: #a3cfbb; color: #0a3622; font-weight: 600; }
+    &.type-holiday.is-active { background: #cfe2ff; border-color: #9ec5fe; color: #084298; font-weight: 600; }
+    &.type-sick.is-active    { background: #fff3cd; border-color: #ffda6a; color: #664d03; font-weight: 600; }
+    &.type-off.is-active     { background: #f8d7da; border-color: #f1aeb5; color: #58151c; font-weight: 600; }
+  }
+}
