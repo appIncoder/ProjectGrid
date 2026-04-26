@@ -19,6 +19,13 @@
           <option [value]="p.id">{{ p.name }}</option>
         }
       </select>
+      <button
+        type="button"
+        class="btn btn-add"
+        (click)="goToActiveProject()"
+        [disabled]="!selectedProjectId && !project?.id">
+        Vers le projet
+      </button>
     </div>
 
     @if (isProjectLoading) {
@@ -65,7 +72,7 @@
         <section class="settings-section card">
           <div class="section-header">
             <h3>Affichage &amp; interactions</h3>
-            <span class="section-badge">Local</span>
+            <span class="section-badge firestore">DB</span>
           </div>
 
           <form [formGroup]="form" class="settings-fields">
@@ -114,8 +121,10 @@
           </form>
 
           <div class="section-actions">
-            <button type="button" class="btn btn-ghost" (click)="resetToDefaults()">Réinitialiser</button>
-            <button type="button" class="btn btn-primary" (click)="save()">Enregistrer</button>
+            <button type="button" class="btn btn-ghost" (click)="resetToDefaults()" [disabled]="savedState === 'saving'">Réinitialiser</button>
+            <button type="button" class="btn btn-primary" (click)="save()" [disabled]="savedState === 'saving'">
+              {{ savedState === 'saving' ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
             @if (savedState === 'saved') { <span class="save-status ok">Sauvegardé</span> }
             @if (savedState === 'error') { <span class="save-status err">Erreur</span> }
           </div>
@@ -130,8 +139,34 @@
 
           <p class="section-hint">
             Personnalisez les libellés des statuts utilisés dans les tableaux de bord du projet.
-            L'identifiant technique (<code>id</code>) ne change pas, seul l'affichage est modifié.
+            L'owner du projet, ou le super user, peut ajouter des statuts et les réordonner dans le workflow.
           </p>
+
+          @if (!canManageWorkflow) {
+            <div class="alert-danger small mb-2">
+              Seuls l'owner du projet et le super user peuvent modifier ce workflow.
+            </div>
+          }
+
+          <div class="workflow-add-row">
+            <input
+              type="text"
+              class="field-control workflow-add-input"
+              [(ngModel)]="newWorkflowStatusLabel"
+              [ngModelOptions]="{ standalone: true }"
+              placeholder="Ajouter un statut (ex: En validation)"
+              [disabled]="!canManageWorkflow"
+              (keyup.enter)="addWorkflowStatus()"
+            />
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              (click)="addWorkflowStatus()"
+              [disabled]="!canManageWorkflow"
+            >
+              Ajouter
+            </button>
+          </div>
 
           <div class="workflow-statuses">
             @for (s of workflowStatuses; track s.id) {
@@ -142,8 +177,30 @@
                   type="text"
                   class="field-control workflow-label-input"
                   [(ngModel)]="s.label"
+                  [ngModelOptions]="{ standalone: true }"
                   [placeholder]="s.id"
+                  [disabled]="!canManageWorkflow"
                 />
+                <div class="workflow-row-actions">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light"
+                    title="Remonter"
+                    [disabled]="!canManageWorkflow || $index === 0"
+                    (click)="moveWorkflowStatus($index, -1)"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-light"
+                    title="Descendre"
+                    [disabled]="!canManageWorkflow || $index === workflowStatuses.length - 1"
+                    (click)="moveWorkflowStatus($index, 1)"
+                  >
+                    ↓
+                  </button>
+                </div>
               </div>
             }
           </div>
@@ -153,12 +210,12 @@
           }
 
           <div class="section-actions mt-3">
-            <button type="button" class="btn btn-ghost" (click)="resetWorkflowToDefault()">Réinitialiser</button>
+            <button type="button" class="btn btn-ghost" (click)="resetWorkflowToDefault()" [disabled]="!canManageWorkflow">Réinitialiser</button>
             <button
               type="button"
               class="btn btn-primary"
               (click)="saveWorkflow()"
-              [disabled]="workflowSaveState === 'saving'"
+              [disabled]="workflowSaveState === 'saving' || !canManageWorkflow"
             >
               {{ workflowSaveState === 'saving' ? 'Enregistrement…' : 'Enregistrer' }}
             </button>

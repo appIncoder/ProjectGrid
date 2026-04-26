@@ -8,7 +8,7 @@ import { filter } from 'rxjs/operators';
 
 import { ProjectDataService, type ProjectTypeDefaults, type ProjectTypeRef } from '../../services/project-data.service';
 import { AuthService } from '../../services/auth.service';
-import type { ActivityId, ActivityStatus, Health, PhaseId, ProjectDetail, ProjectListItem, ProjectStatus } from '../../models';
+import { DEFAULT_PROJECT_SETTINGS, type ActivityId, type ActivityStatus, type Health, type PhaseId, type ProjectDetail, type ProjectListItem, type ProjectRole, type ProjectStatus } from '../../models';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 
 @Component({
@@ -19,6 +19,7 @@ import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
   styleUrls: ['./projects-page.scss'],
 })
 export class ProjectsPage implements OnInit, OnDestroy {
+  private static readonly PROJECT_OWNER_EMAIL = 'etienne.darquennes@eglisemlk.fr';
   searchTerm = '';
   statusFilter: ProjectStatus | 'Tous' = 'Tous';
   healthFilter: Health | 'Tous' = 'Tous';
@@ -115,6 +116,20 @@ export class ProjectsPage implements OnInit, OnDestroy {
       health: this.computeHealth(detail),
       healthName,
       currentPhase: currentPhase.replace('Phase', 'Phase '),
+    };
+  }
+
+  private async resolveProjectOwner(): Promise<{ id: string; label: string; email: string }> {
+    const users = await this.projectData.listUsers();
+    const owner = users.find((user) => String(user.email ?? '').trim().toLowerCase() === ProjectsPage.PROJECT_OWNER_EMAIL);
+    if (!owner?.id) {
+      throw new Error(`Configured project owner not found: ${ProjectsPage.PROJECT_OWNER_EMAIL}`);
+    }
+
+    return {
+      id: String(owner.id).trim(),
+      label: String(owner.label || owner.email || ProjectsPage.PROJECT_OWNER_EMAIL).trim(),
+      email: String(owner.email || ProjectsPage.PROJECT_OWNER_EMAIL).trim(),
     };
   }
 
@@ -262,7 +277,16 @@ export class ProjectsPage implements OnInit, OnDestroy {
       return;
     }
 
-    const owner = this.connectedOwnerLabel;
+    let ownerUser: { id: string; label: string; email: string };
+    try {
+      ownerUser = await this.resolveProjectOwner();
+    } catch (e) {
+      console.error('[ProjectsPage] resolveProjectOwner error', e);
+      this.createProjectError = 'Le compte owner configuré est introuvable dans Firestore.';
+      return;
+    }
+
+    const owner = ownerUser.label;
     const projectId =
       typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID()
@@ -280,11 +304,19 @@ export class ProjectsPage implements OnInit, OnDestroy {
       return;
     }
 
+    const memberRoles: Record<string, ProjectRole[]> = {
+      [ownerUser.id]: ['projectManager'],
+    };
+    const currentUserId = String(this.auth.user?.id ?? '').trim();
+    if (currentUserId) {
+      memberRoles[currentUserId] = Array.from(new Set([...(memberRoles[currentUserId] ?? []), 'projectManager']));
+    }
+
     const payload: ProjectDetail & {
       owner?: string;
       createdBy?: string;
       projectManager?: string;
-      memberRoles?: Record<string, string[]>;
+      memberRoles?: Record<string, ProjectRole[]>;
       risks?: unknown[];
       budgetSummary?: {
         initial: number;
@@ -304,15 +336,12 @@ export class ProjectsPage implements OnInit, OnDestroy {
       activityMatrix: seeded.taskMatrix,
       taskMatrix: seeded.taskMatrix,
       owner,
-      createdBy: owner,
+      createdBy: this.connectedOwnerLabel,
       projectManager: owner,
       projectTypeId,
+      displayInteractions: defaults.displayInteractions ?? DEFAULT_PROJECT_SETTINGS,
       ...(defaults.workflow ? { workflow: defaults.workflow } : {}),
-      memberRoles: this.auth.user?.id
-        ? {
-            [String(this.auth.user.id).trim()]: ['projectManager'],
-          }
-        : {},
+      memberRoles,
       risks: [],
       budgetSummary: {
         initial: 0,

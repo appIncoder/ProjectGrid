@@ -60,6 +60,14 @@
    Shared Status Colors
    ========================================================= */
 
+body.project-board-fullscreen-open {
+  overflow: hidden;
+}
+
+body.management-panel-fullscreen-open {
+  overflow: hidden;
+}
+
 .status-done {
   background: #28a745;
   border-color: #28a745;

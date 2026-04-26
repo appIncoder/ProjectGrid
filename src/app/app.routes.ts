@@ -3,10 +3,11 @@ import { HomePage } from './pages/home-page/home-page';
 import { PrivatePage } from './pages/private-page/private-page';
 import { LoginPage } from './pages/login-page/login-page';
 import { SettingsPage } from './pages/settings-page/settings-page';
-import { DashboardPage } from './pages/dashboard-page/dashboard-page';
+import { AdminPage } from './pages/admin-page/admin-page';
 import { AccountPage } from './pages/account-page/account-page';
 import { ProjectsPage } from './pages/projects-page/projects-page';
 import { ProjectPage } from './pages/project-page/project-page';
+import { superUserGuard } from './guards/super-user.guard';
 
 export const routes: Routes = [
   {
@@ -26,9 +27,10 @@ export const routes: Routes = [
     title: 'Mes paramètres'
   },
   {
-    path: 'dashboard',
-    component: DashboardPage,
-    title: 'Mon tableau de bord'
+    path: 'admin',
+    component: AdminPage,
+    canActivate: [superUserGuard],
+    title: 'Administration'
   },
   {
     path: 'account',

@@ -1,5 +1,6 @@
 // project-models.ts
 import type { DependencyType } from './gantt.model';
+import type { ProjectSettings } from './settings.model';
 export type PhaseId = 'Phase1' | 'Phase2' | 'Phase3' | 'Phase4' | 'Phase5' | 'Phase6';
 export type ActivityId = 'projet' | 'metier' | 'changement' | 'technologie';
 
@@ -14,13 +15,15 @@ export interface ProjectWorkflow {
   statuses: WorkflowStatus[];
 }
 
-export type ActivityStatus =
+export type CoreActivityStatus =
   | 'todo'
   | 'inprogress'
-  | 'onhold'        // ✅ En attente (Bleu)
+  | 'onhold'
   | 'done'
   | 'notdone'
-  | 'notapplicable'; // ✅ Non applicable (Gris)
+  | 'notapplicable';
+
+export type ActivityStatus = CoreActivityStatus | (string & {});
 
 
 
@@ -138,8 +141,11 @@ export type ProjectDetail = {
   projectHealth?: ProjectHealthItem[];
   projectRisks?: ProjectRiskItem[];
   memberRoles?: Record<string, ProjectRole[]>;
+  owner?: string;
+  projectManager?: string;
   projectTypeId?: string;
   workflow?: ProjectWorkflow;
+  displayInteractions?: ProjectSettings;
 };
 
 
@@ -237,6 +243,7 @@ export interface PhaseDefinition {
 export interface UserRef {
   id: string;
   label: string;
+  email?: string;
 }
 
 // ── Rôles projet ────────────────────────────────────────────────────────────

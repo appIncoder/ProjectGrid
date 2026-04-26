@@ -1,8 +1,6 @@
 import type { AppEnvironment } from './environment.model';
 
 export const environment: AppEnvironment = {
-  apiBaseUrl: 'https://carecode.be/projectgrid/api',
-  backendProvider: 'firebase',
   firebase: {
     apiKey: 'AIzaSyCsbqR7HPANpi1tJlY58M5PkyzQ4ID23Ro',
     authDomain: 'carecode-2dea6.firebaseapp.com',

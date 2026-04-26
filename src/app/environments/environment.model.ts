@@ -1,5 +1,3 @@
-export type BackendProvider = 'rest' | 'firebase';
-
 export interface FirebaseWebConfig {
   apiKey: string;
   authDomain: string;
@@ -11,7 +9,5 @@ export interface FirebaseWebConfig {
 }
 
 export interface AppEnvironment {
-  apiBaseUrl: string;
-  backendProvider: BackendProvider;
   firebase: FirebaseWebConfig;
 }

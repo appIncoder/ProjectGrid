@@ -1,0 +1,24 @@
+<div
+  *ngIf="visible"
+  class="task-assignment-popover"
+  [class.task-assignment-popover--reporter]="roleLabel === 'Reporter'"
+  [class.task-assignment-popover--accountant]="roleLabel === 'Suiveur'"
+  [class.task-assignment-popover--responsible]="roleLabel === 'Assigné'"
+  [style.left.px]="x"
+  [style.top.px]="y"
+  (click)="$event.stopPropagation()"
+>
+  <div class="task-assignment-popover__role">{{ roleLabel || 'Rôle' }}</div>
+  <select
+    class="form-select form-select-sm task-assignment-popover__select"
+    [ngModel]="selectedUserId"
+    (ngModelChange)="onSelectedUserIdChange($event)"
+  >
+    <option value="">— Aucun —</option>
+    <option *ngFor="let u of users" [value]="u.id">{{ u.label }} ({{ u.id }})</option>
+  </select>
+  <div class="task-assignment-popover__actions">
+    <button type="button" class="task-assignment-popover__icon-btn task-assignment-popover__icon-btn--close" title="Fermer" (click)="cancel.emit()">✕</button>
+    <button type="button" class="task-assignment-popover__icon-btn task-assignment-popover__icon-btn--confirm" title="Confirmer" (click)="confirm.emit()">✓</button>
+  </div>
+</div>

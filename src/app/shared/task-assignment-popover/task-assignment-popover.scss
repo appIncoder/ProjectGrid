@@ -1,0 +1,51 @@
+.task-assignment-popover {
+  position: fixed;
+  z-index: 1100;
+  width: 300px;
+  padding: 0.55rem;
+  border: 1px solid #d9e0eb;
+  border-radius: 0.6rem;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(24, 39, 75, 0.14);
+}
+
+.task-assignment-popover__role {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #3c4a5f;
+  margin-bottom: 0.35rem;
+}
+
+.task-assignment-popover__select {
+  margin-bottom: 0.45rem;
+}
+
+.task-assignment-popover__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+
+.task-assignment-popover__icon-btn {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  border: 0;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.task-assignment-popover__icon-btn--close {
+  background: #dc3545;
+}
+
+.task-assignment-popover__icon-btn--confirm {
+  background: #198754;
+}

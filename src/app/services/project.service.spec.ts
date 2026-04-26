@@ -1,13 +1,25 @@
 import { TestBed } from '@angular/core/testing';
 
-import { Project } from './project.service';
+import { ProjectDataService } from './project-data.service';
+import { ProjectService } from './project.service';
 
-describe('Project', () => {
-  let service: Project;
+describe('ProjectService', () => {
+  let service: ProjectService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(Project);
+    TestBed.configureTestingModule({
+      providers: [
+        ProjectService,
+        {
+          provide: ProjectDataService,
+          useValue: {
+            cacheProject: () => undefined,
+            getCachedProject: () => undefined,
+          },
+        },
+      ],
+    });
+    service = TestBed.inject(ProjectService);
   });
 
   it('should be created', () => {

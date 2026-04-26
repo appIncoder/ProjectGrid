@@ -3,6 +3,12 @@ import process from 'node:process';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
 
+// Canonical Firestore import:
+// - projectTypes data stays inside the projectTypes document
+// - project data stays inside projects/{projectId}.payload
+// - no legacy writes to projectTypes/{id}/activityDefaults subcollections
+// - no legacy writes to project subcollections for risks/health
+
 function usage() {
   console.error('Usage: node scripts/import-firestore-export.mjs <export.json> [service-account.json]');
   process.exit(1);
@@ -38,6 +44,17 @@ function sanitize(value) {
     return output;
   }
   return value;
+}
+
+function normalizeDisplayInteractions(value) {
+  const row = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    periodPreset: String(row.periodPreset ?? '6m').trim() || '6m',
+    viewMode: String(row.viewMode ?? 'split').trim() || 'split',
+    hoverHintsEnabled: row.hoverHintsEnabled !== undefined ? Boolean(row.hoverHintsEnabled) : true,
+    linkTooltipsEnabled: row.linkTooltipsEnabled !== undefined ? Boolean(row.linkTooltipsEnabled) : true,
+    defaultDependencyType: String(row.defaultDependencyType ?? 'F2S').trim() || 'F2S',
+  };
 }
 
 async function flushBatch(db, operations) {
@@ -142,32 +159,16 @@ async function main() {
     const activityDefaults = Array.isArray(row?.activitiesDefault)
       ? row.activitiesDefault
       : (Array.isArray(row?.tasks) ? row.tasks : []);
-    const {
-      activitiesDefault: _activitiesDefault,
-      tasks: _tasks,
-      ...projectTypeDoc
-    } = row ?? {};
     operations.push({
       ref: db.collection('projectTypes').doc(docId),
       data: sanitize({
-        ...projectTypeDoc,
-        activityDefaultsCount: activityDefaults.length,
+        ...(row ?? {}),
+        activitiesDefault: activityDefaults,
+        tasks: activityDefaults,
+        displayInteractions: normalizeDisplayInteractions(row?.displayInteractions),
       }),
     });
     if (operations.length >= 400) await flushBatch(db, operations);
-
-    for (const item of activityDefaults) {
-      const defaultId = String(item?.id ?? '').trim();
-      if (!defaultId) continue;
-      operations.push({
-        ref: db.collection('projectTypes').doc(docId).collection('activityDefaults').doc(defaultId),
-        data: sanitize({
-          ...item,
-          projectTypeId: docId,
-        }),
-      });
-      if (operations.length >= 400) await flushBatch(db, operations);
-    }
   }
 
   for (const row of projectRows) {
@@ -186,7 +187,10 @@ async function main() {
         status: String(row?.status ?? '').trim(),
         memberIds,
         memberRoles,
-        payload: sanitize(row?.payload ?? {}),
+        payload: sanitize({
+          ...(row?.payload ?? {}),
+          displayInteractions: normalizeDisplayInteractions(row?.payload?.displayInteractions),
+        }),
         createdAt: normalizeDateToTimestamp(row.createdAt),
         updatedAt: normalizeDateToTimestamp(row.updatedAt) ?? Timestamp.now(),
       },

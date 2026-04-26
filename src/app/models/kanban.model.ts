@@ -1,4 +1,4 @@
-export type KanbanStatus = 'todo' | 'inprogress' | 'waiting' | 'done';
+export type KanbanStatus = string;
 export type LaneId = string;
 
 export type KanbanResource = {

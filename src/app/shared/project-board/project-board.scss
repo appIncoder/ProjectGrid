@@ -3,6 +3,8 @@
   --lane-gap: 8px;
   --board-bg: #F4F5F7;
   --card-radius: 3px;
+  --project-board-fullscreen-top: 0px;
+  --project-board-fullscreen-bottom: 0px;
 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
   font-size: 0.86rem;
@@ -10,6 +12,22 @@
   * {
     box-sizing: border-box;
     line-height: 1.3;
+  }
+
+  &.project-board--fullscreen {
+    position: fixed;
+    top: var(--project-board-fullscreen-top);
+    right: 0;
+    bottom: var(--project-board-fullscreen-bottom);
+    left: 0;
+    z-index: 1040;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 20px 12px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 252, 0.98) 100%);
+    backdrop-filter: blur(3px);
+    overflow: hidden;
   }
 
   // ── Toolbar ────────────────────────────────────────────────────────────────
@@ -37,6 +55,31 @@
   .board-sprint-goal {
     font-size: 0.82rem;
     color: #5E6C84;
+  }
+
+  .board-save-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .board-save-status--saving {
+    background: #DEEBFF;
+    color: #0747A6;
+  }
+
+  .board-save-status--saved {
+    background: #E3FCEF;
+    color: #006644;
+  }
+
+  .board-save-status--error {
+    background: #FFEBE6;
+    color: #AE2E24;
   }
 
   .board-create-btn {
@@ -155,20 +198,113 @@
     }
   }
 
+  // ── Filtre de swimlanes ──────────────────────────────────────────────────
+  .swimlane-filter {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 4px 0;
+  }
+
+  &.project-board--fullscreen .swimlane-filter,
+  &.project-board--fullscreen > .card:first-child {
+    flex-shrink: 0;
+  }
+
+  .swimlane-filter-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #42526E;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .swimlane-filter-divider {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    background: #C1C7D0;
+    margin: 0 2px;
+    flex-shrink: 0;
+  }
+
+  .swimlane-filter-action {
+    background: none;
+    border: none;
+    padding: 2px 6px;
+    font-size: 0.78rem;
+    color: #42526E;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 100ms;
+
+    &:hover { background: #EBECF0; }
+  }
+
+  .swimlane-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .swimlane-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid #C1C7D0;
+    background: #fff;
+    color: #42526E;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 100ms, border-color 100ms, color 100ms;
+
+    &:hover {
+      background: #F4F5F7;
+      border-color: #A5ADBA;
+    }
+
+    &.swimlane-chip--selected {
+      background: #DEEBFF;
+      border-color: #4C9AFF;
+      color: #0747A6;
+    }
+  }
+
   // ── Board wrap ─────────────────────────────────────────────────────────────
   .board-wrap {
     position: relative;
     overflow-x: auto;
+    overflow-y: auto;
     background: var(--board-bg);
     border-radius: 4px;
     padding: 0 0 16px;
     min-height: 300px;
   }
 
+  .board-wrap--focused {
+    background: linear-gradient(180deg, rgba(222, 235, 255, 0.58) 0%, rgba(244, 245, 247, 1) 22%);
+  }
+
+  &.project-board--fullscreen .board-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    border-radius: 14px;
+    border: 1px solid #D7E0EF;
+    box-shadow: 0 18px 40px rgba(9, 30, 66, 0.12);
+    padding-bottom: 24px;
+  }
+
   // ── Column headers (sticky) ────────────────────────────────────────────────
   .board-columns-header {
     display: grid;
-    grid-template-columns: repeat(4, minmax(var(--col-min-width), 1fr));
+    grid-template-columns: repeat(var(--status-count, 4), minmax(var(--col-min-width), 1fr));
     gap: var(--lane-gap);
     padding: 12px var(--lane-gap) 8px;
     position: sticky;
@@ -182,6 +318,18 @@
     align-items: center;
     gap: 7px;
     padding: 4px 6px;
+    border-radius: 6px;
+
+    &.cdk-drag-preview {
+      background: #fff;
+      box-shadow: 0 10px 24px rgba(9, 30, 66, 0.18);
+    }
+
+    &.cdk-drag-placeholder {
+      opacity: 0.35;
+      background: #DEEBFF;
+      outline: 1px dashed #4C9AFF;
+    }
 
     .bch-dot {
       width: 10px;
@@ -211,10 +359,33 @@
     }
 
     // Status-specific dot colors
-    &.bch-todo      .bch-dot { background: #6B778C; }
-    &.bch-inprogress .bch-dot { background: #0052CC; }
-    &.bch-waiting   .bch-dot { background: #FF8B00; }
-    &.bch-done      .bch-dot { background: #00875A; }
+    .bch-dot { background: var(--status-accent, #6B778C); }
+  }
+
+  .bch-grip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #7A869A;
+    font-size: 0.82rem;
+    line-height: 1;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .board-col-header.cdk-drag-dragging .bch-grip,
+  .bch-grip:active {
+    cursor: grabbing;
+  }
+
+  .board-inline-error {
+    margin: 0 var(--lane-gap) 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #FFEBE6;
+    color: #AE2E24;
+    font-size: 0.78rem;
+    font-weight: 600;
   }
 
   // ── Swimlane ───────────────────────────────────────────────────────────────
@@ -223,6 +394,16 @@
     border-radius: 4px;
     overflow: hidden;
     border: 1px solid #DFE1E6;
+  }
+
+  .lane--focused {
+    border-color: #4C9AFF;
+    box-shadow: 0 0 0 1px rgba(76, 154, 255, 0.25), 0 10px 24px rgba(9, 30, 66, 0.08);
+  }
+
+  &.project-board--fullscreen .lane--focused {
+    margin-bottom: 0;
+    min-height: calc(100% - 8px);
   }
 
   .lane-header {
@@ -263,14 +444,60 @@
     text-align: center;
   }
 
+  .lane-window-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+  }
+
+  .lane-window-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid #A5ADBA;
+    border-radius: 4px;
+    background: #fff;
+    color: #42526E;
+    font-size: 0.72rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 100ms, background 100ms, border-color 100ms, color 100ms;
+
+    &:hover {
+      transform: translateY(-1px);
+      background: #F4F5F7;
+      border-color: #6B778C;
+    }
+  }
+
+  .lane-window-btn--restore:hover {
+    color: #0052CC;
+    border-color: #4C9AFF;
+  }
+
+  .lane-window-btn--maximize:hover {
+    background: #DEEBFF;
+    color: #0747A6;
+    border-color: #4C9AFF;
+  }
+
   // ── 4-column grid ─────────────────────────────────────────────────────────
   .lane-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(var(--col-min-width), 1fr));
+    grid-template-columns: repeat(var(--status-count, 4), minmax(var(--col-min-width), 1fr));
     gap: var(--lane-gap);
     padding: var(--lane-gap);
     background: #F4F5F7;
     align-items: start;
+  }
+
+  &.project-board--fullscreen .lane-grid {
+    min-height: calc(100% - 52px);
+    align-content: start;
   }
 
   // ── Dropzone ──────────────────────────────────────────────────────────────
@@ -295,7 +522,7 @@
     margin-bottom: 8px;
     cursor: pointer;
     transition: box-shadow 100ms, transform 100ms;
-    border-left: 3px solid transparent;
+    border-left: 3px solid var(--status-accent, transparent);
     min-height: 90px;
 
     &:last-child { margin-bottom: 0; }
@@ -304,12 +531,6 @@
       box-shadow: 0 4px 10px rgba(9, 30, 66, 0.28);
       transform: translateY(-1px);
     }
-
-    // Status accent border-left
-    &.kc-todo       { border-left-color: #6B778C; }
-    &.kc-inprogress { border-left-color: #0052CC; }
-    &.kc-waiting    { border-left-color: #FF8B00; }
-    &.kc-done       { border-left-color: #00875A; }
 
     &.cdk-drag-placeholder {
       background: #DEEBFF;
@@ -407,11 +628,6 @@
     padding: 2px 7px;
     white-space: nowrap;
     text-transform: uppercase;
-
-    &.kc-status-tag--todo       { background: #F4F5F7; color: #6B778C; }
-    &.kc-status-tag--inprogress { background: #DEEBFF; color: #0052CC; }
-    &.kc-status-tag--waiting    { background: #FFF0B3; color: #974F0C; }
-    &.kc-status-tag--done       { background: #E3FCEF; color: #006644; }
   }
 
   // ── Drag preview ──────────────────────────────────────────────────────────

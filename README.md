@@ -1,59 +1,102 @@
-# ProjectCard
+# ProjectGrid
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.0.0.
+ProjectGrid est maintenant une application Angular en mode Firebase-only.
 
-## Development server
+## Stack active
 
-To start a local development server, run:
+- Firebase Auth pour l'authentification et la session
+- Cloud Firestore pour les projets, types de projet, accès, risques et états de santé
+- Aucun backend PHP/MySQL actif dans le runtime applicatif
+
+## Modèle Firestore canonique
+
+Le modèle canonique est désormais centré sur les documents eux-mêmes, sans sous-collections legacy métier.
+
+### `users/{userId}`
+
+- `username`
+- `label`
+- `email`
+- `globalRoles`
+- `projectIds`
+- `currentProjectId`
+
+### `projectTypes/{projectTypeId}`
+
+- `projectType`
+- `phases`
+- `activities`
+- `activitiesDefault`
+- `tasks`
+- `workflow`
+- `displayInteractions`
+
+### `projects/{projectId}`
+
+- `id`
+- `name`
+- `description`
+- `projectTypeId`
+- `memberIds`
+- `memberRoles`
+- `payload`
+- `createdAt`
+- `updatedAt`
+
+### `projects/{projectId}.payload`
+
+- `id`
+- `name`
+- `description`
+- `owner`
+- `projectManager`
+- `phases`
+- `activities`
+- `activityMatrix`
+- `projectTasksMatrix`
+- `ganttDependencies`
+- `projectHealth`
+- `projectRisks`
+- `workflow`
+- `displayInteractions`
+
+## Règles de persistance actuelles
+
+- Les paramètres d'affichage projet sont stockés dans `projects/{projectId}.payload.displayInteractions`
+- Le workflow des statuts projet est stocké dans `projects/{projectId}.payload.workflow`
+- Les defaults de type sont stockés dans `projectTypes/{projectTypeId}`
+- Les risques projet sont stockés dans `projects/{projectId}.payload.projectRisks`
+
+## Ce qui a été retiré
+
+- API PHP
+- dump SQL / schéma MariaDB actifs
+- backend REST sélectionnable au runtime
+- fallbacks Firestore vers sous-collections legacy comme:
+  - `projects/{projectId}/risks`
+  - `projectTypes/{projectTypeId}/activityDefaults`
+
+## Scripts utiles
 
 ```bash
-ng serve
+npm run migrate:auth:import
+npm run migrate:firestore:import
+npm run migrate:firestore:access
+npm run seed:firestore:display-interactions
+npm run seed:firestore:project-display-interactions
+npm run seed:firestore:project-type-phases
+npm run seed:firestore:access-policy
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Développement
 
 ```bash
-ng generate component component-name
+npm install
+npm run start
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Vérification TypeScript
 
 ```bash
-ng generate --help
+./node_modules/.bin/tsc -p tsconfig.app.json --noEmit
 ```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.

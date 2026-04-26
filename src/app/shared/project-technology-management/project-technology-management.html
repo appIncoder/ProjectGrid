@@ -1,13 +1,25 @@
-<div class="tm-detail-card">
+<div
+  class="tm-detail-card"
+  [class.tm-detail-card--fullscreen]="isFullscreen"
+  [style.--tm-fullscreen-top.px]="fullscreenTopOffset"
+  [style.--tm-fullscreen-bottom.px]="fullscreenBottomOffset">
   <div class="tm-head">
     <span class="tm-board-title">Gestion de la technologie – Kanban</span>
-    <app-project-add-task-button
-      label="Ajouter un item"
-      [disabled]="isSaving"
-      (action)="openCreateTaskModal()"
-    ></app-project-add-task-button>
+    <div class="tm-head-actions">
+      <app-project-add-task-button
+        label="Ajouter un item"
+        [disabled]="isSaving"
+        (action)="openCreateTaskModal()"
+      ></app-project-add-task-button>
+      <div class="tm-window-actions">
+        <button type="button" class="tm-window-btn" title="Réduire" aria-label="Réduire" (click)="minimizeView()">&minus;</button>
+        <button type="button" class="tm-window-btn" title="Vue normale" aria-label="Vue normale" (click)="restoreView()">□</button>
+        <button type="button" class="tm-window-btn tm-window-btn--maximize" title="Plein écran" aria-label="Plein écran" (click)="maximizeView()">⛶</button>
+      </div>
+    </div>
   </div>
 
+  @if (!isCollapsed) {
   @if (phaseFilters.length) {
     <div class="tm-phase-filters">
       <button
@@ -35,7 +47,7 @@
   @if (isSaving) { <div class="tm-save-state">Enregistrement...</div> }
   @if (saveError) { <div class="tm-save-error">{{ saveError }}</div> }
 
-  <div class="tm-board-wrap">
+  <div class="tm-board-wrap" (scroll)="hideAssignmentPopover()">
     <div class="tm-board-head">
       <div class="tm-board-head-label">Activité parente</div>
       <div class="tm-board-columns">
@@ -79,7 +91,23 @@
                       (dragend)="onTaskDragEnd()"
                       (click)="openTaskModal(lane, task)"
                     >
-                      <div class="tm-task-title">{{ task.label }}</div>
+                      <div class="tm-task-roles-corner">
+                        <span class="tm-task-avatar" [class.tm-task-avatar--res]="getTaskRoleLabel(task, 'res')" [class.tm-task-avatar--empty]="!getTaskRoleLabel(task, 'res')" [title]="getTaskRoleLabel(task, 'res') ? ('Assigné : ' + getTaskRoleLabel(task, 'res')) : 'Non assigné'" (click)="showAssignmentPopover($event, task, lane.phase, lane.id, 'responsible', 'Assigné')">
+                          {{ getTaskRoleLabel(task, 'res') ? initials(getTaskRoleLabel(task, 'res')!) : '' }}
+                        </span>
+                        <span class="tm-task-avatar" [class.tm-task-avatar--rep]="getTaskRoleLabel(task, 'rep')" [class.tm-task-avatar--empty]="!getTaskRoleLabel(task, 'rep')" [title]="getTaskRoleLabel(task, 'rep') ? ('Reporter : ' + getTaskRoleLabel(task, 'rep')) : 'Reporter non défini'" (click)="showAssignmentPopover($event, task, lane.phase, lane.id, 'reporter', 'Reporter')">
+                          {{ getTaskRoleLabel(task, 'rep') ? initials(getTaskRoleLabel(task, 'rep')!) : '' }}
+                        </span>
+                        <span class="tm-task-avatar" [class.tm-task-avatar--acc]="getTaskRoleLabel(task, 'acc')" [class.tm-task-avatar--empty]="!getTaskRoleLabel(task, 'acc')" [title]="getTaskRoleLabel(task, 'acc') ? ('Suiveur : ' + getTaskRoleLabel(task, 'acc')) : 'Suiveur non défini'" (click)="showAssignmentPopover($event, task, lane.phase, lane.id, 'accountant', 'Suiveur')">
+                          {{ getTaskRoleLabel(task, 'acc') ? initials(getTaskRoleLabel(task, 'acc')!) : '' }}
+                        </span>
+                      </div>
+                      <div class="tm-task-body">
+                        <div class="tm-task-title">{{ task.label }}</div>
+                      </div>
+                      <div class="tm-task-footer">
+                        <span class="tm-task-status-tag" [class]="'tm-task-status-tag tm-task-status-tag--' + col.id">{{ col.label }}</span>
+                      </div>
                     </div>
                   }
                   @if (!lane.groupedByStatus[col.id]?.length) {
@@ -110,4 +138,6 @@
     (parentIdChange)="editedTaskParentId = $event"
     (newCommentTextChange)="newCommentText = $event"
   ></app-project-kanban-task-modal>
+  <app-task-assignment-popover *ngIf="assignmentPopover as ap" [visible]="true" [x]="ap.x" [y]="ap.y" [roleLabel]="ap.roleLabel" [selectedUserId]="ap.selectedUserId" [users]="users" (selectedUserIdChange)="ap.selectedUserId = $event" (cancel)="hideAssignmentPopover()" (confirm)="applyAssignmentPopover()"></app-task-assignment-popover>
+  }
 </div>

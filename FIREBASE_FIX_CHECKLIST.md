@@ -18,6 +18,7 @@ Les règles Firestore créaient une **dépendance circulaire** :
 - ✅ `firebase-project-data-backend.service.ts` - Meilleure gestion des erreurs
 - ✅ Ajout de logs pour faciliter le debugging
 - ✅ Retour de valeurs par défaut si le document n'existe pas
+- ✅ Suppression des fallbacks legacy vers les sous-collections Firestore métier
 
 ### 2. Règles Firestore
 - ✅ Permet aux utilisateurs authentifiés de lire les documents (nécessaire pour les fonctions d'aide)
@@ -81,6 +82,22 @@ node scripts/test-user-access.mjs scripts/carecode-2dea6-firebase-adminsdk-xfnu9
 - ✅ `scripts/test-user-access.mjs` - Nouveau script
 - ✅ `scripts/init-user-roles.mjs` - Nouveau script
 - ✅ `scripts/set-user-role.mjs` - Nouveau script
+
+## Modèle canonique actuel
+
+Le backend applicatif lit désormais le modèle Firestore canonique suivant :
+
+- `users/{userId}`
+- `projects/{projectId}`
+- `projects/{projectId}.payload`
+- `projectTypes/{projectTypeId}`
+- `healthDefaults/{healthId}`
+
+Les structures legacy suivantes ne sont plus utilisées par le backend actif :
+
+- `projects/{projectId}/risks/{riskId}`
+- `projects/{projectId}/health/{healthId}`
+- `projectTypes/{projectTypeId}/activityDefaults/{activityDefaultId}`
 
 ## Vérification de la Correction
 

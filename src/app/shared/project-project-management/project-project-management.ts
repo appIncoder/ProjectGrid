@@ -1,11 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Component, Input, NgZone, OnChanges } from '@angular/core';
+import { Component, HostListener, Input, NgZone, OnChanges, OnDestroy } from '@angular/core';
 
 import { ProjectDataService } from '../../services/project-data.service';
-import type { ActivityStatus, PhaseId, ProjectDetail, ProjectWorkflow, Task, TaskComment } from '../../models';
+import type { ActivityStatus, PhaseId, ProjectDetail, ProjectWorkflow, Task, TaskComment, UserRef } from '../../models';
 import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kanban-task-modal';
 import { ProjectAddTaskButton } from '../project-add-task-button/project-add-task-button';
+import { TaskAssignmentPopover } from '../task-assignment-popover/task-assignment-popover';
 
 interface ParentActivityLaneVm {
   id: string;
@@ -19,12 +20,13 @@ interface ParentActivityLaneVm {
 @Component({
   selector: 'app-project-project-management',
   standalone: true,
-  imports: [CommonModule, FormsModule, ProjectKanbanTaskModal, ProjectAddTaskButton],
+  imports: [CommonModule, FormsModule, ProjectKanbanTaskModal, ProjectAddTaskButton, TaskAssignmentPopover],
   templateUrl: './project-project-management.html',
   styleUrls: ['./project-project-management.scss'],
 })
-export class ProjectProjectManagement implements OnChanges {
+export class ProjectProjectManagement implements OnChanges, OnDestroy {
   @Input() project: ProjectDetail | null = null;
+  @Input() users: UserRef[] = [];
 
   constructor(private projectData: ProjectDataService, private zone: NgZone) {}
 
@@ -69,9 +71,56 @@ export class ProjectProjectManagement implements OnChanges {
   newCommentText = '';
   availableParentActivities: Array<{ id: string; label: string }> = [];
   isCreateMode = false;
+  isCollapsed = false;
+  isFullscreen = false;
+  fullscreenTopOffset = 0;
+  fullscreenBottomOffset = 0;
+  assignmentPopover: {
+    x: number;
+    y: number;
+    roleLabel: string;
+    roleField: 'reporter' | 'accountant' | 'responsible';
+    selectedUserId: string;
+    phase: PhaseId;
+    parentId: string;
+    taskId: string;
+  } | null = null;
 
   ngOnChanges(): void {
     this.rebuild();
+  }
+
+  ngOnDestroy(): void {
+    this.releaseFullscreenViewport();
+  }
+
+  minimizeView(): void {
+    this.isCollapsed = true;
+    this.isFullscreen = false;
+    this.releaseFullscreenViewport();
+  }
+
+  restoreView(): void {
+    this.isCollapsed = false;
+    this.isFullscreen = false;
+    this.releaseFullscreenViewport();
+  }
+
+  maximizeView(): void {
+    this.isCollapsed = false;
+    this.isFullscreen = true;
+    this.captureFullscreenViewport();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    if (this.isFullscreen) this.captureFullscreenViewport();
+    this.hideAssignmentPopover();
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.hideAssignmentPopover();
   }
 
   private rebuild(): void {
@@ -232,6 +281,22 @@ export class ProjectProjectManagement implements OnChanges {
     this.filteredLanes = this.allLanes.filter((lane) => selected.has(lane.phase));
   }
 
+  private captureFullscreenViewport(): void {
+    if (typeof document === 'undefined') return;
+    const header = document.querySelector('app-root > header');
+    const footer = document.querySelector('app-root > footer');
+    this.fullscreenTopOffset = header?.getBoundingClientRect().height ?? 0;
+    this.fullscreenBottomOffset = footer?.getBoundingClientRect().height ?? 0;
+    document.body.classList.add('management-panel-fullscreen-open');
+  }
+
+  private releaseFullscreenViewport(): void {
+    if (typeof document === 'undefined') return;
+    this.fullscreenTopOffset = 0;
+    this.fullscreenBottomOffset = 0;
+    document.body.classList.remove('management-panel-fullscreen-open');
+  }
+
   getColumnTaskCount(status: ActivityStatus): number {
     return this.filteredLanes.reduce((acc, lane) => acc + (lane.groupedByStatus[status]?.length ?? 0), 0);
   }
@@ -254,6 +319,78 @@ export class ProjectProjectManagement implements OnChanges {
 
   getStatusLabel(status: ActivityStatus): string {
     return this.statusColumns.find((s) => s.id === status)?.label ?? status;
+  }
+
+  getTaskRoleLabel(task: Task, role: 'res' | 'rep' | 'acc'): string | null {
+    const userMap = new Map(this.users.map((u) => [u.id, u.label]));
+    const userId =
+      role === 'res' ? task.responsibleId :
+      role === 'rep' ? task.reporterId :
+      task.accountantId;
+    if (!userId) return null;
+    return userMap.get(userId) ?? userId;
+  }
+
+  initials(name: string): string {
+    const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] ?? '';
+    const b = parts.length > 1 ? parts[parts.length - 1][0] : '';
+    return (a + b).toUpperCase();
+  }
+
+  showAssignmentPopover(
+    event: MouseEvent,
+    task: Task,
+    phase: PhaseId,
+    parentId: string,
+    roleField: 'reporter' | 'accountant' | 'responsible',
+    roleLabel: string
+  ): void {
+    event.stopPropagation();
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const boxW = 220;
+    const boxH = 92;
+    const margin = 10;
+    const maxX = window.innerWidth - boxW - margin;
+    const maxY = window.innerHeight - boxH - margin;
+    const preferredX = rect.right + 10;
+    const fallbackX = rect.left - boxW - 10;
+    this.assignmentPopover = {
+      x: preferredX <= maxX ? preferredX : Math.max(margin, fallbackX),
+      y: Math.max(margin, Math.min(maxY, rect.top + rect.height / 2 - boxH / 2)),
+      roleLabel,
+      roleField,
+      selectedUserId:
+        roleField === 'responsible' ? task.responsibleId ?? '' :
+        roleField === 'reporter' ? task.reporterId ?? '' :
+        task.accountantId ?? '',
+      phase,
+      parentId,
+      taskId: String(task.id ?? ''),
+    };
+  }
+
+  hideAssignmentPopover(): void {
+    this.assignmentPopover = null;
+  }
+
+  applyAssignmentPopover(): void {
+    if (!this.assignmentPopover) return;
+    const pop = this.assignmentPopover;
+
+    void this.mutateAndPersist(async () => {
+      const ref = this.findTaskRef(pop.phase, pop.parentId, pop.taskId);
+      if (!ref) return;
+      const value = (pop.selectedUserId ?? '').trim() || undefined;
+      if (pop.roleField === 'reporter') ref.task.reporterId = value;
+      if (pop.roleField === 'accountant') ref.task.accountantId = value;
+      if (pop.roleField === 'responsible') ref.task.responsibleId = value;
+      this.rebuild();
+    });
+
+    this.hideAssignmentPopover();
   }
 
   private getPhaseLabel(phase: PhaseId): string {

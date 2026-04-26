@@ -117,19 +117,19 @@
 
         <!-- Onglet 3 : Conduite du changement (ADKAR) -->
         <div [hidden]="activeTab !== 'detail_project'">
-          <app-project-project-management [project]="p"></app-project-project-management>
+          <app-project-project-management [project]="p" [users]="users"></app-project-project-management>
         </div>
 
         <div [hidden]="activeTab !== 'detail_business'">
-          <app-project-business-management [project]="p"></app-project-business-management>
+          <app-project-business-management [project]="p" [users]="users"></app-project-business-management>
         </div>
 
         <div [hidden]="activeTab !== 'change'">
-          <app-project-change-management [project]="p"></app-project-change-management>
+          <app-project-change-management [project]="p" [users]="users"></app-project-change-management>
         </div>
 
         <div [hidden]="activeTab !== 'detail_technology'">
-          <app-project-technology-management [project]="p"></app-project-technology-management>
+          <app-project-technology-management [project]="p" [users]="users"></app-project-technology-management>
         </div>
 
         <!-- Onglet 4 : Gestion du budget -->

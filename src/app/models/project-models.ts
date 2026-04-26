@@ -3,13 +3,15 @@
 export type PhaseId = 'Phase1' | 'Phase2' | 'Phase3' | 'Phase4' | 'Phase5' | 'Phase6';
 export type ActivityId = 'projet' | 'metier' | 'changement' | 'technologie';
   export * from './project.model';
-export type ActivityStatus =
+export type CoreActivityStatus =
   | 'todo'
   | 'inprogress'
-  | 'onhold'        // ✅ En attente (Bleu)
+  | 'onhold'
   | 'done'
   | 'notdone'
-  | 'notapplicable'; // ✅ Non applicable (Gris)
+  | 'notapplicable';
+
+export type ActivityStatus = CoreActivityStatus | (string & {});
 
 export interface TaskComment {
   text: string;

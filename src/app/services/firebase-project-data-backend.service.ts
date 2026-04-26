@@ -15,14 +15,17 @@ import {
   type Firestore,
   type QueryConstraint,
 } from 'firebase/firestore';
-import type { ActivityDefinition, ActivityId, Item, ItemComment, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow, UserRef } from '../models';
+import type { ActivityDefinition, ActivityId, Item, ItemComment, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectSettings, ProjectWorkflow, UserRef } from '../models';
+import { DEFAULT_PROJECT_SETTINGS } from '../models';
 import type { ProjectDataBackend } from './project-data-backend';
 import type {
+  CreateProjectTypePayload,
   CreateProjectRiskPayload,
   ProjectHealthDefaultRef,
   ProjectRiskRef,
   ProjectTypeDefaults,
   ProjectTypeRef,
+  UpdateProjectTypePayload,
   UpdateProjectRiskPayload,
 } from './project-data.service';
 import { DEFAULT_WORKFLOW, getProjectTypeFallback, PROJECT_TYPE_FALLBACKS } from './project-type-fallbacks';
@@ -153,6 +156,15 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
 
   private compareByCaseInsensitive(a: string, b: string): number {
     return a.localeCompare(b, undefined, { sensitivity: 'base' });
+  }
+
+  private slugifyProjectTypeId(value: string): string {
+    return String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   private async getProjectOrThrow(projectId: string): Promise<ProjectDetail> {
@@ -542,6 +554,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const workflow: ProjectWorkflow = rawWorkflow
       ? this.normalizeWorkflow(rawWorkflow, fallbackWorkflow)
       : fallbackWorkflow;
+    const displayInteractions = this.normalizeDisplayInteractions(data['displayInteractions']);
 
     return {
       projectType: {
@@ -554,6 +567,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       activitiesDefault: mergedDefaults.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
       tasks: mergedDefaults.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
       workflow,
+      displayInteractions,
     };
   }
 
@@ -575,6 +589,17 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     return statuses.length ? { statuses } : fallback;
   }
 
+  private normalizeDisplayInteractions(raw: unknown): ProjectSettings {
+    const row = this.asRecord(raw) ?? {};
+    return {
+      periodPreset: this.asString(row['periodPreset'], DEFAULT_PROJECT_SETTINGS.periodPreset) as ProjectSettings['periodPreset'],
+      viewMode: this.asString(row['viewMode'], DEFAULT_PROJECT_SETTINGS.viewMode) as ProjectSettings['viewMode'],
+      hoverHintsEnabled: row['hoverHintsEnabled'] !== undefined ? Boolean(row['hoverHintsEnabled']) : DEFAULT_PROJECT_SETTINGS.hoverHintsEnabled,
+      linkTooltipsEnabled: row['linkTooltipsEnabled'] !== undefined ? Boolean(row['linkTooltipsEnabled']) : DEFAULT_PROJECT_SETTINGS.linkTooltipsEnabled,
+      defaultDependencyType: this.asString(row['defaultDependencyType'], DEFAULT_PROJECT_SETTINGS.defaultDependencyType) as ProjectSettings['defaultDependencyType'],
+    };
+  }
+
   private normalizeProjectDetail(docId: string, raw: unknown): ProjectDetail {
     const source = this.asRecord(raw) ?? {};
     const project = this.asRecord(source['payload']) ?? source;
@@ -592,12 +617,15 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const workflow: ProjectWorkflow | undefined = rawWorkflow
       ? this.normalizeWorkflow(rawWorkflow, DEFAULT_WORKFLOW)
       : undefined;
+    const displayInteractions = this.normalizeDisplayInteractions(project['displayInteractions']);
 
     return {
       ...project,
       id: this.asString(project['id'], docId) || docId,
       name: this.asString(project['name'], docId) || docId,
       description: this.asString(project['description']),
+      owner: this.asString(project['owner']),
+      projectManager: this.asString(project['projectManager']),
       phases,
       phaseDefinitions,
       activities,
@@ -605,6 +633,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       taskMatrix: activityMatrix,
       projectItemsMatrix,
       projectTasksMatrix: projectItemsMatrix,
+      displayInteractions,
       ...(workflow ? { workflow } : {}),
       ganttDependencies: this.asArray(project['ganttDependencies']).map((item) => {
         const row = this.asRecord(item) ?? {};
@@ -692,6 +721,23 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       return [];
     }
 
+    const isSysAdmin = access.globalRoles.some((role) => this.asString(role).toLowerCase() === 'sysadmin');
+
+    if (isSysAdmin) {
+      const docs = await this.safeGetCollectionDocs(['projects']);
+      return docs
+        .map((item) => {
+          const payload = this.asRecord(item.data['payload']) ?? item.data;
+          return {
+            id: this.asString(payload['id'], item.id) || item.id,
+            name: this.asString(payload['name'], item.id) || item.id,
+            updatedAt: this.asDateString(item.data['updatedAt'] ?? payload['updatedAt']),
+          };
+        })
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .map(({ id, name }) => ({ id, name }));
+    }
+
     const projectIds = Array.from(new Set(access.projectIds)).filter((projectId) => projectId !== '');
     if (projectIds.length === 0) {
       return [];
@@ -741,6 +787,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
             ?? item.data['email'],
           item.id,
         ) || item.id,
+        email: this.asString(item.data['email']),
       }))
       .filter((item) => !!item.id);
   }
@@ -759,6 +806,96 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     return PROJECT_TYPE_FALLBACKS
       .map((item) => item.projectType)
       .sort((left, right) => this.compareByCaseInsensitive(left.name, right.name));
+  }
+
+  async createProjectType(payload: CreateProjectTypePayload): Promise<ProjectTypeDefaults> {
+    await this.auth.whenReady();
+    const name = this.asString(payload?.name);
+    if (!name) throw new Error('Missing project type name');
+
+    const requestedId = this.asString(payload?.id);
+    const id = requestedId || this.slugifyProjectTypeId(name);
+    if (!id) throw new Error('Missing project type id');
+
+    const ref = doc(this.firestore(), 'projectTypes', id);
+    const existing = await getDoc(ref);
+    if (existing.exists()) {
+      throw new Error(`Project type ${id} already exists`);
+    }
+
+    const description = this.asString(payload?.description);
+    const baseDoc = {
+      id,
+      name,
+      description,
+      projectType: {
+        id,
+        name,
+        description,
+      },
+      phases: [],
+      activities: [],
+      activitiesDefault: [],
+      tasks: [],
+      workflow: this.sanitizeForFirestore(DEFAULT_WORKFLOW),
+      displayInteractions: this.sanitizeForFirestore(DEFAULT_PROJECT_SETTINGS),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    await setDoc(ref, baseDoc, { merge: false });
+    return this.normalizeProjectTypeDefaults(id, {
+      ...baseDoc,
+      workflow: DEFAULT_WORKFLOW,
+      displayInteractions: DEFAULT_PROJECT_SETTINGS,
+    });
+  }
+
+  async updateProjectType(projectTypeId: string, payload: UpdateProjectTypePayload): Promise<ProjectTypeDefaults> {
+    await this.auth.whenReady();
+    const id = this.asString(projectTypeId);
+    if (!id) throw new Error('Missing project type id');
+
+    const ref = doc(this.firestore(), 'projectTypes', id);
+    const snapshot = await getDoc(ref);
+    if (!snapshot.exists()) {
+      throw new Error(`Project type ${id} not found`);
+    }
+
+    const current = this.asRecord(snapshot.data()) ?? {};
+    const currentType = this.asRecord(current['projectType']) ?? {};
+    const name = this.asString(payload?.name, this.asString(currentType['name'] ?? current['name'], id)) || id;
+    const description = this.asString(payload?.description, this.asString(currentType['description'] ?? current['description']));
+
+    await setDoc(ref, {
+      name,
+      description,
+      projectType: {
+        id,
+        name,
+        description,
+      },
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    const merged = {
+      ...current,
+      name,
+      description,
+      projectType: {
+        id,
+        name,
+        description,
+      },
+    };
+    return this.normalizeProjectTypeDefaults(id, merged);
+  }
+
+  async deleteProjectType(projectTypeId: string): Promise<void> {
+    await this.auth.whenReady();
+    const id = this.asString(projectTypeId);
+    if (!id) throw new Error('Missing project type id');
+    await deleteDoc(doc(this.firestore(), 'projectTypes', id));
   }
 
   async listProjectHealthDefaults(): Promise<ProjectHealthDefaultRef[]> {
@@ -924,12 +1061,9 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     if (direct.exists()) {
       const data = this.asRecord(direct.data()) ?? {};
       const payload = this.asRecord(data['payload']) ?? data;
-      const embedded = this.normalizeProjectRisks(payload['projectRisks'], projectId);
-      if (embedded.length > 0) return embedded;
+      return this.normalizeProjectRisks(payload['projectRisks'], projectId);
     }
-
-    const docs = await this.safeGetCollectionDocs(['projects', projectId, 'risks'], orderBy('dateCreated', 'desc'));
-    return this.normalizeProjectRisks(docs.map((item) => ({ id: item.id, ...item.data })), projectId);
+    return [];
   }
 
   async getProjectTypeDefaults(projectTypeId: string): Promise<ProjectTypeDefaults | null> {
@@ -937,33 +1071,8 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     try {
       const snapshot = await getDoc(doc(this.firestore(), 'projectTypes', projectTypeId));
       if (snapshot.exists()) {
-        const activityDefaultsDocs = await this.safeGetCollectionDocs(
-          ['projectTypes', projectTypeId, 'activityDefaults'],
-          orderBy('sequence', 'asc'),
-        );
         const raw = this.asRecord(snapshot.data()) ?? {};
-        const mergedRaw = activityDefaultsDocs.length > 0
-          ? {
-              ...raw,
-              activitiesDefault: activityDefaultsDocs.map((item) => ({
-                id: this.asString(item.data['id'], item.id) || item.id,
-                label: this.asString(item.data['label'], item.id) || item.id,
-                phaseId: this.asString(item.data['phaseId']),
-                activityId: this.asString(item.data['activityId']),
-                sequence: this.asNumberOrNull(item.data['sequence']),
-                projectTypeId: this.asString(item.data['projectTypeId'], projectTypeId) || projectTypeId,
-              })),
-              tasks: activityDefaultsDocs.map((item) => ({
-                id: this.asString(item.data['id'], item.id) || item.id,
-                label: this.asString(item.data['label'], item.id) || item.id,
-                phaseId: this.asString(item.data['phaseId']),
-                activityId: this.asString(item.data['activityId']),
-                sequence: this.asNumberOrNull(item.data['sequence']),
-                projectTypeId: this.asString(item.data['projectTypeId'], projectTypeId) || projectTypeId,
-              })),
-            }
-          : raw;
-        return this.normalizeProjectTypeDefaults(snapshot.id, mergedRaw);
+        return this.normalizeProjectTypeDefaults(snapshot.id, raw);
       }
     } catch {
       // Fall through to local defaults.
@@ -982,6 +1091,32 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     return this.normalizeProjectDetail(snapshot.id, snapshot.data());
   }
 
+  async getProjectDisplayInteractions(projectId: string): Promise<ProjectSettings> {
+    const project = await this.getProjectById(projectId);
+    return this.normalizeDisplayInteractions((project as ProjectDetail | null)?.displayInteractions);
+  }
+
+  async saveProjectDisplayInteractions(projectId: string, settings: ProjectSettings): Promise<ProjectSettings> {
+    await this.auth.whenReady();
+    const id = this.asString(projectId);
+    if (!id) throw new Error('Missing projectId');
+
+    const snapshot = await getDoc(doc(this.firestore(), 'projects', id));
+    if (!snapshot.exists()) throw new Error(`Project ${id} not found`);
+
+    const data = this.asRecord(snapshot.data()) ?? {};
+    const payload = this.asRecord(data['payload']) ?? {};
+    const displayInteractions = this.normalizeDisplayInteractions(settings);
+
+    await setDoc(
+      doc(this.firestore(), 'projects', id),
+      { payload: { ...payload, displayInteractions }, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+
+    return displayInteractions;
+  }
+
   async saveProject(project: ProjectDetail): Promise<void> {
     await this.auth.whenReady();
     const projectId = this.asString(project?.id);
@@ -989,9 +1124,26 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       throw new Error('Missing project id');
     }
 
+    const source = this.asRecord(project as unknown) ?? {};
+    const projectTypeId = this.asString(source['projectTypeId']);
+    let displayInteractions = source['displayInteractions'];
+
+    if (!this.asRecord(displayInteractions)) {
+      const snapshot = await getDoc(doc(this.firestore(), 'projects', projectId));
+      const existing = snapshot.exists() ? this.asRecord(snapshot.data()) : null;
+      const existingPayload = this.asRecord(existing?.['payload']);
+      displayInteractions = existingPayload?.['displayInteractions'];
+
+      if (!this.asRecord(displayInteractions) && projectTypeId) {
+        const defaults = await this.getProjectTypeDefaults(projectTypeId);
+        displayInteractions = defaults?.displayInteractions ?? DEFAULT_PROJECT_SETTINGS;
+      }
+    }
+
     const docPayload = this.buildProjectDocument({
       ...project,
       id: projectId,
+      displayInteractions: this.normalizeDisplayInteractions(displayInteractions),
     });
 
     await setDoc(doc(this.firestore(), 'projects', projectId), docPayload, { merge: true });

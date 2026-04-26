@@ -7,18 +7,11 @@ import { Subscription } from 'rxjs';
 import type { PeriodPreset } from '../../models/params.model';
 import type { DependencyType, ViewMode } from '../../models/gantt.model';
 import type { ActivityStatus, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow } from '../../models';
-import type { ProjectSettings } from '../../models';
+import { DEFAULT_PROJECT_SETTINGS, type ProjectSettings } from '../../models';
+import { AuthService } from '../../services/auth.service';
 import { ProjectDataService } from '../../services/project-data.service';
 import { DEFAULT_WORKFLOW } from '../../services/project-type-fallbacks';
 import { ProjectService } from '../../services/project.service';
-
-const DEFAULT_SETTINGS: ProjectSettings = {
-  periodPreset: '6m',
-  viewMode: 'split',
-  hoverHintsEnabled: true,
-  linkTooltipsEnabled: true,
-  defaultDependencyType: 'F2S',
-};
 
 export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string; description: string }> = [
   { value: 'projectManager',    label: 'Project Manager',    description: 'Accès admin complet au projet' },
@@ -39,6 +32,7 @@ export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string; de
   styleUrls: ['./settings-page.scss'],
 })
 export class SettingsPage implements OnInit, OnDestroy {
+  private static readonly SUPER_USER_EMAIL = 'etienne.darquennes@gmail.com';
 
   // ── Projet sélectionné ───────────────────────────────────────────────────
   projectList: Array<{ id: string; name: string }> = [];
@@ -47,9 +41,9 @@ export class SettingsPage implements OnInit, OnDestroy {
   isProjectLoading = false;
   projectLoadError: string | null = null;
 
-  // ── Affichage (localStorage) ─────────────────────────────────────────────
+  // ── Affichage (backend) ──────────────────────────────────────────────────
   form!: FormGroup;
-  savedState: 'idle' | 'saved' | 'error' = 'idle';
+  savedState: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
 
   readonly dependencyType: DependencyType[] = ['F2S', 'F2F', 'S2S'];
   readonly periodPresets: Array<{ value: PeriodPreset; label: string }> = [
@@ -87,6 +81,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private route: ActivatedRoute,
     private router: Router,
+    private authService: AuthService,
     private dataService: ProjectDataService,
     private projectService: ProjectService,
     private cdr: ChangeDetectorRef,
@@ -94,11 +89,11 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.form = this.fb.group({
-      periodPreset:          DEFAULT_SETTINGS.periodPreset as PeriodPreset,
-      hoverHintsEnabled:     DEFAULT_SETTINGS.hoverHintsEnabled,
-      linkTooltipsEnabled:   DEFAULT_SETTINGS.linkTooltipsEnabled,
-      viewMode:              DEFAULT_SETTINGS.viewMode as ViewMode,
-      defaultDependencyType: DEFAULT_SETTINGS.defaultDependencyType as DependencyType,
+      periodPreset:          DEFAULT_PROJECT_SETTINGS.periodPreset as PeriodPreset,
+      hoverHintsEnabled:     DEFAULT_PROJECT_SETTINGS.hoverHintsEnabled,
+      linkTooltipsEnabled:   DEFAULT_PROJECT_SETTINGS.linkTooltipsEnabled,
+      viewMode:              DEFAULT_PROJECT_SETTINGS.viewMode as ViewMode,
+      defaultDependencyType: DEFAULT_PROJECT_SETTINGS.defaultDependencyType as DependencyType,
     });
 
     void this.loadProjectList();
@@ -132,7 +127,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     if (!this.selectedProjectId) {
       this.project = null;
       this.members = [];
-      this.form.reset(DEFAULT_SETTINGS);
+      this.form.reset(DEFAULT_PROJECT_SETTINGS);
       return;
     }
 
@@ -155,7 +150,7 @@ export class SettingsPage implements OnInit, OnDestroy {
         return;
       }
       this.project = p;
-      this.loadDisplaySettings(p.id);
+      await this.loadDisplaySettings(p.id);
       this.loadWorkflow();
       void this.loadMembers(p.id);
     } catch (e) {
@@ -167,13 +162,18 @@ export class SettingsPage implements OnInit, OnDestroy {
     }
   }
 
+  goToActiveProject(): void {
+    const projectId = String(this.project?.id ?? this.selectedProjectId ?? '').trim();
+    if (!projectId) return;
+
+    void this.router.navigate(['/project', projectId]);
+  }
+
   // ── Paramètres d'affichage ───────────────────────────────────────────────
 
-  private storageKey(projectId: string) { return `projectgrid:settings:${projectId}`; }
-
-  private loadDisplaySettings(projectId: string): void {
+  private async loadDisplaySettings(projectId: string): Promise<void> {
     this.savedState = 'idle';
-    const stored = this.readSettings(projectId);
+    const stored = await this.dataService.getProjectDisplayInteractions(projectId);
     this.form.reset({
       periodPreset:          stored.periodPreset,
       hoverHintsEnabled:     stored.hoverHintsEnabled,
@@ -181,32 +181,42 @@ export class SettingsPage implements OnInit, OnDestroy {
       viewMode:              stored.viewMode,
       defaultDependencyType: stored.defaultDependencyType,
     });
+    if (this.project) {
+      this.project = { ...this.project, displayInteractions: stored };
+    }
   }
 
-  private readSettings(projectId: string): ProjectSettings {
-    try {
-      const raw = localStorage.getItem(this.storageKey(projectId));
-      return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_SETTINGS };
-    } catch { return { ...DEFAULT_SETTINGS }; }
-  }
-
-  save(): void {
+  async save(): Promise<void> {
     if (!this.project?.id) { this.savedState = 'error'; return; }
-    const v = this.form.getRawValue();
-    localStorage.setItem(this.storageKey(this.project.id), JSON.stringify({
+    this.savedState = 'saving';
+    const v = this.form.getRawValue() as ProjectSettings;
+    try {
+      const saved = await this.dataService.saveProjectDisplayInteractions(this.project.id, {
       periodPreset:          v.periodPreset,
       hoverHintsEnabled:     v.hoverHintsEnabled,
       linkTooltipsEnabled:   v.linkTooltipsEnabled,
       viewMode:              v.viewMode,
       defaultDependencyType: v.defaultDependencyType,
-    } satisfies ProjectSettings));
-    this.savedState = 'saved';
-    setTimeout(() => (this.savedState = 'idle'), 1500);
+      });
+      this.project = { ...this.project, displayInteractions: saved };
+      this.form.reset(saved);
+      this.savedState = 'saved';
+      setTimeout(() => (this.savedState = 'idle'), 1500);
+    } catch (e) {
+      console.error('[SettingsPage] save display interactions error', e);
+      this.savedState = 'error';
+    }
   }
 
-  resetToDefaults(): void {
-    if (this.project?.id) localStorage.removeItem(this.storageKey(this.project.id));
-    if (this.project?.id) this.loadDisplaySettings(this.project.id);
+  async resetToDefaults(): Promise<void> {
+    if (!this.project?.id) return;
+
+    const defaults = this.project.projectTypeId
+      ? await this.dataService.getProjectTypeDefaults(this.project.projectTypeId)
+      : null;
+    const next = defaults?.displayInteractions ?? DEFAULT_PROJECT_SETTINGS;
+    this.form.reset(next);
+    await this.save();
   }
 
   // ── Gestion des membres ──────────────────────────────────────────────────
@@ -309,6 +319,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   workflowStatuses: Array<{ id: ActivityStatus; label: string; sequence: number }> = [];
   workflowSaveState: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
   workflowError: string | null = null;
+  newWorkflowStatusLabel = '';
 
   private loadWorkflow(): void {
     const wf = (this.project as any)?.workflow as ProjectWorkflow | undefined;
@@ -319,17 +330,68 @@ export class SettingsPage implements OnInit, OnDestroy {
       .map((s) => ({ id: s.id, label: s.label, sequence: s.sequence }));
   }
 
+  get canManageWorkflow(): boolean {
+    const user = this.authService.user;
+    if (!user?.id) return false;
+    const email = user.username.toLowerCase();
+    if (email === SettingsPage.SUPER_USER_EMAIL) return true;
+    const ownerEmail = this.project?.owner?.toLowerCase() ?? '';
+    const projectManagerEmail = this.project?.projectManager?.toLowerCase() ?? '';
+    return email === ownerEmail || email === projectManagerEmail;
+  }
+
+  addWorkflowStatus(): void {
+    if (!this.canManageWorkflow) return;
+
+    const label = this.newWorkflowStatusLabel.trim();
+    if (!label) {
+      this.workflowError = 'Le libellé du nouveau statut est obligatoire.';
+      return;
+    }
+
+    const nextId = this.ensureUniqueWorkflowStatusId(this.slugifyWorkflowStatusId(label));
+    this.workflowStatuses = [
+      ...this.workflowStatuses,
+      { id: nextId, label, sequence: this.workflowStatuses.length + 1 },
+    ];
+    this.newWorkflowStatusLabel = '';
+    this.workflowError = null;
+  }
+
+  moveWorkflowStatus(index: number, direction: -1 | 1): void {
+    if (!this.canManageWorkflow) return;
+
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= this.workflowStatuses.length) return;
+
+    const next = this.workflowStatuses.slice();
+    const [item] = next.splice(index, 1);
+    next.splice(targetIndex, 0, item);
+    this.workflowStatuses = next.map((status, idx) => ({ ...status, sequence: idx + 1 }));
+    this.workflowError = null;
+  }
+
   async saveWorkflow(): Promise<void> {
     if (!this.project?.id) return;
+    if (!this.canManageWorkflow) {
+      this.workflowError = "Seuls l'owner du projet et le super user peuvent modifier le workflow.";
+      this.workflowSaveState = 'error';
+      return;
+    }
 
     const statuses = this.workflowStatuses.map((s, i) => ({
-      id: s.id,
+      id: this.slugifyWorkflowStatusId(s.id),
       label: s.label.trim() || s.id,
       sequence: i + 1,
     }));
 
     if (statuses.some((s) => !s.label)) {
       this.workflowError = 'Tous les libellés sont obligatoires.';
+      return;
+    }
+
+    if (new Set(statuses.map((s) => s.id)).size !== statuses.length) {
+      this.workflowError = 'Chaque statut doit avoir un identifiant unique.';
       return;
     }
 
@@ -355,8 +417,32 @@ export class SettingsPage implements OnInit, OnDestroy {
     this.workflowStatuses = DEFAULT_WORKFLOW.statuses
       .slice()
       .map((s) => ({ id: s.id, label: s.label, sequence: s.sequence }));
+    this.newWorkflowStatusLabel = '';
     this.workflowError = null;
   }
 
   trackByWorkflowId(_: number, s: { id: string }) { return s.id; }
+
+  private slugifyWorkflowStatusId(value: string): ActivityStatus {
+    const normalized = String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return (normalized || 'custom_status') as ActivityStatus;
+  }
+
+  private ensureUniqueWorkflowStatusId(baseId: ActivityStatus): ActivityStatus {
+    const existingIds = new Set(this.workflowStatuses.map((status) => status.id));
+    if (!existingIds.has(baseId)) return baseId;
+
+    let index = 2;
+    let nextId = `${baseId}_${index}` as ActivityStatus;
+    while (existingIds.has(nextId)) {
+      index += 1;
+      nextId = `${baseId}_${index}` as ActivityStatus;
+    }
+    return nextId;
+  }
 }

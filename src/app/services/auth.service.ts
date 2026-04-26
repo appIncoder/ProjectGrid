@@ -1,8 +1,6 @@
 import { inject, Injectable } from '@angular/core';
-import { environment } from '../environments/environment';
 import type { AuthBackend } from './auth-backend';
 import { FirebaseAuthBackendService } from './firebase-auth-backend.service';
-import { RestAuthBackendService } from './rest-auth-backend.service';
 
 const AUTH_STORAGE_KEY = 'pg_auth_session';
 
@@ -20,10 +18,7 @@ export class AuthService {
   private _isAuthenticated = false;
   private _user: AuthSession['user'] | null = null;
   private readonly readyPromise: Promise<void>;
-  private readonly backend: AuthBackend =
-    environment.backendProvider === 'firebase'
-      ? inject(FirebaseAuthBackendService)
-      : inject(RestAuthBackendService);
+  private readonly backend: AuthBackend = inject(FirebaseAuthBackendService);
 
   constructor() {
     this.restoreFromStorage();

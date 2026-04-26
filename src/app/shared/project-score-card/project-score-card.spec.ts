@@ -1,18 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
-import { ProjectScoreCard } from './project-score-card';
+import { ProjectService } from '../../services/project.service';
+import { ProjectScorecard } from './project-score-card';
 
-describe('ProjectScoreCard', () => {
-  let component: ProjectScoreCard;
-  let fixture: ComponentFixture<ProjectScoreCard>;
+describe('ProjectScorecard', () => {
+  let component: ProjectScorecard;
+  let fixture: ComponentFixture<ProjectScorecard>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ProjectScoreCard]
+      imports: [ProjectScorecard],
+      providers: [
+        { provide: ProjectService, useValue: { registerProject: () => undefined } },
+        { provide: NgbModal, useValue: { open: () => undefined } },
+      ],
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(ProjectScoreCard);
+    fixture = TestBed.createComponent(ProjectScorecard);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });

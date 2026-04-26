@@ -8,3 +8,11 @@ export type ProjectSettings = {
   linkTooltipsEnabled: boolean;
   defaultDependencyType: DependencyType;
 };
+
+export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
+  periodPreset: '6m',
+  viewMode: 'split',
+  hoverHintsEnabled: true,
+  linkTooltipsEnabled: true,
+  defaultDependencyType: 'F2S',
+};

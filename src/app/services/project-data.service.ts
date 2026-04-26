@@ -1,15 +1,24 @@
 // src/app/services/project-data.service.ts
 import { inject, Injectable } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
-import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow, UserRef } from '../models';
-import { environment } from '../environments/environment';
+import type { ActivityDefinition, ActivityId, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectSettings, ProjectWorkflow, UserRef } from '../models';
 import { FirebaseProjectDataBackendService } from './firebase-project-data-backend.service';
 import type { ProjectDataBackend } from './project-data-backend';
-import { RestProjectDataBackendService } from './rest-project-data-backend.service';
 
 export interface ProjectTypeRef {
   id: string;
   name: string;
+  description?: string;
+}
+
+export interface CreateProjectTypePayload {
+  id?: string;
+  name: string;
+  description?: string;
+}
+
+export interface UpdateProjectTypePayload {
+  name?: string;
   description?: string;
 }
 
@@ -20,6 +29,7 @@ export interface ProjectTypeDefaults {
   activitiesDefault: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
   tasks: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
   workflow?: ProjectWorkflow;
+  displayInteractions?: ProjectSettings;
 }
 
 export type { ProjectWorkflow };
@@ -73,10 +83,7 @@ export interface ProjectRiskRef {
 export class ProjectDataService {
   private readonly projectsCache = new Map<string, ProjectDetail>();
   private readonly risksChangedSubject = new Subject<{ projectId: string; reason: string }>();
-  private readonly backend: ProjectDataBackend =
-    environment.backendProvider === 'firebase'
-      ? inject(FirebaseProjectDataBackendService)
-      : inject(RestProjectDataBackendService);
+  private readonly backend: ProjectDataBackend = inject(FirebaseProjectDataBackendService);
   private static readonly DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
   private static readonly DEFAULT_ACTIVITIES: Record<ActivityId, ActivityDefinition> = {
     projet: { id: 'projet', label: 'Gestion du projet', owner: '—', sequence: 1 },
@@ -130,6 +137,18 @@ export class ProjectDataService {
 
   async listProjectTypes(): Promise<ProjectTypeRef[]> {
     return this.backend.listProjectTypes();
+  }
+
+  async createProjectType(payload: CreateProjectTypePayload): Promise<ProjectTypeDefaults> {
+    return this.backend.createProjectType(payload);
+  }
+
+  async updateProjectType(projectTypeId: string, payload: UpdateProjectTypePayload): Promise<ProjectTypeDefaults> {
+    return this.backend.updateProjectType(projectTypeId, payload);
+  }
+
+  async deleteProjectType(projectTypeId: string): Promise<void> {
+    return this.backend.deleteProjectType(projectTypeId);
   }
 
   async listProjectHealthDefaults(): Promise<ProjectHealthDefaultRef[]> {
@@ -197,6 +216,20 @@ export class ProjectDataService {
       if (!list.length) return null;
       return await fetchOne(list[0].id);
     }
+  }
+
+  async getProjectDisplayInteractions(projectId: string): Promise<ProjectSettings> {
+    return this.backend.getProjectDisplayInteractions(projectId);
+  }
+
+  async saveProjectDisplayInteractions(projectId: string, settings: ProjectSettings): Promise<ProjectSettings> {
+    const saved = await this.backend.saveProjectDisplayInteractions(projectId, settings);
+    const id = String(projectId ?? '').trim();
+    const cached = this.projectsCache.get(id);
+    if (cached) {
+      this.cacheProject({ ...cached, displayInteractions: saved });
+    }
+    return saved;
   }
 
 
@@ -322,6 +355,15 @@ export class ProjectDataService {
       id: String(raw?.id ?? fallbackId),
       name: String(raw?.name ?? `Projet ${fallbackId}`),
       description: String(raw?.description ?? ''),
+      displayInteractions: raw?.displayInteractions && typeof raw.displayInteractions === 'object'
+        ? {
+            periodPreset: String((raw.displayInteractions as any)?.periodPreset ?? '6m') as any,
+            viewMode: String((raw.displayInteractions as any)?.viewMode ?? 'split') as any,
+            hoverHintsEnabled: Boolean((raw.displayInteractions as any)?.hoverHintsEnabled ?? true),
+            linkTooltipsEnabled: Boolean((raw.displayInteractions as any)?.linkTooltipsEnabled ?? true),
+            defaultDependencyType: String((raw.displayInteractions as any)?.defaultDependencyType ?? 'F2S') as any,
+          }
+        : undefined,
       projectHealth: Array.isArray(raw?.projectHealth)
         ? raw.projectHealth.map((h: any) => ({
             healthId: String(h?.healthId ?? '').trim(),

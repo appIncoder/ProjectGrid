@@ -1,4 +1,9 @@
-<div class="project-board">
+<div
+  class="project-board"
+  [class.project-board--fullscreen]="!!focusedLaneId"
+  [style.--project-board-fullscreen-top.px]="fullscreenTopOffset"
+  [style.--project-board-fullscreen-bottom.px]="fullscreenBottomOffset"
+  [style.--status-count]="statuses.length">
 
   <!-- ── Toolbar ─────────────────────────────────────────────────────────── -->
   <div class="card mb-3">
@@ -7,6 +12,15 @@
         <div class="board-toolbar-left">
           <span class="board-sprint-label">{{ sprint.name }}</span>
           <span class="board-sprint-goal" *ngIf="sprint.goal">{{ sprint.goal }}</span>
+          @if (workflowSaveState === 'saving') {
+            <span class="board-save-status board-save-status--saving">Enregistrement…</span>
+          }
+          @if (workflowSaveState === 'saved') {
+            <span class="board-save-status board-save-status--saved">Sauvegardé</span>
+          }
+          @if (workflowSaveState === 'error') {
+            <span class="board-save-status board-save-status--error">Erreur</span>
+          }
         </div>
 
         <div class="board-header-actions">
@@ -51,34 +65,116 @@
     </div>
   </div>
 
+  <!-- ── Filtre de swimlanes ─────────────────────────────────────────────── -->
+  <div class="swimlane-filter">
+    <span class="swimlane-filter-label">Swimlanes</span>
+
+    <span class="swimlane-filter-divider"></span>
+
+    <button type="button" class="swimlane-filter-action" (click)="selectAllSwimlanes()">Toutes</button>
+
+    <span class="swimlane-filter-divider"></span>
+
+    <div class="swimlane-chips">
+      <button
+        *ngFor="let option of swimlaneFilterOptions"
+        type="button"
+        class="swimlane-chip"
+        [class.swimlane-chip--selected]="isSwimlaneCategorySelected(option.value)"
+        (click)="toggleSwimlaneCategory(option.value)">
+        {{ option.label }}
+      </button>
+    </div>
+
+    <span class="swimlane-filter-divider" *ngIf="focusedLaneId"></span>
+
+    <button
+      *ngIf="focusedLaneId"
+      type="button"
+      class="swimlane-filter-action"
+      (click)="restoreBoardView()">
+      Quitter le plein écran
+    </button>
+  </div>
+
   <!-- ── Board ──────────────────────────────────────────────────────────── -->
-  <div #boardWrap class="board-wrap" (scroll)="hideTaskHoverCard()">
+  <div
+    #boardWrap
+    class="board-wrap"
+    [class.board-wrap--focused]="!!focusedLaneId"
+    (scroll)="hideTaskHoverCard(); hideAssignmentPopover()">
 
     <!-- En-têtes de colonnes sticky -->
-    <div class="board-columns-header">
+    <div
+      class="board-columns-header"
+      cdkDropList
+      cdkDropListOrientation="horizontal"
+      [cdkDropListData]="statuses"
+      [cdkDropListDisabled]="!canManageColumnOrder || workflowSaveState === 'saving'"
+      (cdkDropListDropped)="onStatusDrop($event)">
       <div
         class="board-col-header"
         *ngFor="let st of statuses; trackBy: trackByStatusId"
-        [class]="'bch-' + st.id">
+        cdkDrag
+        [cdkDragDisabled]="!canManageColumnOrder || workflowSaveState === 'saving'"
+        [style.--status-accent]="getStatusAccentColor(st.id)">
+        <span
+          *ngIf="canManageColumnOrder"
+          class="bch-grip"
+          cdkDragHandle
+          title="Déplacer la colonne"
+          aria-label="Déplacer la colonne">
+          ⋮⋮
+        </span>
         <span class="bch-dot"></span>
         <span class="bch-label">{{ st.label }}</span>
         <span class="bch-count">{{ getTicketCountByStatus(st.id) }}</span>
       </div>
     </div>
 
+    @if (workflowError) {
+      <div class="board-inline-error">{{ workflowError }}</div>
+    }
+
     <!-- Swimlanes -->
-    <div class="lane" *ngFor="let lane of lanes; trackBy: trackByLaneId">
+    <div
+      class="lane"
+      *ngFor="let lane of displayedLanes; trackBy: trackByLaneId"
+      [class.lane--focused]="isLaneFocused(lane.id)">
 
       <!-- Lane header -->
       <div class="lane-header" (click)="toggleLane(lane.id)">
         <span class="lane-chevron">{{ isLaneCollapsed(lane.id) ? '▶' : '▼' }}</span>
         <span class="lane-title">{{ lane.label }}</span>
         <span class="lane-count">
-          {{ (laneBuckets[lane.id]?.todo?.length ?? 0) +
-             (laneBuckets[lane.id]?.inprogress?.length ?? 0) +
-             (laneBuckets[lane.id]?.waiting?.length ?? 0) +
-             (laneBuckets[lane.id]?.done?.length ?? 0) }}
+          {{ getLaneTicketCount(lane.id) }}
         </span>
+        <div class="lane-window-actions">
+          <button
+            type="button"
+            class="lane-window-btn lane-window-btn--minimize"
+            title="Réduire"
+            aria-label="Réduire"
+            (click)="minimizeLane(lane.id); $event.stopPropagation()">
+            &minus;
+          </button>
+          <button
+            type="button"
+            class="lane-window-btn lane-window-btn--restore"
+            title="Vue normale"
+            aria-label="Vue normale"
+            (click)="restoreBoardView(lane.id); $event.stopPropagation()">
+            □
+          </button>
+          <button
+            type="button"
+            class="lane-window-btn lane-window-btn--maximize"
+            title="Plein écran"
+            aria-label="Plein écran"
+            (click)="maximizeLane(lane.id); $event.stopPropagation()">
+            ⛶
+          </button>
+        </div>
       </div>
 
       <!-- Grille 4 colonnes -->
@@ -95,7 +191,7 @@
           <!-- Cartes -->
           <div
             class="kanban-card"
-            [class]="'kc-' + st.id"
+            [style.--status-accent]="getStatusAccentColor(st.id)"
             *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
             cdkDrag
             [cdkDragPreviewContainer]="'parent'"
@@ -109,21 +205,24 @@
                 class="kc-avatar"
                 [class.kc-avatar--res]="cardRoles[c.id]?.res"
                 [class.kc-avatar--empty]="!cardRoles[c.id]?.res"
-                [title]="cardRoles[c.id]?.res ? ('Assigné : ' + cardRoles[c.id]!.res) : 'Non assigné'">
+                [title]="cardRoles[c.id]?.res ? ('Assigné : ' + cardRoles[c.id]!.res) : 'Non assigné'"
+                (click)="showAssignmentPopover($event, c, 'responsible', 'Assigné', getTaskFromCard(c)?.responsibleId)">
                 {{ cardRoles[c.id]?.res ? initials(cardRoles[c.id]!.res!) : '' }}
               </span>
               <span
                 class="kc-avatar"
                 [class.kc-avatar--rep]="cardRoles[c.id]?.rep"
                 [class.kc-avatar--empty]="!cardRoles[c.id]?.rep"
-                [title]="cardRoles[c.id]?.rep ? ('Reporter : ' + cardRoles[c.id]!.rep) : 'Reporter non défini'">
+                [title]="cardRoles[c.id]?.rep ? ('Reporter : ' + cardRoles[c.id]!.rep) : 'Reporter non défini'"
+                (click)="showAssignmentPopover($event, c, 'reporter', 'Reporter', getTaskFromCard(c)?.reporterId)">
                 {{ cardRoles[c.id]?.rep ? initials(cardRoles[c.id]!.rep!) : '' }}
               </span>
               <span
                 class="kc-avatar"
                 [class.kc-avatar--acc]="cardRoles[c.id]?.acc"
                 [class.kc-avatar--empty]="!cardRoles[c.id]?.acc"
-                [title]="cardRoles[c.id]?.acc ? ('Suiveur : ' + cardRoles[c.id]!.acc) : 'Suiveur non défini'">
+                [title]="cardRoles[c.id]?.acc ? ('Suiveur : ' + cardRoles[c.id]!.acc) : 'Suiveur non défini'"
+                (click)="showAssignmentPopover($event, c, 'accountant', 'Suiveur', getTaskFromCard(c)?.accountantId)">
                 {{ cardRoles[c.id]?.acc ? initials(cardRoles[c.id]!.acc!) : '' }}
               </span>
             </div>
@@ -136,11 +235,16 @@
             <!-- Pied de carte -->
             <div class="kc-footer">
               <span class="kc-phase-tag" *ngIf="c.description">{{ c.description }}</span>
-              <span class="kc-status-tag" [class]="'kc-status-tag--' + st.id">{{ st.label }}</span>
+              <span
+                class="kc-status-tag"
+                [style.background]="getStatusTagBackground(st.id)"
+                [style.color]="getStatusTagColor(st.id)">
+                {{ st.label }}
+              </span>
             </div>
 
             <ng-template cdkDragPreview>
-              <div class="kanban-card kc-drag-preview" [class]="'kc-' + st.id">
+              <div class="kanban-card kc-drag-preview" [style.--status-accent]="getStatusAccentColor(st.id)">
                 <div class="kc-roles-corner">
                   <span class="kc-avatar"
                     [class.kc-avatar--res]="cardRoles[c.id]?.res"
@@ -215,3 +319,16 @@
   [end]="hc.end"
   [status]="hc.status"
 ></app-task-hover-tooltip>
+
+<app-task-assignment-popover
+  *ngIf="assignmentPopover as ap"
+  [visible]="true"
+  [x]="ap.x"
+  [y]="ap.y"
+  [roleLabel]="ap.roleLabel"
+  [selectedUserId]="ap.selectedUserId"
+  [users]="users"
+  (selectedUserIdChange)="ap.selectedUserId = $event"
+  (cancel)="hideAssignmentPopover()"
+  (confirm)="applyAssignmentPopover()"
+></app-task-assignment-popover>

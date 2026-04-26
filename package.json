@@ -7,11 +7,13 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "migrate:mysql:export": "php scripts/export-mysql-to-firestore.php",
     "migrate:auth:import": "node scripts/import-auth-users.mjs",
     "migrate:firestore:import": "node scripts/import-firestore-export.mjs",
     "migrate:firestore:access": "node scripts/rebuild-firestore-access.mjs",
-    "migrate:mysql-to-firestore": "node scripts/migrate-mysql-to-firestore.mjs"
+    "seed:firestore:display-interactions": "node scripts/seed-firestore-display-interactions.mjs",
+    "seed:firestore:project-display-interactions": "node scripts/seed-firestore-project-display-interactions.mjs",
+    "seed:firestore:project-type-phases": "node scripts/seed-firestore-project-type-phases.mjs",
+    "seed:firestore:access-policy": "node scripts/seed-firestore-access-policy.mjs"
   },
   "prettier": {
     "printWidth": 100,

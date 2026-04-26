@@ -1,0 +1,159 @@
+<div class="admin-page">
+  <header class="admin-page__header">
+    <div>
+      <p class="admin-page__eyebrow">Administration</p>
+      <h2>Admin page</h2>
+      <p class="admin-page__intro">
+        Cette page est reservée au super user et centralise les informations d'administration de l'application.
+      </p>
+    </div>
+    <span class="admin-page__badge">Super user only</span>
+  </header>
+
+  <section class="admin-page__grid">
+    <article class="admin-card">
+      <h3>Session active</h3>
+      <dl class="admin-kv">
+        <div>
+          <dt>Utilisateur</dt>
+          <dd>{{ auth.user?.label || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Email</dt>
+          <dd>{{ auth.user?.username || '—' }}</dd>
+        </div>
+        <div>
+          <dt>Compte super user attendu</dt>
+          <dd>{{ superUserEmail }}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="admin-card">
+      <h3>Contexte applicatif</h3>
+      <dl class="admin-kv">
+        <div>
+          <dt>Projet actif</dt>
+          <dd>{{ projectService.currentProjectId || 'Aucun projet ouvert' }}</dd>
+        </div>
+        <div>
+          <dt>Backend canonique</dt>
+          <dd>Firebase Firestore Cloud</dd>
+        </div>
+        <div>
+          <dt>Perimetre</dt>
+          <dd>Administration de l'application</dd>
+        </div>
+      </dl>
+    </article>
+  </section>
+
+  <section class="admin-page__crud">
+    <article class="admin-card">
+      <div class="admin-card__header">
+        <h3>Créer un projectType</h3>
+        <button type="button" class="btn btn-add" (click)="createProjectType()" [disabled]="projectTypeActionState === 'saving'">
+          Ajouter
+        </button>
+      </div>
+
+      <div class="admin-form-grid">
+        <label class="admin-field">
+          <span>ID document (optionnel)</span>
+          <input type="text" [(ngModel)]="createForm.id" placeholder="ex: prince2" />
+        </label>
+
+        <label class="admin-field">
+          <span>Nom</span>
+          <input type="text" [(ngModel)]="createForm.name" placeholder="Nom du projectType" />
+        </label>
+
+        <label class="admin-field admin-field--full">
+          <span>Description</span>
+          <textarea rows="3" [(ngModel)]="createForm.description" placeholder="Description du projectType"></textarea>
+        </label>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <div class="admin-card__header">
+        <h3>ProjectTypes</h3>
+        <button type="button" class="btn btn-ghost" (click)="loadProjectTypes(selectedProjectTypeId)" [disabled]="isLoadingProjectTypes || projectTypeActionState === 'saving'">
+          Recharger
+        </button>
+      </div>
+
+      @if (isLoadingProjectTypes) {
+        <p class="admin-muted">Chargement des projectTypes…</p>
+      } @else if (projectTypesError) {
+        <p class="admin-error">{{ projectTypesError }}</p>
+      } @else if (projectTypes.length === 0) {
+        <p class="admin-muted">Aucun projectType trouvé.</p>
+      } @else {
+        <div class="admin-type-list">
+          @for (type of projectTypes; track type.id) {
+            <button
+              type="button"
+              class="admin-type-item"
+              [class.is-selected]="type.id === selectedProjectTypeId"
+              (click)="selectProjectType(type.id)">
+              <span class="admin-type-item__title">{{ type.name }}</span>
+              <span class="admin-type-item__meta">{{ type.id }}</span>
+              <span class="admin-type-item__stats">
+                {{ type.phasesCount }} phases · {{ type.activitiesCount }} activités · {{ type.defaultsCount }} defaults
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </article>
+  </section>
+
+  <section class="admin-card admin-card--wide">
+    <div class="admin-card__header">
+      <h3>Modifier le projectType sélectionné</h3>
+      <div class="admin-actions">
+        <button type="button" class="btn btn-primary" (click)="saveProjectType()" [disabled]="!selectedProjectType || projectTypeActionState === 'saving'">
+          {{ projectTypeActionState === 'saving' ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+        <button type="button" class="btn btn-danger-ghost" (click)="deleteProjectType()" [disabled]="!selectedProjectType || projectTypeActionState === 'saving'">
+          Supprimer
+        </button>
+      </div>
+    </div>
+
+    @if (!selectedProjectType) {
+      <p class="admin-muted">Sélectionne un projectType pour afficher et modifier ses informations.</p>
+    } @else {
+      <div class="admin-form-grid">
+        <label class="admin-field">
+          <span>ID document</span>
+          <input type="text" [ngModel]="editForm.id" disabled />
+        </label>
+
+        <label class="admin-field">
+          <span>Nom</span>
+          <input type="text" [(ngModel)]="editForm.name" />
+        </label>
+
+        <label class="admin-field admin-field--full">
+          <span>Description</span>
+          <textarea rows="3" [(ngModel)]="editForm.description"></textarea>
+        </label>
+      </div>
+
+      <div class="admin-type-summary">
+        <div class="admin-summary-chip">{{ selectedProjectType.phases.length }} phases</div>
+        <div class="admin-summary-chip">{{ selectedProjectType.activities.length }} activités</div>
+        <div class="admin-summary-chip">{{ selectedProjectType.activitiesDefault.length }} defaults</div>
+        <div class="admin-summary-chip">{{ selectedProjectType.workflow?.statuses?.length ?? 0 }} statuts workflow</div>
+      </div>
+    }
+
+    @if (projectTypeActionError) {
+      <p class="admin-error">{{ projectTypeActionError }}</p>
+    } @else if (projectTypeActionState === 'saved') {
+      <p class="admin-success">Opération réalisée avec succès.</p>
+    }
+  </section>
+</div>
