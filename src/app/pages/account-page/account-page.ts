@@ -8,6 +8,10 @@ import {
   AbstractControl,
   ValidationErrors,
 } from '@angular/forms';
+import { AuthService } from '../../services/auth.service';
+import { FirebaseSdkService } from '../../services/firebase-sdk.service';
+import { ChangePasswordModalComponent } from '../../shared/change-password-modal/change-password-modal';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import type { ProfileType, AccountRole, AccountModel } from '../../models';
 
@@ -16,13 +20,14 @@ const STORAGE_KEY = 'projectgrid:account';
 @Component({
   selector: 'app-account-page',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ChangePasswordModalComponent],
   templateUrl: './account-page.html',
 })
 export class AccountPage implements OnInit {
   form!: FormGroup; // 👈 initialisé dans ngOnInit
   savedState: 'idle' | 'saved' | 'error' = 'idle';
-  showPassword = false;
+  showChangePasswordModal = false;
+  private storedAccount: AccountModel | null = null;
 
   readonly roles: Array<{ value: AccountRole; label: string }> = [
     { value: 'User', label: 'Utilisateur' },
@@ -38,9 +43,13 @@ export class AccountPage implements OnInit {
     { value: 'guest', label: 'Invité' },
   ];
 
-  constructor(private fb: FormBuilder) {}
+  constructor(
+    private fb: FormBuilder,
+    private auth: AuthService,
+    private firebaseSdk: FirebaseSdkService
+  ) {}
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     this.form = this.fb.group(
       {
         // Profil
@@ -51,16 +60,11 @@ export class AccountPage implements OnInit {
         email: ['', [Validators.required, Validators.email]],
         role: ['User' as AccountRole, [Validators.required]],
         profileType: ['standard' as ProfileType, [Validators.required]],
-
-        // Sécurité
-        currentPassword: [''],
-        newPassword: [''],
-        confirmNewPassword: [''],
-      },
-      { validators: [this.passwordChangeValidator] }
+      }
     );
 
-    const existing = this.readAccount();
+    const firestoreAccount = await this.loadAccountFromFirestore();
+    const existing = firestoreAccount ?? this.readAccount();
     if (existing) {
       this.form.patchValue({
         avatarDataUrl: existing.avatarDataUrl ?? '',
@@ -79,8 +83,22 @@ export class AccountPage implements OnInit {
     return v?.trim() ? v : null;
   }
 
-  togglePasswordVisibility(): void {
-    this.showPassword = !this.showPassword;
+  openChangePasswordModal(): void {
+    this.showChangePasswordModal = true;
+  }
+
+  closeChangePasswordModal(): void {
+    this.showChangePasswordModal = false;
+  }
+
+  onPasswordChanged(): void {
+    this.savedState = 'saved';
+    setTimeout(() => (this.savedState = 'idle'), 1500);
+  }
+
+  isControlInvalid(controlName: string): boolean {
+    const control = this.form.get(controlName);
+    return !!control && control.invalid && (control.touched || control.dirty);
   }
 
   async onAvatarFileSelected(evt: Event): Promise<void> {
@@ -101,7 +119,7 @@ export class AccountPage implements OnInit {
     this.form.patchValue({ avatarDataUrl: '' });
   }
 
-  save(): void {
+  async save(): Promise<void> {
     this.savedState = 'idle';
 
     if (this.form.invalid) {
@@ -111,9 +129,6 @@ export class AccountPage implements OnInit {
     }
 
     const v = this.form.getRawValue();
-
-    const passwordChanged = !!v.newPassword?.trim();
-
     const accountToSave: AccountModel = {
       avatarDataUrl: v.avatarDataUrl?.trim() || undefined,
       username: v.username!.trim(),
@@ -122,21 +137,11 @@ export class AccountPage implements OnInit {
       email: v.email!.trim(),
       role: v.role as AccountRole,
       profileType: v.profileType as ProfileType,
-      passwordLastChangedAt: passwordChanged
-        ? new Date().toISOString()
-        : this.readAccount()?.passwordLastChangedAt,
+      passwordLastChangedAt: this.storedAccount?.passwordLastChangedAt ?? this.readAccount()?.passwordLastChangedAt,
     };
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(accountToSave));
-
-      // UX : reset champs password
-      this.form.patchValue({
-        currentPassword: '',
-        newPassword: '',
-        confirmNewPassword: '',
-      });
-
+      await this.saveAccountToFirestore(accountToSave);
       this.savedState = 'saved';
       setTimeout(() => (this.savedState = 'idle'), 1500);
     } catch {
@@ -145,7 +150,11 @@ export class AccountPage implements OnInit {
   }
 
   reset(): void {
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
     this.form.reset({
       avatarDataUrl: '',
       username: '',
@@ -154,11 +163,67 @@ export class AccountPage implements OnInit {
       email: '',
       role: 'User',
       profileType: 'standard',
-      currentPassword: '',
-      newPassword: '',
-      confirmNewPassword: '',
     });
     this.savedState = 'idle';
+  }
+
+  private async loadAccountFromFirestore(): Promise<AccountModel | null> {
+    const userId = this.getCurrentUserId();
+    if (!userId || !this.firebaseSdk.isConfigured()) return null;
+
+    try {
+      const userRef = doc(this.firebaseSdk.firestore(), 'users', userId);
+      const snapshot = await getDoc(userRef);
+      if (!snapshot.exists()) return null;
+
+      const data = snapshot.data();
+      const accountFromFirestore: AccountModel = {
+        avatarDataUrl: String(data['avatarDataUrl'] ?? '') || undefined,
+        username: String(data['username'] ?? ''),
+        firstName: String(data['firstName'] ?? ''),
+        lastName: String(data['lastName'] ?? ''),
+        email: String(data['email'] ?? ''),
+        role: String(data['role'] ?? 'User') as AccountRole,
+        profileType: String(data['profileType'] ?? 'standard') as ProfileType,
+        passwordLastChangedAt: String(data['passwordLastChangedAt'] ?? '') || undefined,
+      };
+      this.storedAccount = accountFromFirestore;
+      this.form.patchValue({
+        avatarDataUrl: String(data['avatarDataUrl'] ?? ''),
+        username: String(data['username'] ?? ''),
+        firstName: String(data['firstName'] ?? ''),
+        lastName: String(data['lastName'] ?? ''),
+        email: String(data['email'] ?? ''),
+        role: String(data['role'] ?? 'User') as AccountRole,
+        profileType: String(data['profileType'] ?? 'standard') as ProfileType,
+      });
+      return accountFromFirestore;
+    } catch {
+      // Firestore may be temporarily unavailable; keep local fallback if present.
+      return null;
+    }
+  }
+
+  private async saveAccountToFirestore(account: AccountModel): Promise<void> {
+    if (!this.firebaseSdk.isConfigured()) {
+      throw new Error('Firebase not configured');
+    }
+
+    const userId = this.getCurrentUserId();
+    if (!userId) {
+      throw new Error('No authenticated user');
+    }
+
+    const userRef = doc(this.firebaseSdk.firestore(), 'users', userId);
+    await setDoc(
+      userRef,
+      {
+        ...account,
+        uid: userId,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
   }
 
   private readAccount(): AccountModel | null {
@@ -169,17 +234,8 @@ export class AccountPage implements OnInit {
       return null;
     }
   }
-
-  private passwordChangeValidator(group: AbstractControl): ValidationErrors | null {
-    const current = group.get('currentPassword')?.value?.trim() ?? '';
-    const next = group.get('newPassword')?.value?.trim() ?? '';
-    const confirm = group.get('confirmNewPassword')?.value?.trim() ?? '';
-
-    if (!next && !confirm && !current) return null;
-    if (!current) return { currentPasswordRequired: true };
-    if (!next || next.length < 8) return { newPasswordWeak: true };
-    if (next !== confirm) return { newPasswordMismatch: true };
-    return null;
+  private getCurrentUserId(): string | null {
+    return this.auth.user?.id ?? null;
   }
 
   private fileToDataUrl(file: File): Promise<string> {

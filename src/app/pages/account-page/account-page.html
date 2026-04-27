@@ -29,27 +29,27 @@
         </div>
       </div>
 
-      <label class="row">
+      <label class="row" [class.invalid]="isControlInvalid('username')">
         <span class="label">Username</span>
-        <input class="control" type="text" formControlName="username" placeholder="ex: jdupont" />
+        <input class="control" type="text" formControlName="username" placeholder="ex: jdupont" [class.invalid]="isControlInvalid('username')" />
       </label>
-      <div class="error" *ngIf="form.get('username')?.touched && form.get('username')?.invalid">
-        Username requis (min 3 caractères).
-      </div>
+      <div class="error" *ngIf="isControlInvalid('username')">Username requis (min 3 caractères).</div>
 
-      <label class="row">
+      <label class="row" [class.invalid]="isControlInvalid('firstName')">
         <span class="label">Prénom</span>
-        <input class="control" type="text" formControlName="firstName" />
+        <input class="control" type="text" formControlName="firstName" [class.invalid]="isControlInvalid('firstName')" />
       </label>
+        <div class="error" *ngIf="isControlInvalid('firstName')">Prénom requis.</div>
 
-      <label class="row">
+      <label class="row" [class.invalid]="isControlInvalid('lastName')">
         <span class="label">Nom</span>
-        <input class="control" type="text" formControlName="lastName" />
+        <input class="control" type="text" formControlName="lastName" [class.invalid]="isControlInvalid('lastName')" />
       </label>
+        <div class="error" *ngIf="isControlInvalid('lastName')">Nom requis.</div>
 
-      <label class="row">
+      <label class="row" [class.invalid]="isControlInvalid('email')">
         <span class="label">Adresse mail</span>
-        <input class="control" type="email" formControlName="email" placeholder="ex: nom@domaine.com" />
+        <input class="control" type="email" formControlName="email" placeholder="ex: nom@domaine.com" [class.invalid]="isControlInvalid('email')" />
       </label>
       <div class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
         Email invalide.
@@ -74,56 +74,17 @@
     <section class="card">
       <div class="card-title security-title">
         <h3>Sécurité</h3>
-        <button type="button" class="btn small" (click)="togglePasswordVisibility()">
-          {{ showPassword ? 'Masquer' : 'Afficher' }}
-        </button>
       </div>
 
       <p class="hint">
-        Pour changer le mot de passe, saisissez l’actuel + le nouveau (min 8 caractères).
+        Pour changer votre mot de passe, cliquez sur le bouton ci-dessous.
       </p>
 
-      <label class="row">
-        <span class="label">Mot de passe actuel</span>
-        <input
-          class="control"
-          [type]="showPassword ? 'text' : 'password'"
-          formControlName="currentPassword"
-          autocomplete="current-password"
-        />
-      </label>
-
-      <label class="row">
-        <span class="label">Nouveau mot de passe</span>
-        <input
-          class="control"
-          [type]="showPassword ? 'text' : 'password'"
-          formControlName="newPassword"
-          autocomplete="new-password"
-        />
-      </label>
-
-      <label class="row">
-        <span class="label">Confirmer</span>
-        <input
-          class="control"
-          [type]="showPassword ? 'text' : 'password'"
-          formControlName="confirmNewPassword"
-          autocomplete="new-password"
-        />
-      </label>
-
-<div class="error" *ngIf="form.touched && form.errors?.['currentPasswordRequired']">
-  Le mot de passe actuel est requis.
-</div>
-<div class="error" *ngIf="form.touched && form.errors?.['newPasswordWeak']">
-  Nouveau mot de passe trop faible (min 8 caractères).
-</div>
-<div class="error" *ngIf="form.touched && form.errors?.['newPasswordMismatch']">
-  La confirmation ne correspond pas.
-</div>
-
+      <button type="button" class="btn primary" (click)="openChangePasswordModal()">
+        Changer mon mot de passe
+      </button>
     </section>
+
   </form>
 
   <footer class="actions">
@@ -133,6 +94,12 @@
     <span class="status ok" *ngIf="savedState === 'saved'">✅ Sauvegardé</span>
     <span class="status err" *ngIf="savedState === 'error'">⚠️ Vérifie les champs</span>
   </footer>
+
+  <app-change-password-modal
+    *ngIf="showChangePasswordModal"
+    (closeModal)="closeChangePasswordModal()"
+    (passwordChanged)="onPasswordChanged()"
+  />
 </div>
 
 <style>
@@ -158,8 +125,11 @@
   .btn.primary { border-color: #2a6; background: #2a6; color: #fff; }
 
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin: 10px 0; }
+  .row.invalid .label { color: #a33; }
+  .row.invalid .control { border-color: #d0333a; box-shadow: 0 0 0 2px rgba(208, 51, 58, 0.12); }
   .label { color: #333; }
   .control { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px solid #dcdcdc; background: #fff; }
+  .control.invalid { border-color: #d0333a; box-shadow: 0 0 0 2px rgba(208, 51, 58, 0.12); }
 
   .hint { margin: 6px 0 0 0; color: #666; font-size: 12px; }
   .error { margin-top: -6px; color: #a35; font-size: 12px; }
