@@ -26,5 +26,6 @@ export class TaskAssignmentPopover {
   onSelectedUserIdChange(value: string): void {
     this.selectedUserId = value;
     this.selectedUserIdChange.emit(value);
+    this.confirm.emit();
   }
 }

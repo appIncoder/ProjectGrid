@@ -39,6 +39,7 @@ import {
   LinkTooltip,
   ViewMode,
   UserRef,
+  ProjectMilestone,
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
@@ -66,6 +67,11 @@ type TaskHoverCard = {
   status: string;
 };
 
+type GanttMilestoneView = ProjectMilestone & {
+  dayIndex: number;
+  x: number;
+};
+
 @Component({
   selector: 'app-project-roadmap',
   standalone: true,
@@ -89,6 +95,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   @Input() saveError: string | null = null;
 
   @ViewChild('taskEditModal', { static: false }) taskEditModalTpl?: TemplateRef<any>;
+  @ViewChild('milestoneEditModal', { static: false }) milestoneEditModalTpl?: TemplateRef<any>;
   @ViewChild('ganttScroll', { static: false }) ganttScrollRef?: ElementRef<HTMLElement>;
 
   linkTooltip: LinkTooltip | null = null;
@@ -197,7 +204,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   ganttMonths: string[] = [];
   ganttPhaseBands: GanttPhaseBand[] = [];
-  ganttMilestones: { label: string; monthIndex: number }[] = [];
+  ganttMilestones: GanttMilestoneView[] = [];
 
   ganttActivityRows: GanttActivityRow[] = [];
   ganttTasksView: GanttTaskView[] = [];
@@ -349,6 +356,12 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   editedDependencies: EditableDependencyRow[] = [];
   editError: string | null = null;
 
+  milestoneModalTitle = 'Ajouter un jalon';
+  milestoneEditError: string | null = null;
+  editingMilestoneId: string | null = null;
+  editedMilestoneLabel = '';
+  editedMilestoneDate = '';
+
   private clickCandidateTask: GanttTaskView | null = null;
 
   hoveredLinkKey: string | null = null;
@@ -384,6 +397,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
         this.projectService.registerProject(this.project);
         this.ensureProjectDependenciesContainer();
       }
+      this.buildGanttCalendar();
       this.buildRoadmap();
       this.updateGanttLinks();
       this.depsSignature = this.computeDepsSignature();
@@ -575,16 +589,34 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       { id: 'Phase6', label: 'Phase 6', startMonthIndex: 5, endMonthIndex: lastMonthIndex },
     ];
 
-    this.ganttMilestones = [
-      { label: 'Kick-off', monthIndex: 0 },
-      { label: 'Pilote', monthIndex: 2 },
-      { label: 'Go live', monthIndex: 4 },
-    ];
+    this.rebuildGanttMilestones();
 
     this.ganttWidth = this.ganttLeftPadding + this.ganttMonthsCount * this.ganttColWidth + 40;
     this.ganttViewportWidth = Math.max(this.ganttWidth, this.tableContentWidthPx * 2);
 
     this.recomputeTodayIndex();
+  }
+
+  private rebuildGanttMilestones(): void {
+    if (!this.project || !this.ganttStartDate) {
+      this.ganttMilestones = [];
+      return;
+    }
+
+    const totalDays = this.ganttMonthsCount * this.projectService.daysPerMonth;
+    const milestones = this.getProjectMilestones()
+      .map((milestone) => {
+        const dayIndex = this.projectService.parseIsoDateToDayIndex(milestone.date, this.ganttStartDate!);
+        if (dayIndex === null || dayIndex < 0 || dayIndex >= totalDays) return null;
+        return {
+          ...milestone,
+          dayIndex,
+          x: this.ganttLeftPadding + dayIndex * this.dayWidth,
+        };
+      })
+      .filter((item): item is GanttMilestoneView => item !== null);
+
+    this.ganttMilestones = milestones;
   }
 
   private recomputeTodayIndex(): void {
@@ -1573,6 +1605,102 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     }
 
     this.ganttLinksView = links;
+  }
+
+  // =======================
+  // Jalons
+  // =======================
+  private getProjectMilestones(): ProjectMilestone[] {
+    const rows = Array.isArray(this.project?.milestones) ? this.project!.milestones : [];
+    return rows
+      .map((item) => ({
+        id: String(item.id ?? '').trim(),
+        label: String(item.label ?? '').trim(),
+        date: String(item.date ?? '').trim(),
+      }))
+      .filter((item) => !!item.id && !!item.label && /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+      .sort((left, right) => left.date.localeCompare(right.date));
+  }
+
+  openCreateMilestoneModal(): void {
+    if (!this.project || !this.milestoneEditModalTpl) return;
+
+    const today = new Date();
+    this.milestoneModalTitle = 'Ajouter un jalon';
+    this.milestoneEditError = null;
+    this.editingMilestoneId = null;
+    this.editedMilestoneLabel = '';
+    this.editedMilestoneDate = this.projectService.toIsoDate(today);
+
+    this.modalService.open(this.milestoneEditModalTpl, { size: 'sm', centered: true });
+  }
+
+  openEditMilestoneModal(milestone: ProjectMilestone): void {
+    if (!this.project || !this.milestoneEditModalTpl) return;
+
+    this.milestoneModalTitle = 'Modifier le jalon';
+    this.milestoneEditError = null;
+    this.editingMilestoneId = milestone.id;
+    this.editedMilestoneLabel = milestone.label;
+    this.editedMilestoneDate = milestone.date;
+
+    this.modalService.open(this.milestoneEditModalTpl, { size: 'sm', centered: true });
+  }
+
+  saveMilestone(modal: any): void {
+    if (!this.project) {
+      modal.dismiss();
+      return;
+    }
+
+    const label = this.editedMilestoneLabel.trim();
+    const date = this.editedMilestoneDate.trim();
+    if (!label) {
+      this.milestoneEditError = 'Le libellé du jalon est obligatoire.';
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      this.milestoneEditError = 'La date du jalon est obligatoire.';
+      return;
+    }
+
+    const rows = this.getProjectMilestones();
+    const id = this.editingMilestoneId ?? this.createMilestoneId();
+    const next: ProjectMilestone = { id, label, date };
+    const existingIndex = rows.findIndex((item) => item.id === id);
+    if (existingIndex >= 0) rows[existingIndex] = next;
+    else rows.push(next);
+
+    this.project.milestones = rows.sort((left, right) => left.date.localeCompare(right.date));
+    this.ensureTimelineForMilestoneDate(date);
+    this.buildGanttCalendar();
+    this.projectService.markProjectMutated(this.project.id, 'item_updated');
+    modal.close();
+  }
+
+  deleteMilestone(modal: any): void {
+    if (!this.project || !this.editingMilestoneId) {
+      modal.dismiss();
+      return;
+    }
+
+    this.project.milestones = this.getProjectMilestones().filter((item) => item.id !== this.editingMilestoneId);
+    this.buildGanttCalendar();
+    this.projectService.markProjectMutated(this.project.id, 'item_updated');
+    modal.close();
+  }
+
+  private ensureTimelineForMilestoneDate(dateIso: string): void {
+    if (!this.ganttStartDate) return;
+    const dayIndex = this.projectService.parseIsoDateToDayIndex(dateIso, this.ganttStartDate);
+    if (dayIndex !== null && dayIndex >= 0) this.ensureTimelineForEndDay(dayIndex);
+  }
+
+  private createMilestoneId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return `milestone-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
   // =======================

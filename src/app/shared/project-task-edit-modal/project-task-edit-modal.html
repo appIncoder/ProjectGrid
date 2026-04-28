@@ -46,14 +46,14 @@
 
       <div *ngIf="assignPopoverField as field" class="assign-popover">
         <div class="assign-popover-title">{{ getAssignFieldLabel(field) }}</div>
-        <select class="form-select form-select-sm" [(ngModel)]="pendingAssignUserId">
+        <select
+          class="form-select form-select-sm"
+          [ngModel]="pendingAssignUserId"
+          (ngModelChange)="applyAssignSelection($event)"
+        >
           <option value="">— Aucun —</option>
           <option *ngFor="let u of users" [value]="u.id">{{ u.label }} ({{ u.id }})</option>
         </select>
-        <div class="assign-popover-actions">
-          <button type="button" class="assign-icon-btn assign-icon-btn--close" title="Fermer" (click)="closeAssignPopover()">✕</button>
-          <button type="button" class="assign-icon-btn assign-icon-btn--confirm" title="Confirmer" (click)="applyAssignFromPopover()">✓</button>
-        </div>
       </div>
     </div>
   </div>

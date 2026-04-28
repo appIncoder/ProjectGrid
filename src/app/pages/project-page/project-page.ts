@@ -307,6 +307,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       activityMatrix: taskMatrix,
       taskMatrix,
       projectTasksMatrix,
+      milestones: Array.isArray((p as any)?.milestones) ? (p as any).milestones : [],
     } as ProjectDetail;
   }
 }

@@ -17,8 +17,4 @@
     <option value="">— Aucun —</option>
     <option *ngFor="let u of users" [value]="u.id">{{ u.label }} ({{ u.id }})</option>
   </select>
-  <div class="task-assignment-popover__actions">
-    <button type="button" class="task-assignment-popover__icon-btn task-assignment-popover__icon-btn--close" title="Fermer" (click)="cancel.emit()">✕</button>
-    <button type="button" class="task-assignment-popover__icon-btn task-assignment-popover__icon-btn--confirm" title="Confirmer" (click)="confirm.emit()">✓</button>
-  </div>
 </div>

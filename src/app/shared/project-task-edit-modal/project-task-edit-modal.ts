@@ -92,15 +92,10 @@ export class ProjectTaskEditModal {
     this.pendingAssignUserId = '';
   }
 
-  applyAssignFromPopover(): void {
+  applyAssignSelection(value: string): void {
     if (!this.assignPopoverField) return;
-    this.setAssignValue(this.assignPopoverField, this.pendingAssignUserId);
-    this.closeAssignPopover();
-  }
-
-  clearAssignFromPopover(): void {
-    if (!this.assignPopoverField) return;
-    this.setAssignValue(this.assignPopoverField, '');
+    this.pendingAssignUserId = value;
+    this.setAssignValue(this.assignPopoverField, value);
     this.closeAssignPopover();
   }
 

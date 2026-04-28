@@ -693,11 +693,11 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     }
 
     const payload: {
-      reporterId?: string | undefined;
-      accountantId?: string | undefined;
-      responsibleId?: string | undefined;
+      reporterId?: string;
+      accountantId?: string;
+      responsibleId?: string;
     } = {};
-    const value = (this.assignmentPopover.selectedUserId ?? '').trim() || undefined;
+    const value = (this.assignmentPopover.selectedUserId ?? '').trim();
     if (this.assignmentPopover.roleField === 'reporter') payload.reporterId = value;
     if (this.assignmentPopover.roleField === 'accountant') payload.accountantId = value;
     if (this.assignmentPopover.roleField === 'responsible') payload.responsibleId = value;

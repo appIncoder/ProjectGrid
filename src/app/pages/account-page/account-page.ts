@@ -26,6 +26,7 @@ const STORAGE_KEY = 'projectgrid:account';
 export class AccountPage implements OnInit {
   form!: FormGroup; // 👈 initialisé dans ngOnInit
   savedState: 'idle' | 'saved' | 'error' = 'idle';
+  saveErrorMessage = '';
   showChangePasswordModal = false;
   private storedAccount: AccountModel | null = null;
 
@@ -121,9 +122,11 @@ export class AccountPage implements OnInit {
 
   async save(): Promise<void> {
     this.savedState = 'idle';
+    this.saveErrorMessage = '';
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.saveErrorMessage = this.buildValidationMessage();
       this.savedState = 'error';
       return;
     }
@@ -144,9 +147,37 @@ export class AccountPage implements OnInit {
       await this.saveAccountToFirestore(accountToSave);
       this.savedState = 'saved';
       setTimeout(() => (this.savedState = 'idle'), 1500);
-    } catch {
+    } catch (error: any) {
+      console.error('Account save failed:', error);
+      this.saveErrorMessage = 'Échec de la sauvegarde. Vérifie ta connexion ou réessaie plus tard.';
       this.savedState = 'error';
     }
+  }
+
+  private buildValidationMessage(): string {
+    const invalidFields = Object.entries(this.form.controls)
+      .filter(([, control]) => control.invalid)
+      .map(([name]) => {
+        switch (name) {
+          case 'username':
+            return 'Username';
+          case 'firstName':
+            return 'Prénom';
+          case 'lastName':
+            return 'Nom';
+          case 'email':
+            return 'Adresse mail';
+          case 'role':
+            return 'Rôle';
+          case 'profileType':
+            return 'Type de profil';
+          default:
+            return name;
+        }
+      });
+    return invalidFields.length
+      ? `Champs invalides : ${invalidFields.join(', ')}`
+      : 'Certains champs sont invalides.';
   }
 
   reset(): void {
@@ -215,13 +246,24 @@ export class AccountPage implements OnInit {
     }
 
     const userRef = doc(this.firebaseSdk.firestore(), 'users', userId);
+    const accountPayload: Record<string, unknown> = {
+      username: account.username,
+      firstName: account.firstName,
+      lastName: account.lastName,
+      email: account.email,
+      role: account.role,
+      profileType: account.profileType,
+      avatarDataUrl: account.avatarDataUrl ?? null,
+      uid: userId,
+      updatedAt: serverTimestamp(),
+    };
+    if (account.passwordLastChangedAt !== undefined) {
+      accountPayload['passwordLastChangedAt'] = account.passwordLastChangedAt;
+    }
+
     await setDoc(
       userRef,
-      {
-        ...account,
-        uid: userId,
-        updatedAt: serverTimestamp(),
-      },
+      accountPayload,
       { merge: true }
     );
   }

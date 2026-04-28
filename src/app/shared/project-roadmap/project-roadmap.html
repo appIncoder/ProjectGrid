@@ -34,6 +34,9 @@
 
       <button class="roadmap-btn" (click)="centerOnToday()">Aujourd'hui</button>
       <button class="roadmap-btn roadmap-btn--success" (click)="recalculateSchedule()">↻ Recalculer</button>
+      <button class="roadmap-btn roadmap-btn--accent" (click)="openCreateMilestoneModal()">
+        + Ajouter un jalon
+      </button>
 
       <button class="btn btn-add" (click)="openCreateTaskModal()">
         + Ajouter une activité
@@ -264,16 +267,20 @@
                 <path d="M 0 0 L 10 5 L 0 10 z"></path>
               </marker>
             </defs>
-            <g *ngFor="let ms of ganttMilestones">
+            <g
+              *ngFor="let ms of ganttMilestones"
+              class="gantt-milestone"
+              (click)="openEditMilestoneModal(ms)"
+            >
               <circle
                 class="gantt-milestone-dot"
-                [attr.cx]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
+                [attr.cx]="ms.x"
                 [attr.cy]="18"
                 r="4"
               ></circle>
               <text
                 class="gantt-milestone-text"
-                [attr.x]="ganttLeftPadding + ms.monthIndex * ganttColWidth + ganttColWidth / 2"
+                [attr.x]="ms.x"
                 [attr.y]="12"
               >{{ ms.label }}</text>
             </g>
@@ -523,4 +530,46 @@
     (cancel)="modal.dismiss()"
     (save)="saveTaskEdit(modal)"
   ></app-project-task-edit-modal>
+</ng-template>
+
+<!-- ── Modal jalon ─────────────────────────────────────────────────────── -->
+<ng-template #milestoneEditModal let-modal>
+  <div class="modal-header py-2">
+    <h5 class="modal-title fs-6 mb-0">{{ milestoneModalTitle }}</h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+  </div>
+
+  <div class="modal-body">
+    <div *ngIf="milestoneEditError" class="alert alert-danger py-2 small mb-3">
+      {{ milestoneEditError }}
+    </div>
+
+    <label class="form-label form-label-sm">Libellé</label>
+    <input
+      class="form-control form-control-sm mb-3"
+      [(ngModel)]="editedMilestoneLabel"
+      maxlength="40"
+      placeholder="ex: Go live"
+    />
+
+    <label class="form-label form-label-sm">Date</label>
+    <input
+      type="date"
+      class="form-control form-control-sm"
+      [(ngModel)]="editedMilestoneDate"
+    />
+  </div>
+
+  <div class="modal-footer milestone-modal-footer">
+    <button
+      *ngIf="editingMilestoneId"
+      type="button"
+      class="btn btn-sm btn-outline-danger"
+      (click)="deleteMilestone(modal)"
+    >
+      Supprimer
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="modal.dismiss()">Annuler</button>
+    <button type="button" class="btn btn-sm btn-primary" (click)="saveMilestone(modal)">Enregistrer</button>
+  </div>
 </ng-template>

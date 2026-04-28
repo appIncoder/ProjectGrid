@@ -92,7 +92,9 @@
     <button type="button" class="btn primary" (click)="save()">Enregistrer</button>
 
     <span class="status ok" *ngIf="savedState === 'saved'">✅ Sauvegardé</span>
-    <span class="status err" *ngIf="savedState === 'error'">⚠️ Vérifie les champs</span>
+    <span class="status err" *ngIf="savedState === 'error'">
+      ⚠️ {{ saveErrorMessage || 'Vérifie les champs' }}
+    </span>
   </footer>
 
   <app-change-password-modal

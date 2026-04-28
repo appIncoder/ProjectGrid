@@ -600,6 +600,19 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     };
   }
 
+  private normalizeMilestones(raw: unknown): ProjectDetail['milestones'] {
+    return this.asArray(raw)
+      .map((item) => {
+        const row = this.asRecord(item) ?? {};
+        const id = this.asString(row['id']);
+        const label = this.asString(row['label']);
+        const date = this.asString(row['date']);
+        return { id, label, date };
+      })
+      .filter((item) => !!item.id && !!item.label && /^\d{4}-\d{2}-\d{2}$/.test(item.date))
+      .sort((left, right) => left.date.localeCompare(right.date));
+  }
+
   private normalizeProjectDetail(docId: string, raw: unknown): ProjectDetail {
     const source = this.asRecord(raw) ?? {};
     const project = this.asRecord(source['payload']) ?? source;
@@ -634,6 +647,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       projectItemsMatrix,
       projectTasksMatrix: projectItemsMatrix,
       displayInteractions,
+      milestones: this.normalizeMilestones(project['milestones']),
       ...(workflow ? { workflow } : {}),
       ganttDependencies: this.asArray(project['ganttDependencies']).map((item) => {
         const row = this.asRecord(item) ?? {};

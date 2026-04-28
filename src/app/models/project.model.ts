@@ -113,6 +113,12 @@ export interface ProjectRiskItem {
   remainingRiskId: string;
 }
 
+export interface ProjectMilestone {
+  id: string;
+  label: string;
+  date: string;
+}
+
 
 export type ProjectDetail = {
   id: string;
@@ -140,6 +146,7 @@ export type ProjectDetail = {
   }>;
   projectHealth?: ProjectHealthItem[];
   projectRisks?: ProjectRiskItem[];
+  milestones?: ProjectMilestone[];
   memberRoles?: Record<string, ProjectRole[]>;
   owner?: string;
   projectManager?: string;

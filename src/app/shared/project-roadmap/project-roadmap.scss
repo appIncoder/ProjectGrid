@@ -555,8 +555,21 @@ $accent-technologie: #E65100;
 }
 
 // ── Jalons ────────────────────────────────────────────────────────────────────
+.gantt-milestone { cursor: pointer; }
 .gantt-milestone-dot  { fill: #8B0000; }
 .gantt-milestone-text { font-size: 0.58rem; fill: #8B0000; text-anchor: middle; }
+.gantt-milestone:hover .gantt-milestone-dot { fill: #B00000; }
+.gantt-milestone:hover .gantt-milestone-text { fill: #B00000; text-decoration: underline; }
+
+.milestone-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .btn-outline-danger {
+    margin-right: auto;
+  }
+}
 
 // ── Grille ────────────────────────────────────────────────────────────────────
 .gantt-row-stripe--even { fill: #FFFFFF; }
