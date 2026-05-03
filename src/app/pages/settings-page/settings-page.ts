@@ -24,6 +24,33 @@ export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string; de
   { value: 'technologyMember',  label: 'Technology Member',  description: 'CRUD sur les tâches technologie assignées' },
 ];
 
+const UNIQUE_MANAGER_ROLES = new Set<ProjectRole>([
+  'projectManager',
+  'businessManager',
+  'changeManager',
+  'technologyManager',
+]);
+
+type AccessRuleValue = 'yes' | 'no' | 'assigned';
+type AccessRoleColumn =
+  | 'sysadmin'
+  | 'owner'
+  | 'projectManager'
+  | 'businessManager'
+  | 'changeManager'
+  | 'technologyManager'
+  | 'projectMember'
+  | 'businessMember'
+  | 'changeMember'
+  | 'technologyMember';
+
+type AccessRuleRow = {
+  section: string;
+  label: string;
+  note?: string;
+  values: Record<AccessRoleColumn, AccessRuleValue>;
+};
+
 @Component({
   selector: 'app-settings-page',
   standalone: true,
@@ -32,8 +59,6 @@ export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string; de
   styleUrls: ['./settings-page.scss'],
 })
 export class SettingsPage implements OnInit, OnDestroy {
-  private static readonly SUPER_USER_EMAIL = 'etienne.darquennes@gmail.com';
-
   // ── Projet sélectionné ───────────────────────────────────────────────────
   projectList: Array<{ id: string; name: string }> = [];
   selectedProjectId = '';
@@ -59,10 +84,122 @@ export class SettingsPage implements OnInit, OnDestroy {
   ];
 
   // ── Onglets ──────────────────────────────────────────────────────────────
-  activeTab: 'project' | 'access' = 'project';
+  activeTab: 'project' | 'access' | 'roles' = 'project';
 
   // ── Membres & rôles (Firestore) ──────────────────────────────────────────
   readonly roleOptions = PROJECT_ROLE_OPTIONS;
+  readonly accessRoleColumns: Array<{ value: AccessRoleColumn; label: string }> = [
+    { value: 'sysadmin', label: 'Sysadmin' },
+    { value: 'owner', label: 'Owner' },
+    { value: 'projectManager', label: 'Project Manager' },
+    { value: 'businessManager', label: 'Business Manager' },
+    { value: 'changeManager', label: 'Change Manager' },
+    { value: 'technologyManager', label: 'Technology Manager' },
+    { value: 'projectMember', label: 'Project Member' },
+    { value: 'businessMember', label: 'Business Member' },
+    { value: 'changeMember', label: 'Change Member' },
+    { value: 'technologyMember', label: 'Technology Member' },
+  ];
+  readonly accessRuleRows: AccessRuleRow[] = [
+    {
+      section: 'Activités',
+      label: 'Créer une activité',
+      note: 'Création via scorecard, board, roadmap et boards détaillés.',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Activités',
+      label: 'Modifier une activité',
+      note: 'Nom, dates, statut, phase, dépendances, assignations.',
+      values: this.rule('yes', 'no', 'yes', 'yes', 'yes', 'yes', 'assigned', 'assigned', 'assigned', 'assigned'),
+    },
+    {
+      section: 'Activités',
+      label: 'Déplacer / faire avancer une activité',
+      note: 'Drag/drop ou changement de statut.',
+      values: this.rule('yes', 'no', 'yes', 'yes', 'yes', 'yes', 'assigned', 'assigned', 'assigned', 'assigned'),
+    },
+    {
+      section: 'Activités',
+      label: 'Supprimer une activité',
+      values: this.rule('yes', 'no', 'yes', 'yes', 'yes', 'yes', 'assigned', 'assigned', 'assigned', 'assigned'),
+    },
+    {
+      section: 'Tâches',
+      label: 'Créer une tâche / item détaillé',
+      note: 'Même règle que la création d’activité.',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Tâches',
+      label: 'Modifier une tâche',
+      note: 'Les members peuvent seulement agir sur leurs tâches assignées.',
+      values: this.rule('yes', 'no', 'yes', 'yes', 'yes', 'yes', 'assigned', 'assigned', 'assigned', 'assigned'),
+    },
+    {
+      section: 'Tâches',
+      label: 'Supprimer une tâche',
+      values: this.rule('yes', 'no', 'yes', 'yes', 'yes', 'yes', 'assigned', 'assigned', 'assigned', 'assigned'),
+    },
+    {
+      section: 'Commentaires',
+      label: 'Ajouter un commentaire',
+      note: 'Les rôles member peuvent commenter dans n’importe quelle activité.',
+      values: this.rule('yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes'),
+    },
+    {
+      section: 'Roadmap',
+      label: 'Modifier la roadmap',
+      note: 'Jalons, dépendances, recalcul, édition complète.',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Roadmap',
+      label: 'Déplacer une barre roadmap',
+      note: 'Les members peuvent replanifier uniquement leurs éléments assignés.',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'assigned', 'assigned', 'assigned', 'assigned'),
+    },
+    {
+      section: 'Risques',
+      label: 'Créer un risque',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Risques',
+      label: 'Modifier un risque',
+      values: this.rule('yes', 'no', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Risques',
+      label: 'Supprimer un risque',
+      values: this.rule('yes', 'no', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Ressources',
+      label: 'Créer une ressource',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Ressources',
+      label: 'Modifier une ressource',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Ressources',
+      label: 'Supprimer une ressource',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Administration',
+      label: 'Modifier les membres et rôles',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+    {
+      section: 'Administration',
+      label: 'Modifier le workflow',
+      values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
+    },
+  ];
 
   members: ProjectMember[] = [];
   allUsers: Array<{ id: string; label: string }> = [];
@@ -72,10 +209,37 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   addForm = { userId: '', roles: [] as ProjectRole[] };
   addError: string | null = null;
+  addRolesDropdownOpen = false;
   editingMemberId: string | null = null;
   editingRoles: ProjectRole[] = [];
 
   private subs = new Subscription();
+
+  private rule(
+    sysadmin: AccessRuleValue,
+    owner: AccessRuleValue,
+    projectManager: AccessRuleValue,
+    businessManager: AccessRuleValue,
+    changeManager: AccessRuleValue,
+    technologyManager: AccessRuleValue,
+    projectMember: AccessRuleValue,
+    businessMember: AccessRuleValue,
+    changeMember: AccessRuleValue,
+    technologyMember: AccessRuleValue,
+  ): Record<AccessRoleColumn, AccessRuleValue> {
+    return {
+      sysadmin,
+      owner,
+      projectManager,
+      businessManager,
+      changeManager,
+      technologyManager,
+      projectMember,
+      businessMember,
+      changeMember,
+      technologyMember,
+    };
+  }
 
   constructor(
     private fb: FormBuilder,
@@ -86,6 +250,18 @@ export class SettingsPage implements OnInit, OnDestroy {
     private projectService: ProjectService,
     private cdr: ChangeDetectorRef,
   ) {}
+
+  getAccessValueSymbol(value: AccessRuleValue): string {
+    if (value === 'yes') return '✓';
+    if (value === 'assigned') return '●';
+    return '✕';
+  }
+
+  getAccessValueLabel(value: AccessRuleValue): string {
+    if (value === 'yes') return 'YES';
+    if (value === 'assigned') return 'ONLY WHEN ASSIGNED';
+    return 'NO';
+  }
 
   ngOnInit(): void {
     this.form = this.fb.group({
@@ -241,8 +417,9 @@ export class SettingsPage implements OnInit, OnDestroy {
   }
 
   get availableUsersForAdd(): Array<{ id: string; label: string }> {
-    const existing = new Set(this.members.map((m) => m.userId));
-    return this.allUsers.filter((u) => !existing.has(u.id));
+    return this.allUsers
+      .slice()
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
   }
 
   isRoleSelectedForAdd(role: ProjectRole): boolean { return this.addForm.roles.includes(role); }
@@ -250,6 +427,35 @@ export class SettingsPage implements OnInit, OnDestroy {
   toggleRoleForAdd(role: ProjectRole): void {
     const idx = this.addForm.roles.indexOf(role);
     idx >= 0 ? this.addForm.roles.splice(idx, 1) : this.addForm.roles.push(role);
+  }
+
+  toggleAddRolesDropdown(): void {
+    this.addRolesDropdownOpen = !this.addRolesDropdownOpen;
+  }
+
+  closeAddRolesDropdown(): void {
+    this.addRolesDropdownOpen = false;
+  }
+
+  getAddRolesSummary(): string {
+    if (!this.addForm.roles.length) return 'Sélectionner un ou plusieurs rôles';
+    if (this.addForm.roles.length === 1) return this.getRoleLabel(this.addForm.roles[0]);
+    return `${this.addForm.roles.length} rôles sélectionnés`;
+  }
+
+  onAddUserSelected(userId: string): void {
+    this.addError = null;
+    this.addForm.userId = userId;
+    const existing = this.members.find((m) => m.userId === this.addForm.userId);
+    this.addForm.roles = existing ? [...existing.roles] : [];
+  }
+
+  isExistingMemberForAdd(userId: string): boolean {
+    return this.members.some((m) => m.userId === userId);
+  }
+
+  get selectedAddMember(): ProjectMember | null {
+    return this.members.find((m) => m.userId === this.addForm.userId) ?? null;
   }
 
   async addMember(): Promise<void> {
@@ -260,9 +466,20 @@ export class SettingsPage implements OnInit, OnDestroy {
     const user = this.allUsers.find((u) => u.id === this.addForm.userId);
     if (!user) return;
 
-    const next = [...this.members, { userId: user.id, label: user.label, roles: [...this.addForm.roles] }];
-    await this.persistMembers(next);
-    if (this.membersSaveState !== 'error') this.addForm = { userId: '', roles: [] };
+    const selectedRoles = Array.from(new Set(this.addForm.roles));
+    const existing = this.members.find((m) => m.userId === user.id);
+    const next = existing
+      ? this.members.map((m) => (
+          m.userId === user.id
+            ? { ...m, label: user.label, roles: selectedRoles }
+            : m
+        ))
+      : [...this.members, { userId: user.id, label: user.label, roles: selectedRoles }];
+    await this.persistMembers(this.assignUniqueManagerRolesToTarget(next, user.id));
+    if (this.membersSaveState !== 'error') {
+      this.addForm = { userId: '', roles: [] };
+      this.closeAddRolesDropdown();
+    }
   }
 
   startEditMember(member: ProjectMember): void {
@@ -284,7 +501,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     const next = this.members.map((m) =>
       m.userId === this.editingMemberId ? { ...m, roles: [...this.editingRoles] } : m
     );
-    await this.persistMembers(next);
+    await this.persistMembers(this.assignUniqueManagerRolesToTarget(next, this.editingMemberId));
     if (this.membersSaveState !== 'error') this.cancelEditMember();
   }
 
@@ -294,10 +511,18 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   private async persistMembers(next: ProjectMember[]): Promise<void> {
     if (!this.project?.id) return;
+    const normalizedMembers = this.normalizeUniqueManagerRoles(next);
     this.membersSaveState = 'saving';
     try {
-      await this.dataService.setProjectMembers(this.project.id, next);
-      this.members = next;
+      await this.dataService.setProjectMembers(this.project.id, normalizedMembers);
+      this.members = normalizedMembers;
+      this.project = {
+        ...this.project,
+        memberRoles: normalizedMembers.reduce<Record<string, ProjectRole[]>>((acc, member) => {
+          acc[member.userId] = [...member.roles];
+          return acc;
+        }, {}),
+      };
       this.membersSaveState = 'saved';
       this.cdr.detectChanges();
       setTimeout(() => { this.membersSaveState = 'idle'; this.cdr.detectChanges(); }, 1500);
@@ -306,6 +531,41 @@ export class SettingsPage implements OnInit, OnDestroy {
       this.membersSaveState = 'error';
       this.cdr.detectChanges();
     }
+  }
+
+  private normalizeUniqueManagerRoles(members: ProjectMember[]): ProjectMember[] {
+    const assignedManagerRoles = new Set<ProjectRole>();
+    return members.map((member) => {
+      const roles: ProjectRole[] = [];
+      for (const role of member.roles) {
+        if (roles.includes(role)) continue;
+        if (UNIQUE_MANAGER_ROLES.has(role)) {
+          if (assignedManagerRoles.has(role)) continue;
+          assignedManagerRoles.add(role);
+        }
+        roles.push(role);
+      }
+      return { ...member, roles };
+    });
+  }
+
+  private assignUniqueManagerRolesToTarget(members: ProjectMember[], targetUserId: string): ProjectMember[] {
+    const target = members.find((member) => member.userId === targetUserId);
+    const targetManagerRoles = new Set<ProjectRole>(
+      (target?.roles ?? []).filter((role) => UNIQUE_MANAGER_ROLES.has(role))
+    );
+
+    if (!targetManagerRoles.size) return this.normalizeUniqueManagerRoles(members);
+
+    return this.normalizeUniqueManagerRoles(
+      members.map((member) => {
+        if (member.userId === targetUserId) return member;
+        return {
+          ...member,
+          roles: member.roles.filter((role) => !targetManagerRoles.has(role)),
+        };
+      })
+    );
   }
 
   getRoleLabel(role: ProjectRole): string {
@@ -333,8 +593,11 @@ export class SettingsPage implements OnInit, OnDestroy {
   get canManageWorkflow(): boolean {
     const user = this.authService.user;
     if (!user?.id) return false;
+    if (this.authService.isAccessCheckActive) {
+      return this.authService.hasEffectiveProjectRole(this.project, ['projectManager']);
+    }
+    if (this.authService.isSuperUser) return true;
     const email = user.username.toLowerCase();
-    if (email === SettingsPage.SUPER_USER_EMAIL) return true;
     const ownerEmail = this.project?.owner?.toLowerCase() ?? '';
     const projectManagerEmail = this.project?.projectManager?.toLowerCase() ?? '';
     return email === ownerEmail || email === projectManagerEmail;

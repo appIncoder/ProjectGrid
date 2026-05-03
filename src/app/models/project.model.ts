@@ -147,6 +147,7 @@ export type ProjectDetail = {
   projectHealth?: ProjectHealthItem[];
   projectRisks?: ProjectRiskItem[];
   milestones?: ProjectMilestone[];
+  otherResources?: ProjectOtherResource[];
   memberRoles?: Record<string, ProjectRole[]>;
   owner?: string;
   projectManager?: string;
@@ -276,4 +277,15 @@ export interface ProjectMember {
   dailyRate?: number;
   /** Jours non travaillés : clé = "YYYY-MM-DD", valeur = type d'absence. */
   dayOffs?: Record<string, DayOffType>;
+}
+
+export type ProjectOtherResourceType = 'material' | 'software' | 'service' | 'other';
+
+export interface ProjectOtherResource {
+  id: string;
+  label: string;
+  type: ProjectOtherResourceType;
+  quantity?: number | null;
+  unit?: string;
+  notes?: string;
 }

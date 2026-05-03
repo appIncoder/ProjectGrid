@@ -10,7 +10,17 @@ import {
 } from '@angular/core';
 
 import { ProjectDataService } from '../../services/project-data.service';
-import type { DayOffType, ProjectDetail, ProjectMember } from '../../models';
+import { ProjectService } from '../../services/project.service';
+import { AuthService } from '../../services/auth.service';
+import { AppButton } from '../design-system/button/button';
+import type {
+  DayOffType,
+  ProjectDetail,
+  ProjectMember,
+  ProjectOtherResource,
+  ProjectOtherResourceType,
+  UserRef,
+} from '../../models';
 
 // ── Jours fériés français 2026 & 2027 ────────────────────────────────────────
 const PUBLIC_HOLIDAYS = new Set<string>([
@@ -79,7 +89,7 @@ export const DAY_OFF_OPTIONS: { type: DayOffType | null; label: string; cssClass
 
 @Component({
   selector: 'app-project-ressources',
-  imports: [],
+  imports: [AppButton],
   templateUrl: './project-ressources.html',
   styleUrl: './project-ressources.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,10 +98,38 @@ export class ProjectRessources {
   readonly project = input<ProjectDetail | null>(null);
 
   private readonly data       = inject(ProjectDataService);
+  private readonly projectService = inject(ProjectService);
+  private readonly authService = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly members   = signal<ProjectMember[]>([]);
+  readonly allUsers  = signal<UserRef[]>([]);
   readonly isLoading = signal(false);
+  readonly activeTab = signal<'human' | 'others'>('human');
+
+  readonly otherResources = computed<ProjectOtherResource[]>(() => {
+    const rows = this.project()?.otherResources ?? [];
+    return rows
+      .map((item) => ({
+        id: String(item.id ?? '').trim(),
+        label: String(item.label ?? '').trim(),
+        type: item.type ?? 'other',
+        quantity: item.quantity ?? null,
+        unit: item.unit ?? '',
+        notes: item.notes ?? '',
+      }))
+      .filter((item) => !!item.id && !!item.label)
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+  });
+
+  readonly availableHumanResources = computed<UserRef[]>(() => {
+    const memberIds = new Set(this.members().map((member) => member.userId));
+    return this.allUsers()
+      .filter((user) => !memberIds.has(user.id))
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+  });
+
+  readonly canAddResource = computed<boolean>(() => this.authService.canAddProjectActivity(this.project()));
 
   // ── Drag multi-select ──────────────────────────────────────────────────────
   /** Vrai dès que la souris s'est déplacée vers une autre cellule pendant le drag */
@@ -113,6 +151,17 @@ export class ProjectRessources {
   readonly weekPopup       = signal<WeekPopupState | null>(null);
   readonly memberEditPopup = signal<MemberEditPopupState | null>(null);
   readonly bulkPopup       = signal<BulkPopupState | null>(null);
+  readonly addResourcePopupOpen = signal(false);
+  readonly addResourceError = signal<string | null>(null);
+  readonly addResourceKind = signal<'human' | 'other'>('human');
+  readonly addHumanUserId = signal('');
+  readonly addHumanAvailability = signal(100);
+  readonly addHumanDailyRate = signal<number | null>(null);
+  readonly addOtherLabel = signal('');
+  readonly addOtherType = signal<ProjectOtherResourceType>('material');
+  readonly addOtherQuantity = signal<number | null>(null);
+  readonly addOtherUnit = signal('');
+  readonly addOtherNotes = signal('');
 
   readonly weekPopupMember = computed<ProjectMember | null>(() => {
     const p = this.weekPopup();
@@ -179,6 +228,7 @@ export class ProjectRessources {
         this.loadMembers(p.id);
       } else {
         this.members.set([]);
+        this.allUsers.set([]);
       }
     });
 
@@ -193,12 +243,149 @@ export class ProjectRessources {
   private async loadMembers(projectId: string): Promise<void> {
     this.isLoading.set(true);
     try {
-      this.members.set(await this.data.listProjectMembers(projectId));
+      const [members, users] = await Promise.all([
+        this.data.listProjectMembers(projectId),
+        this.data.listUsers(projectId).catch(() => [] as UserRef[]),
+      ]);
+      this.members.set(members);
+      this.allUsers.set(users);
     } catch {
       this.members.set([]);
+      this.allUsers.set([]);
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  setActiveTab(tab: 'human' | 'others'): void {
+    this.closeAllPopups();
+    this.activeTab.set(tab);
+  }
+
+  // ── Ajout ressource ───────────────────────────────────────────────────────
+
+  openAddResourcePopup(): void {
+    if (!this.canAddResource()) return;
+    this.closeAllPopups();
+    this.addResourceError.set(null);
+    this.addResourceKind.set(this.activeTab() === 'others' ? 'other' : 'human');
+    this.addHumanUserId.set(this.availableHumanResources()[0]?.id ?? '');
+    this.addHumanAvailability.set(100);
+    this.addHumanDailyRate.set(null);
+    this.addOtherLabel.set('');
+    this.addOtherType.set('material');
+    this.addOtherQuantity.set(null);
+    this.addOtherUnit.set('');
+    this.addOtherNotes.set('');
+    this.addResourcePopupOpen.set(true);
+  }
+
+  closeAddResourcePopup(): void {
+    this.addResourcePopupOpen.set(false);
+    this.addResourceError.set(null);
+  }
+
+  setAddResourceKind(kind: 'human' | 'other'): void {
+    this.addResourceKind.set(kind);
+    this.addResourceError.set(null);
+  }
+
+  onAddHumanUserChange(event: Event): void {
+    this.addHumanUserId.set((event.target as HTMLSelectElement).value);
+  }
+
+  onAddHumanAvailabilityInput(event: Event): void {
+    const val = Number((event.target as HTMLInputElement).value);
+    this.addHumanAvailability.set(Math.min(100, Math.max(0, Number.isFinite(val) ? val : 0)));
+  }
+
+  onAddHumanDailyRateInput(event: Event): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const val = Number(raw);
+    this.addHumanDailyRate.set(raw === '' || !Number.isFinite(val) ? null : val);
+  }
+
+  onAddOtherLabelInput(event: Event): void {
+    this.addOtherLabel.set((event.target as HTMLInputElement).value);
+  }
+
+  onAddOtherTypeChange(event: Event): void {
+    this.addOtherType.set((event.target as HTMLSelectElement).value as ProjectOtherResourceType);
+  }
+
+  onAddOtherQuantityInput(event: Event): void {
+    const raw = (event.target as HTMLInputElement).value;
+    const val = Number(raw);
+    this.addOtherQuantity.set(raw === '' || !Number.isFinite(val) ? null : val);
+  }
+
+  onAddOtherUnitInput(event: Event): void {
+    this.addOtherUnit.set((event.target as HTMLInputElement).value);
+  }
+
+  onAddOtherNotesInput(event: Event): void {
+    this.addOtherNotes.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  saveAddedResource(): void {
+    if (!this.canAddResource()) {
+      this.addResourceError.set("Vous n'avez pas le droit d'ajouter une ressource.");
+      return;
+    }
+    if (this.addResourceKind() === 'human') {
+      this.saveAddedHumanResource();
+      return;
+    }
+    this.saveAddedOtherResource();
+  }
+
+  private saveAddedHumanResource(): void {
+    const userId = this.addHumanUserId().trim();
+    const user = this.availableHumanResources().find((item) => item.id === userId);
+    if (!user) {
+      this.addResourceError.set('Sélectionnez une ressource humaine.');
+      return;
+    }
+
+    const nextMember: ProjectMember = {
+      userId: user.id,
+      label: user.label,
+      roles: ['projectMember'],
+      availability: this.addHumanAvailability(),
+    };
+    const dailyRate = this.addHumanDailyRate();
+    if (dailyRate != null) nextMember.dailyRate = dailyRate;
+
+    this.members.update((list) => [...list, nextMember].sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' })));
+    this.saveMembers();
+    this.activeTab.set('human');
+    this.closeAddResourcePopup();
+  }
+
+  private saveAddedOtherResource(): void {
+    const project = this.project();
+    if (!project) return;
+
+    const label = this.addOtherLabel().trim();
+    if (!label) {
+      this.addResourceError.set('Le nom de la ressource est obligatoire.');
+      return;
+    }
+
+    const nextResource: ProjectOtherResource = {
+      id: this.createResourceId(),
+      label,
+      type: this.addOtherType(),
+      quantity: this.addOtherQuantity(),
+      unit: this.addOtherUnit().trim(),
+      notes: this.addOtherNotes().trim(),
+    };
+
+    project.otherResources = [...(project.otherResources ?? []), nextResource]
+      .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+    this.projectService.markProjectMutated(project.id, 'item_updated');
+    this.activeTab.set('others');
+    this.closeAddResourcePopup();
   }
 
   // ── Drag multi-select ─────────────────────────────────────────────────────
@@ -402,6 +589,14 @@ export class ProjectRessources {
     this.weekPopup.set(null);
     this.memberEditPopup.set(null);
     this.bulkPopup.set(null);
+    this.addResourcePopupOpen.set(false);
+  }
+
+  private createResourceId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
+    return `resource-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
   private getWeekDays(monday: Date): Date[] {
@@ -449,5 +644,18 @@ export class ProjectRessources {
 
   getDailyRate(member: ProjectMember): string {
     return member.dailyRate != null ? member.dailyRate.toLocaleString('fr-FR') : '–';
+  }
+
+  getOtherResourceTypeLabel(type: ProjectOtherResource['type']): string {
+    switch (type) {
+      case 'material':
+        return 'Matériel';
+      case 'software':
+        return 'Logiciel';
+      case 'service':
+        return 'Service';
+      default:
+        return 'Autre';
+    }
   }
 }

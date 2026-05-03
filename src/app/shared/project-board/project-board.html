@@ -24,9 +24,9 @@
         </div>
 
         <div class="board-header-actions">
-          <button type="button" class="btn btn-add" (click)="openCreateTaskModal(taskEditModal)">
-            + Ajouter une activité
-          </button>
+          <app-button variant="primary" size="sm" icon="+" [disabled]="!canAddActivity" (pressed)="openCreateTaskModal(taskEditModal)">
+            Ajouter une activité
+          </app-button>
         </div>
       </div>
     </div>
@@ -194,6 +194,7 @@
             [style.--status-accent]="getStatusAccentColor(st.id)"
             *ngFor="let c of laneBuckets[lane.id][st.id]; trackBy: trackByCardId"
             cdkDrag
+            [cdkDragDisabled]="!canMoveKanbanCard(c)"
             [cdkDragPreviewContainer]="'parent'"
             (mouseenter)="showTaskHoverCard($event, c)"
             (mouseleave)="hideTaskHoverCard()"

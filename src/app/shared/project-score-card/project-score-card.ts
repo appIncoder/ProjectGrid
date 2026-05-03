@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
 import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
+import { AppButton } from '../design-system/button/button';
 
 import {
   ActivityDefinition,
@@ -11,6 +12,7 @@ import {
   ActivityStatus,
   PhaseId,
   ProjectDetail,
+  ProjectRole,
   Task,
   TaskCategory,
   UserRef,
@@ -20,13 +22,14 @@ import {
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
+import { AuthService } from '../../services/auth.service';
 
 // Dependency types are imported from models/gantt.model
 
 @Component({
   selector: 'app-project-score-card',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip],
+  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip, AppButton],
   templateUrl: './project-score-card.html',
   styleUrls: ['./project-score-card.scss'],
 })
@@ -38,6 +41,12 @@ export class ProjectScorecard implements OnChanges {
     Phase4: 'Phase 4',
     Phase5: 'Phase 5',
     Phase6: 'Phase 6',
+  };
+  private readonly managerRoleByActivity: Record<ActivityId, ProjectRole> = {
+    projet: 'projectManager',
+    metier: 'businessManager',
+    changement: 'changeManager',
+    technologie: 'technologyManager',
   };
 
   @Input() project: ProjectDetail | null = null;
@@ -92,6 +101,7 @@ export class ProjectScorecard implements OnChanges {
     taskId: string;
     fromActivityId: ActivityId;
     fromPhase: PhaseId;
+    task: Task;
   } | null = null;
   private dropTarget: { activityId: ActivityId; phase: PhaseId } | null = null;
 
@@ -114,7 +124,8 @@ export class ProjectScorecard implements OnChanges {
 
   constructor(
     private modalService: NgbModal,
-    private projectService: ProjectService
+    private projectService: ProjectService,
+    private authService: AuthService
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -136,6 +147,22 @@ export class ProjectScorecard implements OnChanges {
       if (aSeq !== bSeq) return aSeq - bSeq;
       return (a.label ?? '').localeCompare(b.label ?? '', 'fr', { sensitivity: 'base' });
     });
+  }
+
+  getActivityManagerLabel(activityId: ActivityId): string {
+    const role = this.managerRoleByActivity[activityId];
+    const memberRoles = this.project?.memberRoles ?? {};
+    const managerIds = Object.entries(memberRoles)
+      .filter(([, roles]) => Array.isArray(roles) && roles.includes(role))
+      .map(([userId]) => userId);
+
+    if (!managerIds.length) return '';
+    return managerIds.map((userId) => this.getUserLabel(userId)).join(', ');
+  }
+
+  private getUserLabel(userId: string): string {
+    const user = this.users.find((item) => item.id === userId);
+    return user?.label || user?.email || userId;
   }
 
   getPhases(): PhaseId[] {
@@ -246,6 +273,7 @@ export class ProjectScorecard implements OnChanges {
   onTaskContextMenu(event: MouseEvent, activityId: ActivityId, phase: PhaseId, task: Task): void {
     event.preventDefault();
     event.stopPropagation();
+    if (!this.canManageActivity(activityId) && !this.canMoveAssignedTask(task)) return;
 
     const wrap = this.scorecardWrapRef?.nativeElement;
     if (!wrap) return;
@@ -279,6 +307,11 @@ export class ProjectScorecard implements OnChanges {
   applyQuickStatus(status: ActivityStatus): void {
     if (!this.project || !this.contextMenu) return;
     const ctx = this.contextMenu;
+    const task = this.findTask(ctx.activityId, ctx.phase, ctx.taskId);
+    if (!this.canManageActivity(ctx.activityId) && !this.canMoveAssignedTask(task)) {
+      this.closeContextMenu();
+      return;
+    }
     this.projectService.updateTask({
       projectId: this.project.id,
       activityId: ctx.activityId,
@@ -315,10 +348,15 @@ export class ProjectScorecard implements OnChanges {
   }
 
   onTaskDragStart(event: DragEvent, activityId: ActivityId, phase: PhaseId, task: Task): void {
+    if (!this.canManageActivity(activityId) && !this.canMoveAssignedTask(task)) {
+      event.preventDefault();
+      return;
+    }
     this.draggedTask = {
       taskId: task.id,
       fromActivityId: activityId,
       fromPhase: phase,
+      task,
     };
     event.dataTransfer?.setData('text/plain', task.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
@@ -330,6 +368,7 @@ export class ProjectScorecard implements OnChanges {
   }
 
   onTaskDragOver(event: DragEvent, activityId: ActivityId, phase: PhaseId): void {
+    if (!this.draggedTask || !this.canMoveTask(this.draggedTask.fromActivityId, activityId, this.draggedTask.task)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
     this.dropTarget = { activityId, phase };
@@ -346,10 +385,11 @@ export class ProjectScorecard implements OnChanges {
     this.dropTarget = null;
     if (!this.project || !this.draggedTask) return;
 
-    const { taskId, fromActivityId, fromPhase } = this.draggedTask;
+    const { taskId, fromActivityId, fromPhase, task } = this.draggedTask;
     this.draggedTask = null;
 
     if (fromActivityId === toActivityId && fromPhase === toPhase) return;
+    if (!this.canMoveTask(fromActivityId, toActivityId, task)) return;
 
     this.projectService.updateTask({
       projectId: this.project.id,
@@ -379,6 +419,30 @@ export class ProjectScorecard implements OnChanges {
       default:
         return 'technologyManagement';
     }
+  }
+
+  canManageActivity(activityId: ActivityId): boolean {
+    return this.authService.canManageActivityType(this.project, this.mapActivityToCategory(activityId));
+  }
+
+  canMoveTaskPill(activityId: ActivityId, task: Task): boolean {
+    return this.canManageActivity(activityId) || this.canMoveAssignedTask(task);
+  }
+
+  get canAddActivity(): boolean {
+    return this.authService.canAddProjectActivity(this.project);
+  }
+
+  private canMoveTask(fromActivityId: ActivityId, toActivityId: ActivityId, task: Task | null | undefined): boolean {
+    return (this.canManageActivity(fromActivityId) && this.canManageActivity(toActivityId)) || this.canMoveAssignedTask(task);
+  }
+
+  private canMoveAssignedTask(task: Task | null | undefined): boolean {
+    return this.authService.canMoveAssignedTask(this.project, task);
+  }
+
+  private findTask(activityId: ActivityId, phase: PhaseId, taskId: string): Task | null {
+    return this.project?.taskMatrix?.[activityId]?.[phase]?.find((task) => task.id === taskId) ?? null;
   }
 
   // =======================
@@ -450,6 +514,7 @@ export class ProjectScorecard implements OnChanges {
     task: Task
   ): void {
     if (!this.project) return;
+    if (!this.canManageActivity(activityId)) return;
 
     this.taskBeingEdited = task;
     this.isCreateMode = false;
@@ -481,7 +546,7 @@ export class ProjectScorecard implements OnChanges {
   }
 
   openCreateTaskModal(content: TemplateRef<any>): void {
-    if (!this.project) return;
+    if (!this.project || !this.canAddActivity) return;
 
     const defaultActivityId = this.getActivities()[0]?.id ?? 'projet';
     const defaultPhase = this.getPhases()[0] ?? 'Phase1';
@@ -596,6 +661,10 @@ export class ProjectScorecard implements OnChanges {
     if (this.isCreateMode) {
       const targetPhase: PhaseId = this.editedPhase ?? this.editingPhase ?? 'Phase1';
       const activityId = this.mapCategoryToActivity(this.editedCategory);
+      if (!this.canAddActivity) {
+        this.editError = "Vous n'avez pas le droit d'ajouter une activité pour ce type d'activité.";
+        return;
+      }
       const createdTask = this.projectService.createTask({
         projectId: this.project.id,
         activityId,
@@ -626,6 +695,22 @@ export class ProjectScorecard implements OnChanges {
     } else {
       if (!this.taskBeingEdited || !this.editingActivityId || !this.editingPhase) {
         modal.dismiss();
+        return;
+      }
+      if (!this.canManageActivity(this.editingActivityId)) {
+        this.editError = "Vous n'avez pas le droit de modifier ce type d'activité.";
+        return;
+      }
+
+      const targetActivityId = this.mapCategoryToActivity(this.editedCategory);
+      const statusChanged = this.editedItemStatus !== this.taskBeingEdited.status;
+      const locationChanged = targetActivityId !== this.editingActivityId || (this.editedPhase || this.editingPhase) !== this.editingPhase;
+      if (statusChanged && !this.canManageActivity(this.editingActivityId)) {
+        this.editError = "Vous n'avez pas le droit de faire avancer ce type d'activité.";
+        return;
+      }
+      if (locationChanged && !this.canMoveTask(this.editingActivityId, targetActivityId, this.taskBeingEdited)) {
+        this.editError = "Vous n'avez pas le droit de déplacer cette activité vers ce type d'activité.";
         return;
       }
 

@@ -1,0 +1,119 @@
+:host {
+  display: inline-flex;
+}
+
+:host:has(.pg-button--full) {
+  display: block;
+  width: 100%;
+}
+
+.pg-button {
+  --pg-button-bg: #ffffff;
+  --pg-button-border: #cbd5e1;
+  --pg-button-color: #1f2937;
+  --pg-button-hover-bg: #f1f5f9;
+  --pg-button-hover-border: #94a3b8;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 0;
+  border: 1px solid var(--pg-button-border);
+  border-radius: 7px;
+  background: var(--pg-button-bg);
+  color: var(--pg-button-color);
+  font-family: inherit;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+
+  &:hover:not(:disabled) {
+    background: var(--pg-button-hover-bg);
+    border-color: var(--pg-button-hover-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.pg-button--sm {
+  min-height: 30px;
+  padding: 0.34rem 0.62rem;
+  font-size: 0.78rem;
+}
+
+.pg-button--md {
+  min-height: 36px;
+  padding: 0.46rem 0.82rem;
+  font-size: 0.88rem;
+}
+
+.pg-button--lg {
+  min-height: 42px;
+  padding: 0.58rem 1rem;
+  font-size: 0.96rem;
+}
+
+.pg-button--full {
+  width: 100%;
+}
+
+.pg-button--primary {
+  --pg-button-bg: #2563eb;
+  --pg-button-border: #1d4ed8;
+  --pg-button-color: #ffffff;
+  --pg-button-hover-bg: #1d4ed8;
+  --pg-button-hover-border: #1e40af;
+}
+
+.pg-button--secondary {
+  --pg-button-bg: #ffffff;
+  --pg-button-border: #cbd5e1;
+  --pg-button-color: #334155;
+  --pg-button-hover-bg: #f8fafc;
+  --pg-button-hover-border: #94a3b8;
+}
+
+.pg-button--ghost {
+  --pg-button-bg: transparent;
+  --pg-button-border: transparent;
+  --pg-button-color: #475569;
+  --pg-button-hover-bg: #f1f5f9;
+  --pg-button-hover-border: #e2e8f0;
+}
+
+.pg-button--danger {
+  --pg-button-bg: #dc2626;
+  --pg-button-border: #b91c1c;
+  --pg-button-color: #ffffff;
+  --pg-button-hover-bg: #b91c1c;
+  --pg-button-hover-border: #991b1b;
+}
+
+.pg-button--success {
+  --pg-button-bg: #15803d;
+  --pg-button-border: #166534;
+  --pg-button-color: #ffffff;
+  --pg-button-hover-bg: #166534;
+  --pg-button-hover-border: #14532d;
+}
+
+.pg-button.is-active {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.pg-button__content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

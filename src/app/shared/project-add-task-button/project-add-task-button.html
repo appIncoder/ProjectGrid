@@ -1,8 +1,3 @@
-<button
-  type="button"
-  class="btn btn-add"
-  [disabled]="disabled"
-  (click)="action.emit()"
->
-  + {{ label }}
-</button>
+<app-button variant="primary" size="sm" icon="+" [disabled]="disabled" (pressed)="action.emit()">
+  {{ label }}
+</app-button>

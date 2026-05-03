@@ -36,6 +36,22 @@ type FirestoreMap = Record<string, unknown>;
 
 @Injectable({ providedIn: 'root' })
 export class FirebaseProjectDataBackendService implements ProjectDataBackend {
+  private static readonly PROJECT_ROLES = new Set<ProjectRole>([
+    'projectManager',
+    'businessManager',
+    'changeManager',
+    'technologyManager',
+    'projectMember',
+    'businessMember',
+    'changeMember',
+    'technologyMember',
+  ]);
+  private static readonly UNIQUE_MANAGER_ROLES = new Set<ProjectRole>([
+    'projectManager',
+    'businessManager',
+    'changeManager',
+    'technologyManager',
+  ]);
   private static readonly DEFAULT_PHASES: PhaseId[] = ['Phase1', 'Phase2', 'Phase3', 'Phase4', 'Phase5', 'Phase6'];
   private static readonly DEFAULT_ACTIVITIES: Record<ActivityId, ActivityDefinition> = {
     projet: { id: 'projet', label: 'Gestion du projet', owner: '—', sequence: 1 },
@@ -613,9 +629,55 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       .sort((left, right) => left.date.localeCompare(right.date));
   }
 
+  private normalizeOtherResources(raw: unknown): ProjectDetail['otherResources'] {
+    return this.asArray(raw)
+      .map((item) => {
+        const row = this.asRecord(item) ?? {};
+        const id = this.asString(row['id']);
+        const label = this.asString(row['label']);
+        const type = this.asString(row['type'], 'other') as NonNullable<ProjectDetail['otherResources']>[number]['type'];
+        const quantity = this.asNumberOrNull(row['quantity']);
+        const unit = this.asString(row['unit']);
+        const notes = this.asString(row['notes']);
+        return { id, label, type, quantity, unit, notes };
+      })
+      .filter((item) => !!item.id && !!item.label)
+      .sort((left, right) => left.label.localeCompare(right.label, 'fr', { sensitivity: 'base' }));
+  }
+
+  private normalizeMemberRoles(raw: unknown): Record<string, ProjectRole[]> {
+    const record = this.asRecord(raw) ?? {};
+    const managerRoleOwners = new Set<ProjectRole>();
+    const normalized: Record<string, ProjectRole[]> = {};
+
+    for (const [rawUserId, rawRoles] of Object.entries(record)) {
+      const userId = this.asString(rawUserId);
+      if (!userId) continue;
+
+      const roles: ProjectRole[] = [];
+      for (const rawRole of this.asArray(rawRoles)) {
+        const role = this.asString(rawRole) as ProjectRole;
+        if (!FirebaseProjectDataBackendService.PROJECT_ROLES.has(role)) continue;
+        if (roles.includes(role)) continue;
+
+        if (FirebaseProjectDataBackendService.UNIQUE_MANAGER_ROLES.has(role)) {
+          if (managerRoleOwners.has(role)) continue;
+          managerRoleOwners.add(role);
+        }
+
+        roles.push(role);
+      }
+
+      if (roles.length) normalized[userId] = roles;
+    }
+
+    return normalized;
+  }
+
   private normalizeProjectDetail(docId: string, raw: unknown): ProjectDetail {
     const source = this.asRecord(raw) ?? {};
     const project = this.asRecord(source['payload']) ?? source;
+    const memberRoles = this.normalizeMemberRoles(source['memberRoles'] ?? project['memberRoles']);
     const { phases, phaseDefinitions } = this.normalizePhases(project);
     const activities = this.normalizeActivityDefinitions(project['activities']);
     const activityMatrix = this.normalizeActivityMatrix(project['activityMatrix'] ?? project['taskMatrix'], activities, phases);
@@ -648,6 +710,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       projectTasksMatrix: projectItemsMatrix,
       displayInteractions,
       milestones: this.normalizeMilestones(project['milestones']),
+      otherResources: this.normalizeOtherResources(project['otherResources']),
       ...(workflow ? { workflow } : {}),
       ganttDependencies: this.asArray(project['ganttDependencies']).map((item) => {
         const row = this.asRecord(item) ?? {};
@@ -659,6 +722,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       }).filter((item) => !!item.fromId && !!item.toId),
       projectHealth: this.normalizeProjectHealth(project['projectHealth']),
       projectRisks: this.normalizeProjectRisks(project['projectRisks'], this.asString(project['id'], docId) || docId),
+      memberRoles,
     } as ProjectDetail;
   }
 
@@ -689,7 +753,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const normalized = this.normalizeProjectDetail(project.id, project as unknown);
     const payload = this.sanitizeForFirestore(normalized) as Record<string, unknown>;
     const source = this.asRecord(project as unknown) ?? {};
-    const memberRoles = this.sanitizeForFirestore(source['memberRoles'] ?? payload['memberRoles'] ?? {}) as Record<string, unknown>;
+    const memberRoles = this.sanitizeForFirestore(this.normalizeMemberRoles(source['memberRoles'] ?? payload['memberRoles'] ?? {})) as Record<string, unknown>;
     const memberIds = Object.keys(memberRoles ?? {}).filter((id) => this.asString(id) !== '');
     const projectTypeId = this.asString(source['projectTypeId'] ?? payload['projectTypeId']);
     const createdAt = source['createdAt'] ?? serverTimestamp();
@@ -701,7 +765,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       projectTypeId,
       memberIds,
       memberRoles,
-      payload,
+      payload: { ...payload, memberRoles },
       createdAt,
       updatedAt: serverTimestamp(),
     };
@@ -1194,7 +1258,14 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     if (!snapshot.exists()) return [];
 
     const data = this.asRecord(snapshot.data()) ?? {};
-    const memberRoles = this.asRecord(data['memberRoles']) ?? {};
+    const memberRoles = this.normalizeMemberRoles(data['memberRoles']);
+    const memberDetails = this.asArray(data['projectMembers'])
+      .map((item) => this.asRecord(item) ?? {})
+      .reduce<Record<string, FirestoreMap>>((acc, item) => {
+        const userId = this.asString(item['userId']);
+        if (userId) acc[userId] = item;
+        return acc;
+      }, {});
 
     if (Object.keys(memberRoles).length === 0) return [];
 
@@ -1208,11 +1279,27 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     );
 
     return Object.entries(memberRoles)
-      .map(([userId, roles]): ProjectMember => ({
-        userId,
-        label: userLabelMap.get(userId) ?? userId,
-        roles: this.asArray(roles).map((r) => this.asString(r)).filter(Boolean) as ProjectRole[],
-      }))
+      .map(([userId, roles]): ProjectMember => {
+        const detail = memberDetails[userId] ?? {};
+        const availability = this.asNumberOrNull(detail['availability']);
+        const dailyRate = this.asNumberOrNull(detail['dailyRate']);
+        const dayOffsRaw = this.asRecord(detail['dayOffs']) ?? {};
+        const dayOffs = Object.entries(dayOffsRaw).reduce<NonNullable<ProjectMember['dayOffs']>>((acc, [day, value]) => {
+          const type = this.asString(value);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(day) && (type === 'holiday' || type === 'sick' || type === 'off')) {
+            acc[day] = type;
+          }
+          return acc;
+        }, {});
+        return {
+          userId,
+          label: this.asString(detail['label'], userLabelMap.get(userId) ?? userId) || userId,
+          roles: this.asArray(roles).map((r) => this.asString(r)).filter(Boolean) as ProjectRole[],
+          ...(availability !== null ? { availability } : {}),
+          ...(dailyRate !== null ? { dailyRate } : {}),
+          ...(Object.keys(dayOffs).length ? { dayOffs } : {}),
+        };
+      })
       .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
   }
 
@@ -1221,17 +1308,34 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const id = this.asString(projectId);
     if (!id) throw new Error('Missing project id');
 
-    const memberRoles: Record<string, string[]> = {};
-    for (const m of members) {
-      const uid = this.asString(m.userId);
-      if (!uid) continue;
-      memberRoles[uid] = m.roles.filter(Boolean);
-    }
+    const memberRoles = this.normalizeMemberRoles(
+      members.reduce<Record<string, ProjectRole[]>>((acc, m) => {
+        const uid = this.asString(m.userId);
+        if (!uid) return acc;
+        acc[uid] = this.asArray<ProjectRole>(m.roles).filter(Boolean);
+        return acc;
+      }, {})
+    );
     const memberIds = Object.keys(memberRoles);
+    const projectMembers = members
+      .map((m) => ({
+        userId: this.asString(m.userId),
+        label: this.asString(m.label),
+        availability: this.asNumberOrNull(m.availability),
+        dailyRate: this.asNumberOrNull(m.dailyRate),
+        dayOffs: this.asRecord(m.dayOffs) ?? {},
+      }))
+      .filter((m) => !!m.userId);
 
     await setDoc(
       doc(this.firestore(), 'projects', id),
-      { memberRoles, memberIds, updatedAt: serverTimestamp() },
+      {
+        memberRoles,
+        memberIds,
+        projectMembers: this.sanitizeForFirestore(projectMembers),
+        payload: { memberRoles },
+        updatedAt: serverTimestamp(),
+      },
       { merge: true }
     );
 

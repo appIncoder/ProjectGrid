@@ -8,7 +8,7 @@
     <div class="pm-head-actions">
       <app-project-add-task-button
         label="Ajouter un item"
-        [disabled]="isSaving"
+        [disabled]="isSaving || !canAddActivity"
         (action)="openCreateTaskModal()"
       ></app-project-add-task-button>
       <div class="pm-window-actions">
@@ -84,7 +84,7 @@
                   @for (task of lane.groupedByStatus[col.id]; track task.id) {
                     <div
                       [class]="'pm-task-card ' + getStatusClass(col.id)"
-                      draggable="true"
+                      [attr.draggable]="canMoveTask(task) ? 'true' : 'false'"
                       (dragstart)="onTaskDragStart($event, lane.phase, lane.id, task)"
                       (dragend)="onTaskDragEnd()"
                       (click)="openTaskModal(lane, task)"
@@ -140,6 +140,7 @@
     [isSaving]="isSaving"
     [error]="modalError"
     [title]="isCreateMode ? 'Ajouter une tâche' : 'Modifier la tâche'"
+    [detailsReadonly]="!canManageThisActivityType"
     [taskName]="editedTaskName"
     [parentId]="editedTaskParentId"
     [parentOptions]="availableParentActivities"

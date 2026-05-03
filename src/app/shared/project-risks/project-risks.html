@@ -3,9 +3,9 @@
     <div class="card mb-3">
       <div class="card-body roadmap-card-body d-flex justify-content-between align-items-center">
         <h3 class="h6 mb-0">Gestion des risques</h3>
-        <button type="button" class="btn btn-add" (click)="openAddRiskModal()">
-          + Ajouter un risque
-        </button>
+        <app-button variant="primary" size="sm" icon="+" [disabled]="!canAddRisk" (pressed)="openAddRiskModal()">
+          Ajouter un risque
+        </app-button>
       </div>
     </div>
 
@@ -228,12 +228,12 @@
           </div>
 
           <div class="d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onCancelAddRisk($event)" [disabled]="isCreatingRisk">
+            <app-button variant="secondary" size="sm" (pressed)="onCancelAddRisk($event)" [disabled]="isCreatingRisk">
               Annuler
-            </button>
-            <button type="button" class="btn btn-sm btn-primary" (click)="confirmAddRisk($event)" [disabled]="isCreatingRisk">
+            </app-button>
+            <app-button variant="primary" size="sm" (pressed)="confirmAddRisk($event)" [disabled]="isCreatingRisk || !canAddRisk">
               Confirmer
-            </button>
+            </app-button>
           </div>
         </div>
       </div>

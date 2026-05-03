@@ -12,6 +12,7 @@
     max(300px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
   );
   --task-pill-max-width: 210px;
+  --scorecard-task-radius: 5px;
 }
 
 .scorecard-toolbar {
@@ -157,9 +158,33 @@
   margin-bottom: 0.12rem;
 }
 
-.activity-owner {
+.activity-manager {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  max-width: 100%;
   font-size: 0.72rem;
   line-height: 1.2;
+  color: #475569;
+}
+
+.activity-manager-label {
+  display: inline-flex;
+  align-items: center;
+  height: 1.2rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #1d4ed8;
+  font-size: 0.64rem;
+  font-weight: 750;
+}
+
+.activity-manager strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cell-tasks {
@@ -182,31 +207,84 @@
   text-overflow: clip;
   white-space: normal;
   overflow-wrap: anywhere;
-  border-radius: 6px;
-  border: 1px solid #000;
-  padding: 0.1rem 1.2rem 0.1rem 0.38rem;
+  border-radius: var(--scorecard-task-radius);
+  border: 1px solid #dfe4ec;
+  border-left: 4px solid var(--task-status-accent, #c1c7d0);
+  padding: 0.34rem 1.35rem 0.34rem 0.52rem;
   font-size: 0.72rem;
-  line-height: 1.22;
+  font-weight: 600;
+  line-height: 1.25;
   text-align: left;
   cursor: pointer;
-  color: #000;
+  color: #172b4d;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 253, 0.98) 100%);
+  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.22);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
 
-  &.status-done        { background: #28a745; border-color: #28a745; }
-  &.status-todo        { background: #fff;    border-color: #000;    }
-  &.status-inprogress  { background: #fd7e14; border-color: #fd7e14; }
-  &.status-onhold      { background: #0d6efd; border-color: #0d6efd; }
-  &.status-notdone     { background: #dc3545; border-color: #dc3545; }
-  &.status-notapplicable { background: #adb5bd; border-color: #adb5bd; }
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0.32rem;
+    right: 0.36rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: var(--task-status-accent, #c1c7d0);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
+  }
+
+  &:hover {
+    border-color: #c8d2e1;
+    box-shadow: 0 5px 12px rgba(9, 30, 66, 0.22);
+    transform: translateY(-1px);
+  }
+
+  &.status-done {
+    --task-status-accent: #22c55e;
+    background: linear-gradient(180deg, #f7fffa 0%, #eefbf3 100%);
+  }
+
+  &.status-todo {
+    --task-status-accent: #8993a4;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  }
+
+  &.status-inprogress {
+    --task-status-accent: #f59e0b;
+    background: linear-gradient(180deg, #fffaf0 0%, #fff3d8 100%);
+  }
+
+  &.status-onhold {
+    --task-status-accent: #2563eb;
+    background: linear-gradient(180deg, #f7fbff 0%, #eaf2ff 100%);
+  }
+
+  &.status-notdone {
+    --task-status-accent: #ef4444;
+    background: linear-gradient(180deg, #fff8f7 0%, #ffeceb 100%);
+  }
+
+  &.status-notapplicable {
+    --task-status-accent: #94a3b8;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+    color: #475569;
+  }
 }
 
 .task-pill::after {
   content: '\270E';
   position: absolute;
-  right: 0.42rem;
+  right: 0.34rem;
   top: 50%;
-  transform: translateY(-50%) scale(0.92);
-  font-size: 0.74rem;
+  transform: translateY(-40%) scale(0.9);
+  font-size: 0.68rem;
   opacity: 0;
+  color: #42526e;
   transition: opacity 120ms ease, transform 120ms ease;
 }
 

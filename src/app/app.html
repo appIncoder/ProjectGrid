@@ -78,8 +78,28 @@
           </ng-container>
         </ul>
 
-        <!-- Boutons de test Login / Logout -->
-        <div class="d-flex">
+        <div class="d-flex align-items-center gap-2">
+          <div *ngIf="auth.isRealSysAdmin && auth.isAuthenticated" class="access-check-control">
+            <label class="access-check-label" for="accessCheckRole">Check access as</label>
+            <select
+              id="accessCheckRole"
+              class="access-check-select"
+              [value]="auth.accessCheckMode?.role ?? ''"
+              (change)="onAccessCheckRoleChange($event)">
+              <option value="">Sysadmin réel</option>
+              <option *ngFor="let role of accessCheckRoleOptions" [value]="role.value">
+                {{ role.label }}
+              </option>
+            </select>
+            <button
+              *ngIf="auth.isAccessCheckActive"
+              type="button"
+              class="access-check-exit"
+              (click)="stopAccessCheck()">
+              Quitter
+            </button>
+          </div>
+
           <button *ngIf="auth.isAuthenticated"
                   class="avatar-logout-btn"
                   (click)="logout()">
@@ -107,6 +127,9 @@
       Status :
       <span *ngIf="auth.isAuthenticated" class="text-success">Connecté</span>
       <span *ngIf="!auth.isAuthenticated" class="text-danger">Non connecté</span>
+      <span *ngIf="auth.isAccessCheckActive" class="access-check-status">
+        Mode vérification : {{ auth.accessCheckMode?.label }}
+      </span>
     </div>
     <div>
       © {{ title }}

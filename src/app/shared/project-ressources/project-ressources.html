@@ -6,16 +6,39 @@
       <div class="ressources-toolbar-left">
         <h3 class="h6 mb-1">Ressources : Disponibilités de l'équipe projet</h3>
         <div class="ressources-kpis">
-          <span class="ressources-kpi">Membres : {{ members().length }}</span>
+          <span class="ressources-kpi">Ressources humaines : {{ members().length }}</span>
+          <span class="ressources-kpi">Autres ressources : {{ otherResources().length }}</span>
         </div>
       </div>
+      <app-button variant="primary" size="sm" icon="+" [disabled]="!canAddResource()" (pressed)="openAddResourcePopup()">
+        Ajouter une ressource
+      </app-button>
+    </div>
+
+    <div class="ressources-tabs" role="tablist" aria-label="Ressources">
+      <button
+        type="button"
+        class="ressources-tab"
+        [class.is-active]="activeTab() === 'human'"
+        (click)="setActiveTab('human')"
+      >
+        Ressources humaines
+      </button>
+      <button
+        type="button"
+        class="ressources-tab"
+        [class.is-active]="activeTab() === 'others'"
+        (click)="setActiveTab('others')"
+      >
+        Autres ressources
+      </button>
     </div>
 
     @if (isLoading()) {
       <div class="text-muted small">Chargement des membres…</div>
-    } @else if (members().length === 0) {
+    } @else if (activeTab() === 'human' && members().length === 0) {
       <div class="text-muted small">Aucun membre assigné à ce projet.</div>
-    } @else {
+    } @else if (activeTab() === 'human') {
 
       <div class="ressources-table-wrap">
         <table
@@ -72,14 +95,167 @@
           </tbody>
         </table>
       </div>
+    } @else if (otherResources().length === 0) {
+      <div class="text-muted small">Aucune ressource matérielle, logicielle ou de service n’est renseignée pour ce projet.</div>
+    } @else {
+      <div class="other-resources-list">
+        @for (resource of otherResources(); track resource.id) {
+          <div class="other-resource-row">
+            <div class="other-resource-main">
+              <span class="other-resource-type">{{ getOtherResourceTypeLabel(resource.type) }}</span>
+              <span class="other-resource-name">{{ resource.label }}</span>
+            </div>
+            <span class="other-resource-quantity">
+              @if (resource.quantity != null) {
+                {{ resource.quantity }} {{ resource.unit || '' }}
+              } @else {
+                –
+              }
+            </span>
+            <span class="other-resource-notes">{{ resource.notes || '–' }}</span>
+          </div>
+        }
+      </div>
     }
 
   </div>
 </div>
 
 <!-- ── Backdrop commun ────────────────────────────────────────────────────── -->
-@if (weekPopup() || memberEditPopup() || bulkPopup()) {
-  <div class="popup-backdrop" (click)="closeWeekPopup(); closeMemberEditPopup(); closeBulkPopup()"></div>
+@if (weekPopup() || memberEditPopup() || bulkPopup() || addResourcePopupOpen()) {
+  <div class="popup-backdrop" (click)="closeWeekPopup(); closeMemberEditPopup(); closeBulkPopup(); closeAddResourcePopup()"></div>
+}
+
+<!-- ── Popup ajout ressource ─────────────────────────────────────────────── -->
+@if (addResourcePopupOpen()) {
+  <div class="resource-add-popup" (click)="$event.stopPropagation()">
+    <div class="resource-add-popup__header">
+      <span class="resource-add-popup__title">Ajouter une ressource</span>
+      <button type="button" class="resource-add-popup__close" (click)="closeAddResourcePopup()">✕</button>
+    </div>
+
+    <div class="resource-add-popup__body">
+      @if (addResourceError(); as error) {
+        <div class="resource-add-popup__error">{{ error }}</div>
+      }
+
+      <div class="resource-kind-switch" role="group" aria-label="Type de ressource">
+        <button
+          type="button"
+          class="resource-kind-btn"
+          [class.is-active]="addResourceKind() === 'human'"
+          (click)="setAddResourceKind('human')"
+        >
+          Humaine
+        </button>
+        <button
+          type="button"
+          class="resource-kind-btn"
+          [class.is-active]="addResourceKind() === 'other'"
+          (click)="setAddResourceKind('other')"
+        >
+          Autre
+        </button>
+      </div>
+
+      @if (addResourceKind() === 'human') {
+        <div class="resource-add-popup__field">
+          <label class="resource-add-popup__label">Ressource humaine</label>
+          <select class="form-select form-select-sm" [value]="addHumanUserId()" (change)="onAddHumanUserChange($event)">
+            @for (user of availableHumanResources(); track user.id) {
+              <option [value]="user.id">{{ user.label }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="resource-add-popup__grid">
+          <div class="resource-add-popup__field">
+            <label class="resource-add-popup__label">Disponibilité (%)</label>
+            <input
+              type="number"
+              class="form-control form-control-sm"
+              min="0"
+              max="100"
+              step="5"
+              [value]="addHumanAvailability()"
+              (input)="onAddHumanAvailabilityInput($event)"
+            />
+          </div>
+          <div class="resource-add-popup__field">
+            <label class="resource-add-popup__label">TJM (€)</label>
+            <input
+              type="number"
+              class="form-control form-control-sm"
+              min="0"
+              step="50"
+              [value]="addHumanDailyRate() ?? ''"
+              placeholder="–"
+              (input)="onAddHumanDailyRateInput($event)"
+            />
+          </div>
+        </div>
+      } @else {
+        <div class="resource-add-popup__field">
+          <label class="resource-add-popup__label">Nom de la ressource</label>
+          <input
+            type="text"
+            class="form-control form-control-sm"
+            [value]="addOtherLabel()"
+            placeholder="ex: Licence Jira, Salle projet, Serveur de test"
+            (input)="onAddOtherLabelInput($event)"
+          />
+        </div>
+
+        <div class="resource-add-popup__grid">
+          <div class="resource-add-popup__field">
+            <label class="resource-add-popup__label">Type</label>
+            <select class="form-select form-select-sm" [value]="addOtherType()" (change)="onAddOtherTypeChange($event)">
+              <option value="software">Logicielle</option>
+              <option value="material">Matérielle</option>
+            </select>
+          </div>
+          <div class="resource-add-popup__field">
+            <label class="resource-add-popup__label">Quantité</label>
+            <input
+              type="number"
+              class="form-control form-control-sm"
+              min="0"
+              step="1"
+              [value]="addOtherQuantity() ?? ''"
+              placeholder="–"
+              (input)="onAddOtherQuantityInput($event)"
+            />
+          </div>
+        </div>
+
+        <div class="resource-add-popup__field">
+          <label class="resource-add-popup__label">Unité</label>
+          <input
+            type="text"
+            class="form-control form-control-sm"
+            [value]="addOtherUnit()"
+            placeholder="ex: licences, postes, jours"
+            (input)="onAddOtherUnitInput($event)"
+          />
+        </div>
+
+        <div class="resource-add-popup__field">
+          <label class="resource-add-popup__label">Notes</label>
+          <textarea
+            class="form-control form-control-sm"
+            rows="3"
+            [value]="addOtherNotes()"
+            (input)="onAddOtherNotesInput($event)"
+          ></textarea>
+        </div>
+      }
+    </div>
+
+    <div class="resource-add-popup__footer">
+      <app-button variant="secondary" size="sm" (pressed)="closeAddResourcePopup()">Annuler</app-button>
+      <app-button variant="primary" size="sm" [disabled]="!canAddResource()" (pressed)="saveAddedResource()">Ajouter</app-button>
+    </div>
+  </div>
 }
 
 <!-- ── Popup bulk (multiselect) ───────────────────────────────────────────── -->
@@ -150,8 +326,8 @@
         </div>
       </div>
       <div class="member-edit-popup__footer">
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeMemberEditPopup()">Annuler</button>
-        <button type="button" class="btn btn-sm btn-primary" (click)="saveMemberEdit()">Enregistrer</button>
+        <app-button variant="secondary" size="sm" (pressed)="closeMemberEditPopup()">Annuler</app-button>
+        <app-button variant="primary" size="sm" (pressed)="saveMemberEdit()">Enregistrer</app-button>
       </div>
     </div>
   }

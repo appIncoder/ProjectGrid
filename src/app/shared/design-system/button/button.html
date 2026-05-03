@@ -1,0 +1,16 @@
+<button
+  [attr.type]="type"
+  class="pg-button"
+  [ngClass]="[
+    'pg-button--' + variant,
+    'pg-button--' + size,
+    active ? 'is-active' : '',
+    fullWidth ? 'pg-button--full' : ''
+  ]"
+  [disabled]="disabled"
+  [attr.aria-label]="ariaLabel || null"
+  (click)="onClick($event)"
+>
+  <span *ngIf="icon" class="pg-button__icon" aria-hidden="true">{{ icon }}</span>
+  <span class="pg-button__content"><ng-content></ng-content></span>
+</button>

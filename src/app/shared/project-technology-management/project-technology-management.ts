@@ -5,6 +5,7 @@ import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kan
 import { ProjectAddTaskButton } from '../project-add-task-button/project-add-task-button';
 import { TaskAssignmentPopover } from '../task-assignment-popover/task-assignment-popover';
 import { ProjectDataService } from '../../services/project-data.service';
+import { AuthService } from '../../services/auth.service';
 import type { ActivityStatus, PhaseId, ProjectDetail, ProjectWorkflow, Task, TaskComment, UserRef } from '../../models';
 
 interface ParentActivityLaneVm {
@@ -27,7 +28,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
   @Input() project: ProjectDetail | null = null;
   @Input() users: UserRef[] = [];
 
-  constructor(private projectData: ProjectDataService, private zone: NgZone) {}
+  constructor(private projectData: ProjectDataService, private zone: NgZone, private authService: AuthService) {}
 
   private readonly defaultStatusColumns: Array<{ id: ActivityStatus; label: string }> = [
     { id: 'todo',          label: 'To Do' },
@@ -225,6 +226,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
     roleField: 'reporter' | 'accountant' | 'responsible',
     roleLabel: string
   ): void {
+    if (!this.canManageThisActivityType) return;
     event.stopPropagation();
     const target = event.currentTarget as HTMLElement | null;
     if (!target) return;
@@ -256,7 +258,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
   }
 
   applyAssignmentPopover(): void {
-    if (!this.assignmentPopover) return;
+    if (!this.assignmentPopover || !this.canManageThisActivityType) return;
     const pop = this.assignmentPopover;
 
     void this.mutateAndPersist(async () => {
@@ -273,6 +275,10 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
   }
 
   onTaskDragStart(event: DragEvent, phase: PhaseId, parentId: string, task: Task): void {
+    if (!this.canMoveTask(task)) {
+      event.preventDefault();
+      return;
+    }
     this.draggedTaskCtx = { phase, parentId, taskId: String(task?.id ?? '') };
     event.dataTransfer?.setData('text/plain', this.draggedTaskCtx.taskId);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
@@ -284,6 +290,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
   }
 
   onStatusDragOver(event: DragEvent, lane: ParentActivityLaneVm, targetStatus: ActivityStatus): void {
+    if (!this.canMoveTask(this.getDraggedTaskForMove())) return;
     event.preventDefault();
     this.dragOverTarget = { laneId: lane.id, phase: lane.phase, status: targetStatus };
   }
@@ -310,6 +317,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
     void this.mutateAndPersist(async () => {
       const taskRef = this.findTaskRef(dragged.phase, dragged.parentId, dragged.taskId);
       if (!taskRef) return;
+      if (!this.canMoveTask(taskRef.task)) return;
       taskRef.task.status = targetStatus;
       this.rebuild();
     });
@@ -321,6 +329,24 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
       this.dragOverTarget?.phase === lane.phase &&
       this.dragOverTarget?.status === status
     );
+  }
+
+  get canManageThisActivityType(): boolean {
+    return this.authService.canManageActivityType(this.project, 'technologyManagement');
+  }
+
+  get canAddActivity(): boolean {
+    return this.authService.canAddProjectActivity(this.project);
+  }
+
+  canMoveTask(task: Task | null | undefined): boolean {
+    return this.canManageThisActivityType || this.authService.canMoveAssignedTask(this.project, task);
+  }
+
+  private getDraggedTaskForMove(): Task | null {
+    const ctx = this.draggedTaskCtx;
+    if (!ctx) return null;
+    return this.findTaskRef(ctx.phase, ctx.parentId, ctx.taskId)?.task ?? null;
   }
 
   openTaskModal(lane: ParentActivityLaneVm, task: Task): void {
@@ -338,7 +364,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
   }
 
   openCreateTaskModal(): void {
-    if (!this.project) return;
+    if (!this.project || !this.canAddActivity) return;
     this.ensureProjectTasksMatrix();
     const phase = this.currentPhaseId ?? this.project.phases?.[0] ?? null;
     if (!phase) return;
@@ -374,6 +400,10 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
 
   async saveTaskModal(): Promise<void> {
     if (!this.project || !this.editedTaskPhase) return;
+    if (this.isCreateMode && !this.canAddActivity) {
+      this.modalError = "Vous n'avez pas le droit d'ajouter une activité.";
+      return;
+    }
     const nextName = this.editedTaskName.trim();
     const nextParentId = this.editedTaskParentId.trim();
     if (!nextName) {
@@ -421,6 +451,19 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
       }
       const ref = this.findTaskRef(phase, previousParentId, taskId);
       if (!ref) return;
+      if (!this.canManageThisActivityType) {
+        const comment = this.newCommentText.trim();
+        if (comment) {
+          if (!Array.isArray(ref.task.comments)) ref.task.comments = [];
+          ref.task.comments.push({
+            text: comment,
+            authorName: 'Utilisateur',
+            createdAt: new Date().toISOString(),
+          });
+        }
+        this.rebuild();
+        return;
+      }
       ref.task.label = nextName;
 
       const comment = this.newCommentText.trim();

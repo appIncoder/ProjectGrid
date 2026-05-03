@@ -1,13 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AppButton } from '../design-system/button/button';
 
 import type { TaskComment } from '../../models';
 
 @Component({
   selector: 'app-project-kanban-task-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AppButton],
   templateUrl: './project-kanban-task-modal.html',
   styleUrls: ['./project-kanban-task-modal.scss'],
 })
@@ -16,6 +17,7 @@ export class ProjectKanbanTaskModal {
   @Input() isSaving = false;
   @Input() error: string | null = null;
   @Input() title = 'Modifier la tache';
+  @Input() detailsReadonly = false;
 
   @Input() taskName = '';
   @Input() parentId = '';
@@ -28,6 +30,10 @@ export class ProjectKanbanTaskModal {
   @Output() taskNameChange = new EventEmitter<string>();
   @Output() parentIdChange = new EventEmitter<string>();
   @Output() newCommentTextChange = new EventEmitter<string>();
+
+  get primaryActionLabel(): string {
+    return this.detailsReadonly ? 'Ajouter le commentaire' : 'Enregistrer';
+  }
 
   onClose(): void {
     if (this.isSaving) return;

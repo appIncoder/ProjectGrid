@@ -112,7 +112,7 @@
 
         <!-- Onglet 2 : Gestion des risques -->
         <div [hidden]="activeTab !== 'risks'">
-          <app-project-risks [projectId]="p.id"></app-project-risks>
+          <app-project-risks [projectId]="p.id" [project]="p"></app-project-risks>
         </div>
 
         <!-- Onglet 3 : Conduite du changement (ADKAR) -->

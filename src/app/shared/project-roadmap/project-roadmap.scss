@@ -137,6 +137,12 @@ $accent-technologie: #E65100;
 
   &:hover { background: $ms-header-bg; border-color: $ms-border; }
   &:active { background: $ms-header-alt; }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+    background: #F3F4F6;
+    color: $ms-text-subtle;
+  }
 
   &--active {
     background: #D0E4F7;
@@ -202,6 +208,17 @@ $accent-technologie: #E65100;
   &--date { font-size: 0.7rem; padding: 2px 4px; height: 24px; }
   &--error { border-color: $ms-today; }
   &:focus { outline: 2px solid #5B9BD5; outline-offset: -1px; }
+  &:disabled {
+    cursor: default;
+    background: #F8FAFC;
+    color: $ms-text-subtle;
+  }
+}
+
+.roadmap-select:disabled {
+  cursor: default;
+  background: #F8FAFC;
+  color: $ms-text-subtle;
 }
 
 .roadmap-field-error { font-size: 0.65rem; color: $ms-today; margin-top: 1px; }
@@ -556,10 +573,22 @@ $accent-technologie: #E65100;
 
 // ── Jalons ────────────────────────────────────────────────────────────────────
 .gantt-milestone { cursor: pointer; }
+.gantt-milestone--readonly { cursor: default; }
 .gantt-milestone-dot  { fill: #8B0000; }
 .gantt-milestone-text { font-size: 0.58rem; fill: #8B0000; text-anchor: middle; }
 .gantt-milestone:hover .gantt-milestone-dot { fill: #B00000; }
 .gantt-milestone:hover .gantt-milestone-text { fill: #B00000; text-decoration: underline; }
+
+.gantt-milestone--readonly:hover .gantt-milestone-dot { fill: #8B0000; }
+.gantt-milestone--readonly:hover .gantt-milestone-text { fill: #8B0000; text-decoration: none; }
+
+.roadmap-root--readonly {
+  .gantt-bar,
+  .gantt-bar-bullet,
+  .gantt-bar-bullet-end {
+    cursor: default;
+  }
+}
 
 .milestone-modal-footer {
   display: flex;

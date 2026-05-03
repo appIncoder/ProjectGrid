@@ -60,6 +60,15 @@
         <span class="settings-tab-icon">👥</span>
         Droits d'accès
       </button>
+      <button
+        type="button"
+        class="settings-tab"
+        [class.is-active]="activeTab === 'roles'"
+        (click)="activeTab = 'roles'"
+      >
+        <span class="settings-tab-icon">▦</span>
+        Roles
+      </button>
     </nav>
 
     <!-- ══════════════════════════════════════════════════════════
@@ -243,18 +252,6 @@
             Les droits sont définis par les rôles. Tout accès non listé est <strong>readonly</strong> par défaut.
           </p>
 
-          <!-- Légende des rôles -->
-          <div class="roles-legend">
-            <div class="roles-legend-grid">
-              @for (r of roleOptions; track r.value) {
-                <div class="role-desc">
-                  <span class="role-chip">{{ r.label }}</span>
-                  <span class="role-desc-text">{{ r.description }}</span>
-                </div>
-              }
-            </div>
-          </div>
-
           @if (isMembersLoading) {
             <div class="loading-hint">Chargement des membres…</div>
           }
@@ -341,29 +338,62 @@
 
             <div class="field-row">
               <label class="field-label">Utilisateur</label>
-              <select class="field-control" [(ngModel)]="addForm.userId">
+              <select class="field-control" [ngModel]="addForm.userId" (ngModelChange)="onAddUserSelected($event)">
                 <option value="">-- Sélectionner --</option>
                 @for (u of availableUsersForAdd; track u.id) {
-                  <option [value]="u.id">{{ u.label }}</option>
+                  <option [value]="u.id">
+                    {{ u.label }}{{ isExistingMemberForAdd(u.id) ? ' (déjà membre)' : '' }}
+                  </option>
                 }
               </select>
             </div>
 
+            @if (selectedAddMember) {
+              <div class="add-member-note">
+                Ce membre existe déjà. Les rôles cochés ci-dessous remplaceront sa sélection actuelle.
+              </div>
+            }
+
             <div class="field-row align-start">
               <label class="field-label pt-1">Rôles</label>
-              <div class="role-checkboxes">
-                @for (r of roleOptions; track r.value) {
-                  <label class="role-check">
-                    <input
-                      type="checkbox"
-                      [checked]="isRoleSelectedForAdd(r.value)"
-                      (change)="toggleRoleForAdd(r.value)"
-                    />
-                    <span>
-                      <strong>{{ r.label }}</strong>
-                      <span class="role-desc-text"> — {{ r.description }}</span>
-                    </span>
-                  </label>
+              <div class="add-role-multiselect">
+                <button
+                  type="button"
+                  class="field-control add-role-trigger"
+                  [class.is-open]="addRolesDropdownOpen"
+                  (click)="toggleAddRolesDropdown()"
+                >
+                  <span>{{ getAddRolesSummary() }}</span>
+                  <span class="add-role-trigger-caret">▾</span>
+                </button>
+
+                @if (addRolesDropdownOpen) {
+                  <div class="add-role-menu">
+                    @for (r of roleOptions; track r.value) {
+                      <label class="add-role-option">
+                        <input
+                          type="checkbox"
+                          [checked]="isRoleSelectedForAdd(r.value)"
+                          (change)="toggleRoleForAdd(r.value)"
+                        />
+                        <span>
+                          <strong>{{ r.label }}</strong>
+                          <small>{{ r.description }}</small>
+                        </span>
+                      </label>
+                    }
+                    <div class="add-role-menu-footer">
+                      <button type="button" class="btn btn-xs btn-primary" (click)="closeAddRolesDropdown()">OK</button>
+                    </div>
+                  </div>
+                }
+
+                @if (addForm.roles.length > 0) {
+                  <div class="add-role-selection">
+                    @for (role of addForm.roles; track role) {
+                      <span class="role-chip">{{ getRoleLabel(role) }}</span>
+                    }
+                  </div>
                 }
               </div>
             </div>
@@ -375,9 +405,76 @@
                 (click)="addMember()"
                 [disabled]="!addForm.userId || addForm.roles.length === 0 || membersSaveState === 'saving'"
               >
-                {{ membersSaveState === 'saving' ? 'Ajout en cours…' : 'Ajouter' }}
+                {{ membersSaveState === 'saving' ? 'Enregistrement…' : (selectedAddMember ? 'Mettre à jour les rôles' : 'Ajouter') }}
               </button>
             </div>
+          </div>
+        </section>
+
+      </div>
+    }
+
+    <!-- ══════════════════════════════════════════════════════════
+         Onglet 3 : Roles
+         ══════════════════════════════════════════════════════════ -->
+    @if (activeTab === 'roles') {
+      <div class="settings-tab-panel settings-tab-panel--wide" style="padding-left: 1rem; padding-right: 1rem">
+
+        <section class="settings-section card roles-matrix-section">
+          <div class="section-header">
+            <h3>Accès par rôle</h3>
+            <span class="section-badge">Référence</span>
+          </div>
+
+          <p class="section-hint">
+            Cette matrice documente les règles d’accès appliquées dans l’application.
+            Les icônes indiquent YES, NO ou ONLY WHEN ASSIGNED.
+          </p>
+
+          <div class="access-legend">
+            <span class="access-token access-token--yes" aria-hidden="true">✓</span><span>YES</span>
+            <span class="access-token access-token--no" aria-hidden="true">✕</span><span>NO</span>
+            <span class="access-token access-token--assigned" aria-hidden="true">●</span><span>ONLY WHEN ASSIGNED</span>
+          </div>
+
+          <div class="access-matrix-wrap">
+            <table class="access-matrix">
+              <thead>
+                <tr>
+                  <th class="access-type-col">Type d'accès</th>
+                  @for (role of accessRoleColumns; track role.value) {
+                    <th class="access-role-col">{{ role.label }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of accessRuleRows; track row.section + row.label) {
+                  <tr>
+                    <td class="access-type-cell">
+                      <span class="access-section">{{ row.section }}</span>
+                      <span class="access-label">{{ row.label }}</span>
+                      @if (row.note) {
+                        <span class="access-note">{{ row.note }}</span>
+                      }
+                    </td>
+                    @for (role of accessRoleColumns; track role.value) {
+                      <td
+                        class="access-value-cell"
+                        [class.access-value-cell--yes]="row.values[role.value] === 'yes'"
+                        [class.access-value-cell--no]="row.values[role.value] === 'no'"
+                        [class.access-value-cell--assigned]="row.values[role.value] === 'assigned'"
+                        [attr.title]="getAccessValueLabel(row.values[role.value])"
+                        [attr.aria-label]="getAccessValueLabel(row.values[role.value])"
+                      >
+                        <span class="access-value-icon" aria-hidden="true">
+                          {{ getAccessValueSymbol(row.values[role.value]) }}
+                        </span>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
         </section>
 

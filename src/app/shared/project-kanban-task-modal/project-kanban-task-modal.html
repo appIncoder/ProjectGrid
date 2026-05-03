@@ -12,7 +12,7 @@
           type="text"
           [ngModel]="taskName"
           (ngModelChange)="taskNameChange.emit($event)"
-          [disabled]="isSaving"
+          [disabled]="isSaving || detailsReadonly"
         />
       </label>
 
@@ -21,7 +21,7 @@
         <select
           [ngModel]="parentId"
           (ngModelChange)="parentIdChange.emit($event)"
-          [disabled]="isSaving"
+          [disabled]="isSaving || detailsReadonly"
         >
           <option *ngFor="let p of parentOptions" [ngValue]="p.id">{{ p.label }}</option>
         </select>
@@ -56,7 +56,7 @@
 
     <div class="pkm-modal-actions">
       <button type="button" class="pkm-btn-secondary" (click)="onClose()" [disabled]="isSaving">Annuler</button>
-      <button type="button" class="pkm-btn-primary" (click)="save.emit()" [disabled]="isSaving">Enregistrer</button>
+      <button type="button" class="pkm-btn-primary" (click)="save.emit()" [disabled]="isSaving">{{ primaryActionLabel }}</button>
     </div>
   </div>
 </div>

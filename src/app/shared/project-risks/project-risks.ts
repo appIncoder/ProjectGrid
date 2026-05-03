@@ -4,8 +4,10 @@ import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 
-import { RiskCellItem, RiskLevel, RiskStatus, TopRiskExtended } from '../../models';
+import { ProjectDetail, RiskCellItem, RiskLevel, RiskStatus, TopRiskExtended } from '../../models';
 import { ProjectDataService } from '../../services/project-data.service';
+import { AuthService } from '../../services/auth.service';
+import { AppButton } from '../design-system/button/button';
 
 export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   OPEN: 'Ouvert',
@@ -18,12 +20,13 @@ export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
 @Component({
   selector: 'app-project-risks',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, AppButton],
   templateUrl: './project-risks.html',
   styleUrls: ['./project-risks.scss'],
 })
 export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
   @Input() projectId: string | null = null;
+  @Input() project: ProjectDetail | null = null;
 
   riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
   riskProbabilityLevels: string[] = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
@@ -59,6 +62,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
 
   constructor(
     private data: ProjectDataService,
+    private authService: AuthService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -89,6 +93,10 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
   }
   statusOptions: RiskStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'RESOLVED', 'CLOSED'];
   levelOptions: RiskLevel[] = ['low', 'medium', 'high', 'critical'];
+
+  get canAddRisk(): boolean {
+    return this.authService.canAddProjectActivity(this.project);
+  }
 
   // ====== Helpers ======
   private makeRiskKey(impact: string, probability: string): string {
@@ -338,6 +346,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
   }
 
   openAddRiskModal(): void {
+    if (!this.canAddRisk) return;
     this.createRiskError = null;
     this.newRiskForm = {
       title: '',
@@ -508,6 +517,11 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
   async confirmAddRisk(event?: Event): Promise<void> {
     event?.preventDefault();
     event?.stopPropagation();
+
+    if (!this.canAddRisk) {
+      this.createRiskError = "Vous n'avez pas le droit d'ajouter un risque.";
+      return;
+    }
 
     const projectId = (this.projectId ?? '').trim();
     if (!projectId) {

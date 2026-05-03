@@ -1,4 +1,4 @@
-<div class="roadmap-root">
+<div class="roadmap-root" [class.roadmap-root--readonly]="!canEditRoadmap">
   <!-- Side-effect import (ne pas supprimer) -->
   <app-project-task-edit-modal *ngIf="false"></app-project-task-edit-modal>
 
@@ -33,12 +33,12 @@
       <div class="roadmap-toolbar-sep"></div>
 
       <button class="roadmap-btn" (click)="centerOnToday()">Aujourd'hui</button>
-      <button class="roadmap-btn roadmap-btn--success" (click)="recalculateSchedule()">↻ Recalculer</button>
-      <button class="roadmap-btn roadmap-btn--accent" (click)="openCreateMilestoneModal()">
+      <button class="roadmap-btn roadmap-btn--success" [disabled]="!canEditRoadmap" (click)="recalculateSchedule()">↻ Recalculer</button>
+      <button class="roadmap-btn roadmap-btn--accent" [disabled]="!canEditRoadmap" (click)="openCreateMilestoneModal()">
         + Ajouter un jalon
       </button>
 
-      <button class="btn btn-add" (click)="openCreateTaskModal()">
+      <button class="btn btn-add" [disabled]="!canEditRoadmap" (click)="openCreateTaskModal()">
         + Ajouter une activité
       </button>
     </div>
@@ -143,6 +143,7 @@
                     class="roadmap-input roadmap-input--date"
                     [class.roadmap-input--error]="!!tableDateErrors[t.id]"
                     [value]="getTaskStartIsoForTable(t)"
+                    [disabled]="!canMoveRoadmapTask(t)"
                     (change)="onTableStartDateChange(t, ($any($event.target).value))"
                   />
                   @if (tableDateErrors[t.id]) {
@@ -163,6 +164,7 @@
                     class="roadmap-input roadmap-input--date"
                     [class.roadmap-input--error]="!!tableDateErrors[t.id]"
                     [value]="getTaskEndIsoForTable(t)"
+                    [disabled]="!canMoveRoadmapTask(t)"
                     (change)="onTableEndDateChange(t, ($any($event.target).value))"
                   />
                   @if (tableDateErrors[t.id]) {
@@ -210,6 +212,7 @@
                 <select
                   class="roadmap-select roadmap-select--sm"
                   [ngModel]="getInlineDepType(t)"
+                  [disabled]="!canEditRoadmap"
                   (ngModelChange)="onInlineDepTypeChange(t, $event)"
                 >
                   @for (opt of dependencyTypeOptions; track opt.value) {
@@ -227,6 +230,7 @@
                 <select
                   class="roadmap-select roadmap-select--sm"
                   [ngModel]="getInlineDepToId(t)"
+                  [disabled]="!canEditRoadmap"
                   (ngModelChange)="onInlineDepToChange(t, $event)"
                 >
                   <option value="">—</option>
@@ -270,6 +274,7 @@
             <g
               *ngFor="let ms of ganttMilestones"
               class="gantt-milestone"
+              [class.gantt-milestone--readonly]="!canEditRoadmap"
               (click)="openEditMilestoneModal(ms)"
             >
               <circle

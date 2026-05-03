@@ -10,9 +10,9 @@
         </div>
       </div>
       <div class="scorecard-toolbar-actions">
-        <button type="button" class="btn btn-add" (click)="openCreateTaskModal(taskEditModal)">
-          + Ajouter une activité
-        </button>
+        <app-button variant="primary" size="sm" icon="+" [disabled]="!canAddActivity" (pressed)="openCreateTaskModal(taskEditModal)">
+          Ajouter une activité
+        </app-button>
       </div>
     </div>
 
@@ -37,8 +37,9 @@
             <!-- 1ère colonne : thématique + responsable -->
             <td class="text-start activity-cell">
               <div class="activity-name">{{ activity.label }}</div>
-              <div class="activity-owner text-muted">
-                Responsable : <strong>{{ activity.owner }}</strong>
+              <div class="activity-manager" *ngIf="getActivityManagerLabel(activity.id) as managerLabel">
+                <span class="activity-manager-label">Manager</span>
+                <strong>{{ managerLabel }}</strong>
               </div>
             </td>
 
@@ -55,7 +56,7 @@
                   *ngFor="let task of getTasks(activity.id, phase)"
                   class="task-pill"
                   [ngClass]="getStatusClass(task.status)"
-                  draggable="true"
+                  [attr.draggable]="canMoveTaskPill(activity.id, task) ? 'true' : 'false'"
                   (dragstart)="onTaskDragStart($event, activity.id, phase, task)"
                   (dragend)="onTaskDragEnd()"
                   (mouseenter)="showTaskHoverCard($event, task)"

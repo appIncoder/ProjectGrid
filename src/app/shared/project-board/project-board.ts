@@ -23,19 +23,18 @@ import { ProjectService } from '../../services/project.service';
 import { TaskAssignmentPopover } from '../task-assignment-popover/task-assignment-popover';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
 import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
+import { AppButton } from '../design-system/button/button';
 
 // Lane type imported from models (see import above)
 
 @Component({
   selector: 'app-project-board',
   standalone: true,
-  imports: [CommonModule, DragDropModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip, TaskAssignmentPopover],
+  imports: [CommonModule, DragDropModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip, TaskAssignmentPopover, AppButton],
   templateUrl: './project-board.html',
   styleUrls: ['./project-board.scss'],
 })
 export class ProjectBoard implements OnChanges, OnDestroy {
-  private static readonly SUPER_USER_EMAIL = 'etienne.darquennes@gmail.com';
-
   readonly swimlaneFilterOptions: Array<{ value: TaskCategory; label: string }> = [
     { value: 'projectManagement', label: 'Gestion de projet' },
     { value: 'businessManagement', label: 'Gestion du métier' },
@@ -395,9 +394,12 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   get canManageColumnOrder(): boolean {
     const user = this.authService.user;
     if (!user?.id) return false;
+    if (this.authService.isAccessCheckActive) {
+      return this.authService.hasEffectiveProjectRole(this.project, ['projectManager']);
+    }
+    if (this.authService.isSuperUser) return true;
     const email = String(user.username ?? '').trim().toLowerCase();
     if (!email) return false;
-    if (email === ProjectBoard.SUPER_USER_EMAIL) return true;
     const ownerEmail = String(this.project?.owner ?? '').trim().toLowerCase();
     return !!ownerEmail && email === ownerEmail;
   }
@@ -658,6 +660,7 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     selectedUserId?: string | null
   ): void {
     event.stopPropagation();
+    if (!this.canMoveKanbanCard(card)) return;
     const target = event.currentTarget as HTMLElement | null;
     if (!target) return;
 
@@ -691,6 +694,10 @@ export class ProjectBoard implements OnChanges, OnDestroy {
       this.hideAssignmentPopover();
       return;
     }
+    if (!this.canManageLane(parsed.activityId)) {
+      this.hideAssignmentPopover();
+      return;
+    }
 
     const payload: {
       reporterId?: string;
@@ -719,11 +726,13 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   onDrop(laneId: string, status: KanbanStatus, ev: CdkDragDrop<KanbanCard[]>): void {
     this.hideTaskHoverCard();
     const target = this.laneBuckets[laneId][status];
+    const fromLaneId = this.extractLaneIdFromDropId(ev.previousContainer.id);
+    const movedCard = ev.previousContainer.data?.[ev.previousIndex] ?? null;
+    if (!this.canMoveCardBetweenLanes(fromLaneId || laneId, laneId, movedCard)) return;
 
     if (ev.previousContainer === ev.container) {
       moveItemInArray(target, ev.previousIndex, ev.currentIndex);
     } else {
-      const fromLaneId = this.extractLaneIdFromDropId(ev.previousContainer.id);
       const fromStatus = this.extractStatusFromDropId(ev.previousContainer.id);
       const source = this.laneBuckets[fromLaneId]?.[fromStatus] ?? [];
 
@@ -741,11 +750,20 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     this.emitAllCards();
   }
 
+  canMoveKanbanCard(card: KanbanCard): boolean {
+    return this.canManageLane(card.laneId || '') || this.canMoveAssignedCard(card);
+  }
+
+  get canAddActivity(): boolean {
+    return this.authService.canAddProjectActivity(this.project);
+  }
+
   openTaskEditModal(content: TemplateRef<any>, card: KanbanCard): void {
     if (!this.project) return;
 
     const parsed = this.parseFallbackCardId(card.id);
     if (!parsed) return;
+    if (!this.canManageLane(parsed.activityId)) return;
 
     const task = this.project.taskMatrix?.[parsed.activityId]?.[parsed.phase]?.find((t) => t.id === parsed.taskId);
     if (!task) return;
@@ -774,7 +792,7 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   }
 
   openCreateTaskModal(content: TemplateRef<any>, laneId?: string): void {
-    if (!this.project) return;
+    if (!this.project || !this.canAddActivity) return;
 
     const defaultActivityId = (laneId as ActivityId) || (this.lanes[0]?.id as ActivityId) || 'projet';
     const defaultPhase = this.project.phases[0] ?? 'Phase1';
@@ -865,6 +883,10 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     if (this.isCreateMode) {
       const targetPhase: PhaseId = this.editedPhase ?? this.editingPhase ?? 'Phase1';
       const activityId = this.mapCategoryToActivity(this.editedCategory);
+      if (!this.canAddActivity) {
+        this.editError = "Vous n'avez pas le droit d'ajouter une activité pour ce type d'activité.";
+        return;
+      }
       const createdTask = this.projectService.createTask({
         projectId: this.project.id,
         activityId,
@@ -895,6 +917,22 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     } else {
       if (!this.taskBeingEdited || !this.editingActivityId || !this.editingPhase) {
         modal.dismiss();
+        return;
+      }
+      if (!this.canManageLane(this.editingActivityId)) {
+        this.editError = "Vous n'avez pas le droit de modifier ce type d'activité.";
+        return;
+      }
+
+      const targetActivityId = this.mapCategoryToActivity(this.editedCategory);
+      const statusChanged = this.editedItemStatus !== this.taskBeingEdited.status;
+      const locationChanged = targetActivityId !== this.editingActivityId || (this.editedPhase || this.editingPhase) !== this.editingPhase;
+      if (statusChanged && !this.canManageLane(this.editingActivityId)) {
+        this.editError = "Vous n'avez pas le droit de faire avancer ce type d'activité.";
+        return;
+      }
+      if (locationChanged && !this.canMoveCardBetweenLanes(this.editingActivityId, targetActivityId, null, this.taskBeingEdited)) {
+        this.editError = "Vous n'avez pas le droit de déplacer cette activité vers ce type d'activité.";
         return;
       }
 
@@ -941,6 +979,27 @@ export class ProjectBoard implements OnChanges, OnDestroy {
       default:
         return 'technologyManagement';
     }
+  }
+
+  private canManageLane(laneId: string): boolean {
+    return this.authService.canManageActivityType(this.project, this.mapActivityToCategory(laneId as ActivityId));
+  }
+
+  private canMoveCardBetweenLanes(
+    fromLaneId: string,
+    toLaneId: string,
+    card?: KanbanCard | null,
+    task?: Task | null,
+  ): boolean {
+    return (this.canManageLane(fromLaneId) && this.canManageLane(toLaneId)) || this.canMoveAssignedTask(task ?? (card ? this.getTaskFromCard(card) : null));
+  }
+
+  private canMoveAssignedCard(card: KanbanCard): boolean {
+    return this.canMoveAssignedTask(this.getTaskFromCard(card));
+  }
+
+  private canMoveAssignedTask(task: Task | null | undefined): boolean {
+    return this.authService.canMoveAssignedTask(this.project, task);
   }
 
   private mapCategoryToActivity(category: TaskCategory): ActivityId {

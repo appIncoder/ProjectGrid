@@ -43,6 +43,7 @@ import {
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
+import { AuthService } from '../../services/auth.service';
 
 // Task schedule/constraints types imported from models/gantt.model.ts
 type RoadmapColKey = 'task' | 'start' | 'end' | 'phase' | 'progress' | 'linkType' | 'linkedTask';
@@ -372,7 +373,30 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   filterLinksInGantt = false;
   private filterTaskId: string | null = null;
 
-  constructor(private projectService: ProjectService, private modalService: NgbModal) {}
+  constructor(
+    private projectService: ProjectService,
+    private modalService: NgbModal,
+    private authService: AuthService,
+  ) {}
+
+  get canEditRoadmap(): boolean {
+    if (!this.project) return false;
+    if (this.authService.isAccessCheckActive) {
+      return this.authService.hasEffectiveProjectRole(this.project, ['projectManager']);
+    }
+    if (this.authService.isSuperUser) return true;
+    if (this.authService.hasEffectiveProjectRole(this.project, ['projectManager'])) return true;
+
+    const email = String(this.authService.user?.username ?? '').trim().toLowerCase();
+    const ownerEmail = String(this.project.owner ?? '').trim().toLowerCase();
+    return !!email && !!ownerEmail && email === ownerEmail;
+  }
+
+  canMoveRoadmapTask(taskView: GanttTaskView): boolean {
+    if (this.canEditRoadmap) return true;
+    const ctx = this.findContextForTaskId(taskView.id);
+    return this.authService.canMoveAssignedTask(this.project, ctx?.task);
+  }
 
   ngOnInit(): void {
     this.tablePanelWidthPx = 400;
@@ -682,7 +706,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   onInlineDepTypeChange(task: GanttTaskView, type: DependencyType): void {
-    if (!this.project) return;
+    if (!this.project || !this.canEditRoadmap) return;
     this.ensureProjectDependenciesContainer();
 
     const toId = this.getInlineDepToId(task);
@@ -692,7 +716,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   onInlineDepToChange(task: GanttTaskView, toId: string): void {
-    if (!this.project) return;
+    if (!this.project || !this.canEditRoadmap) return;
     this.ensureProjectDependenciesContainer();
 
     const cleanTo = (toId ?? '').trim();
@@ -718,7 +742,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private upsertPrimaryDependency(fromId: string, toId: string, type: DependencyType): void {
-    if (!this.project) return;
+    if (!this.project || !this.canEditRoadmap) return;
     const anyProj = this.project as any;
     const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
 
@@ -739,7 +763,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private removePrimaryDependency(fromId: string): void {
-    if (!this.project) return;
+    if (!this.project || !this.canEditRoadmap) return;
     const anyProj = this.project as any;
     const allDeps: GanttDependency[] = Array.isArray(anyProj.ganttDependencies) ? anyProj.ganttDependencies : [];
 
@@ -1623,7 +1647,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   openCreateMilestoneModal(): void {
-    if (!this.project || !this.milestoneEditModalTpl) return;
+    if (!this.project || !this.milestoneEditModalTpl || !this.canEditRoadmap) return;
 
     const today = new Date();
     this.milestoneModalTitle = 'Ajouter un jalon';
@@ -1636,7 +1660,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   openEditMilestoneModal(milestone: ProjectMilestone): void {
-    if (!this.project || !this.milestoneEditModalTpl) return;
+    if (!this.project || !this.milestoneEditModalTpl || !this.canEditRoadmap) return;
 
     this.milestoneModalTitle = 'Modifier le jalon';
     this.milestoneEditError = null;
@@ -1650,6 +1674,10 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   saveMilestone(modal: any): void {
     if (!this.project) {
       modal.dismiss();
+      return;
+    }
+    if (!this.canEditRoadmap) {
+      this.milestoneEditError = "Vous n'avez pas le droit de modifier la roadmap.";
       return;
     }
 
@@ -1683,6 +1711,10 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       modal.dismiss();
       return;
     }
+    if (!this.canEditRoadmap) {
+      this.milestoneEditError = "Vous n'avez pas le droit de modifier la roadmap.";
+      return;
+    }
 
     this.project.milestones = this.getProjectMilestones().filter((item) => item.id !== this.editingMilestoneId);
     this.buildGanttCalendar();
@@ -1707,7 +1739,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   // ✅ Recalculer (snap contraintes + deps)
   // =======================
   recalculateSchedule(): void {
-    if (!this.project || !this.ganttStartDate) return;
+    if (!this.project || !this.ganttStartDate || !this.canEditRoadmap) return;
 
     // Base: toutes les tâches (hors synthèses)
     const tasksFlat = this.getAllTasksFlat();
@@ -2055,7 +2087,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   // Table -> Gantt + sync -> ProjectService
   // =======================
   onTableStartDateChange(task: GanttTaskView, iso: string): void {
-    if (!this.ganttStartDate || !this.project) return;
+    if (!this.ganttStartDate || !this.project || !this.canMoveRoadmapTask(task)) return;
 
     const start = this.projectService.parseIsoDateToDayIndex(iso, this.ganttStartDate);
     if (start === null) return;
@@ -2076,7 +2108,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   onTableEndDateChange(task: GanttTaskView, iso: string): void {
-    if (!this.ganttStartDate || !this.project) return;
+    if (!this.ganttStartDate || !this.project || !this.canMoveRoadmapTask(task)) return;
 
     const end = this.projectService.parseIsoDateToDayIndex(iso, this.ganttStartDate);
     if (end === null) return;
@@ -2097,7 +2129,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private applyScheduleFromTable(task: GanttTaskView, startDay: number, endDay: number): void {
-    if (!this.project || !this.ganttStartDate) return;
+    if (!this.project || !this.ganttStartDate || !this.canMoveRoadmapTask(task)) return;
 
     this.ensureTimelineForEndDay(endDay);
 
@@ -2127,7 +2159,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private syncTaskDatesToModel(taskView: GanttTaskView): void {
-    if (!this.project || !this.ganttStartDate) return;
+    if (!this.project || !this.ganttStartDate || !this.canMoveRoadmapTask(taskView)) return;
     if (String(taskView.id).startsWith('summary-')) return;
 
     const startDay = taskView.startDayIndex ?? 0;
@@ -2340,7 +2372,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private addDependencyFromLinkDrag(fromId: string, toId: string, side: LinkAnchorSide): void {
-    if (!this.project) return;
+    if (!this.project || !this.canEditRoadmap) return;
     if (!fromId || !toId || fromId === toId) return;
 
     this.ensureProjectDependenciesContainer();
@@ -2389,6 +2421,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   // =======================
   onGanttBarMouseDown(event: MouseEvent, task: GanttTaskView): void {
     if (String(task.id).startsWith('summary-')) return;
+    if (!this.canMoveRoadmapTask(task)) return;
 
     this.dragMode = 'move';
     this.clickCandidateTask = task;
@@ -2408,6 +2441,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   onGanttBarResizeEndMouseDown(event: MouseEvent, task: GanttTaskView): void {
     if (String(task.id).startsWith('summary-')) return;
+    if (!this.canMoveRoadmapTask(task)) return;
+    if (!this.canEditRoadmap && !event.altKey) return;
 
     // Par défaut : création de lien par drag depuis l'extrémité droite.
     // Alt + drag conserve le redimensionnement de fin.
@@ -2462,6 +2497,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   onGanttMouseMove(event: MouseEvent): void {
     if (!this.draggingTask) return;
+    if (!this.canMoveRoadmapTask(this.draggingTask)) return;
 
     if (this.dragMode === 'move') {
       const dx = event.clientX - this.dragStartClientX;
@@ -2540,6 +2576,14 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   onGanttMouseUp(event: MouseEvent): void {
     if (!this.draggingTask) return;
+    if (!this.canMoveRoadmapTask(this.draggingTask)) {
+      this.draggingTask = null;
+      this.dragMode = 'move';
+      this.resizeFixedStartDayIndex = null;
+      this.clearLinkDraft();
+      this.hideHints();
+      return;
+    }
 
     if (this.dragMode === 'link-create') {
       if (
@@ -2646,7 +2690,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private openTaskEditModalFromRoadmap(taskView: GanttTaskView): void {
-    if (!this.project || !this.taskEditModalTpl) return;
+    if (!this.project || !this.taskEditModalTpl || !this.canEditRoadmap) return;
 
     const ctx = this.findContextForTaskId(taskView.id);
     if (!ctx) return;
@@ -2691,7 +2735,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   openCreateTaskModal(): void {
-    if (!this.project || !this.taskEditModalTpl) return;
+    if (!this.project || !this.taskEditModalTpl || !this.authService.canAddProjectActivity(this.project)) return;
 
     const defaultActivityId = this.getOrderedActivities()[0] ?? 'projet';
     const defaultPhase = this.project.phases[0] ?? 'Phase1';
@@ -2772,10 +2816,12 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   addDependencyRow(): void {
+    if (!this.canEditRoadmap) return;
     this.editedDependencies.push({ toId: '', type: 'F2S' });
   }
 
   removeDependencyRow(index: number): void {
+    if (!this.canEditRoadmap) return;
     this.editedDependencies.splice(index, 1);
   }
 
@@ -2786,6 +2832,10 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   saveTaskEdit(modal: any): void {
     if (!this.project) {
       modal.dismiss();
+      return;
+    }
+    if (!this.canEditRoadmap) {
+      this.editError = "Vous n'avez pas le droit de modifier la roadmap.";
       return;
     }
 
