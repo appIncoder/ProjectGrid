@@ -25,10 +25,11 @@ import type {
   ProjectRiskRef,
   ProjectTypeDefaults,
   ProjectTypeRef,
+  ProjectTypeRules,
   UpdateProjectTypePayload,
   UpdateProjectRiskPayload,
 } from './project-data.service';
-import { DEFAULT_WORKFLOW, getProjectTypeFallback, PROJECT_TYPE_FALLBACKS } from './project-type-fallbacks';
+import { DEFAULT_PROJECT_TYPE_RULES, DEFAULT_WORKFLOW, getProjectTypeFallback, PROJECT_TYPE_FALLBACKS } from './project-type-fallbacks';
 import { FirebaseSdkService } from './firebase-sdk.service';
 import { AuthService } from './auth.service';
 
@@ -570,6 +571,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const workflow: ProjectWorkflow = rawWorkflow
       ? this.normalizeWorkflow(rawWorkflow, fallbackWorkflow)
       : fallbackWorkflow;
+    const rules = this.normalizeProjectTypeRules(data['rules'] ?? fallback?.rules);
     const displayInteractions = this.normalizeDisplayInteractions(data['displayInteractions']);
 
     return {
@@ -583,7 +585,26 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       activitiesDefault: mergedDefaults.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
       tasks: mergedDefaults.sort((left, right) => (left.sequence ?? Number.MAX_SAFE_INTEGER) - (right.sequence ?? Number.MAX_SAFE_INTEGER)),
       workflow,
+      rules,
       displayInteractions,
+    };
+  }
+
+  private normalizeProjectTypeRules(raw: unknown): ProjectTypeRules {
+    const row = this.asRecord(raw) ?? {};
+    return {
+      proposePhaseActivityReportWhenPhaseReady: Boolean(
+        row['proposePhaseActivityReportWhenPhaseReady']
+          ?? DEFAULT_PROJECT_TYPE_RULES.proposePhaseActivityReportWhenPhaseReady
+      ),
+      proposePhaseChangeWhenAllActivitiesDoneAfterGo: Boolean(
+        row['proposePhaseChangeWhenAllActivitiesDoneAfterGo']
+          ?? DEFAULT_PROJECT_TYPE_RULES.proposePhaseChangeWhenAllActivitiesDoneAfterGo
+      ),
+      proposeParentActivityClosureWhenAllChildTasksDone: Boolean(
+        row['proposeParentActivityClosureWhenAllChildTasksDone']
+          ?? DEFAULT_PROJECT_TYPE_RULES.proposeParentActivityClosureWhenAllChildTasksDone
+      ),
     };
   }
 
@@ -643,6 +664,33 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       })
       .filter((item) => !!item.id && !!item.label)
       .sort((left, right) => left.label.localeCompare(right.label, 'fr', { sensitivity: 'base' }));
+  }
+
+  private normalizePhaseActivityReports(raw: unknown): ProjectDetail['phaseActivityReports'] {
+    return this.asArray(raw)
+      .map((item) => {
+        const row = this.asRecord(item) ?? {};
+        const id = this.asString(row['id']);
+        const phaseId = this.asString(row['phaseId']) as PhaseId;
+        const phaseLabel = this.asString(row['phaseLabel'] ?? row['phaseId']);
+        const nextPhaseId = this.asString(row['nextPhaseId']) as PhaseId;
+        const nextPhaseLabel = this.asString(row['nextPhaseLabel']);
+        const title = this.asString(row['title']);
+        const content = this.asString(row['content']);
+        const generatedAt = this.asDateString(row['generatedAt']);
+        return {
+          id,
+          phaseId,
+          phaseLabel,
+          ...(nextPhaseId ? { nextPhaseId } : {}),
+          ...(nextPhaseLabel ? { nextPhaseLabel } : {}),
+          title,
+          content,
+          generatedAt,
+        };
+      })
+      .filter((item) => !!item.id && !!item.phaseId && !!item.title && !!item.content && !!item.generatedAt)
+      .sort((left, right) => right.generatedAt.localeCompare(left.generatedAt));
   }
 
   private normalizeMemberRoles(raw: unknown): Record<string, ProjectRole[]> {
@@ -710,6 +758,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       projectTasksMatrix: projectItemsMatrix,
       displayInteractions,
       milestones: this.normalizeMilestones(project['milestones']),
+      phaseActivityReports: this.normalizePhaseActivityReports(project['phaseActivityReports']),
       otherResources: this.normalizeOtherResources(project['otherResources']),
       ...(workflow ? { workflow } : {}),
       ganttDependencies: this.asArray(project['ganttDependencies']).map((item) => {
@@ -916,6 +965,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       activitiesDefault: [],
       tasks: [],
       workflow: this.sanitizeForFirestore(DEFAULT_WORKFLOW),
+      rules: this.sanitizeForFirestore(DEFAULT_PROJECT_TYPE_RULES),
       displayInteractions: this.sanitizeForFirestore(DEFAULT_PROJECT_SETTINGS),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -925,6 +975,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     return this.normalizeProjectTypeDefaults(id, {
       ...baseDoc,
       workflow: DEFAULT_WORKFLOW,
+      rules: DEFAULT_PROJECT_TYPE_RULES,
       displayInteractions: DEFAULT_PROJECT_SETTINGS,
     });
   }

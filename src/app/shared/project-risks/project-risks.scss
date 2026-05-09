@@ -1,3 +1,28 @@
+.project-risks-root {
+  min-height: min(820px, max(560px, calc(100dvh - 15.5rem)));
+}
+
+.project-risks-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0.75rem;
+}
+
+.project-risks-toolbar-card {
+  flex: 0 0 auto;
+}
+
+.risk-matrix-card {
+  flex: 0 0 auto;
+}
+
+.top-risks-table-wrap {
+  flex: 1 1 auto;
+  min-height: 180px;
+  overflow: auto;
+}
+
 .risk-matrix-shell {
   display: grid;
   grid-template-columns: 42px 1fr;

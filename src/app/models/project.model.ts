@@ -119,6 +119,17 @@ export interface ProjectMilestone {
   date: string;
 }
 
+export interface ProjectPhaseActivityReport {
+  id: string;
+  phaseId: PhaseId;
+  phaseLabel: string;
+  nextPhaseId?: PhaseId;
+  nextPhaseLabel?: string;
+  title: string;
+  content: string;
+  generatedAt: string;
+}
+
 
 export type ProjectDetail = {
   id: string;
@@ -147,6 +158,7 @@ export type ProjectDetail = {
   projectHealth?: ProjectHealthItem[];
   projectRisks?: ProjectRiskItem[];
   milestones?: ProjectMilestone[];
+  phaseActivityReports?: ProjectPhaseActivityReport[];
   otherResources?: ProjectOtherResource[];
   memberRoles?: Record<string, ProjectRole[]>;
   owner?: string;

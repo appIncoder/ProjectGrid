@@ -1,6 +1,6 @@
-<div class="card flex-fill">
-  <div class="card-body">
-    <div class="card mb-3">
+<div class="card flex-fill project-risks-root">
+  <div class="card-body project-risks-body">
+    <div class="card mb-2 project-risks-toolbar-card">
       <div class="card-body roadmap-card-body d-flex justify-content-between align-items-center">
         <h3 class="h6 mb-0">Gestion des risques</h3>
         <app-button variant="primary" size="sm" icon="+" [disabled]="!canAddRisk" (pressed)="openAddRiskModal()">
@@ -10,7 +10,7 @@
     </div>
 
     <!-- Matrice des risques -->
-    <div class="card mb-3">
+    <div class="card mb-2 risk-matrix-card">
       <div class="card-body">
         <h3 class="h6 mb-3">Matrice des risques</h3>
 
@@ -63,7 +63,7 @@
     </div>
 
     <h4 class="h6 mb-2">Risques prioritaires</h4>
-    <div class="table-responsive">
+    <div class="table-responsive top-risks-table-wrap">
       <table class="table table-sm align-middle mb-0 top-risks-table">
         <thead>
           <tr>

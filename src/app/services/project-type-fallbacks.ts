@@ -1,4 +1,4 @@
-import type { ProjectTypeDefaults, ProjectWorkflow } from './project-data.service';
+import type { ProjectTypeDefaults, ProjectTypeRules, ProjectWorkflow } from './project-data.service';
 
 export const DEFAULT_WORKFLOW: ProjectWorkflow = {
   statuses: [
@@ -9,6 +9,12 @@ export const DEFAULT_WORKFLOW: ProjectWorkflow = {
     { id: 'notdone',       label: 'Not Done',    sequence: 5 },
     { id: 'notapplicable', label: 'N/A',         sequence: 6 },
   ],
+};
+
+export const DEFAULT_PROJECT_TYPE_RULES: ProjectTypeRules = {
+  proposePhaseActivityReportWhenPhaseReady: true,
+  proposePhaseChangeWhenAllActivitiesDoneAfterGo: true,
+  proposeParentActivityClosureWhenAllChildTasksDone: true,
 };
 
 function derivePhases(rows: ProjectTypeDefaults['activitiesDefault']): ProjectTypeDefaults['phases'] {
@@ -128,6 +134,7 @@ export const PROJECT_TYPE_FALLBACKS: ProjectTypeDefaults[] = [
     activitiesDefault: PMBOK_DEFAULTS,
     tasks: PMBOK_DEFAULTS,
     workflow: DEFAULT_WORKFLOW,
+    rules: DEFAULT_PROJECT_TYPE_RULES,
   },
   {
     projectType: {
@@ -140,6 +147,7 @@ export const PROJECT_TYPE_FALLBACKS: ProjectTypeDefaults[] = [
     activitiesDefault: AGILE_PM_DEFAULTS,
     tasks: AGILE_PM_DEFAULTS,
     workflow: DEFAULT_WORKFLOW,
+    rules: DEFAULT_PROJECT_TYPE_RULES,
   },
   {
     projectType: {
@@ -152,6 +160,7 @@ export const PROJECT_TYPE_FALLBACKS: ProjectTypeDefaults[] = [
     activitiesDefault: PRINCE2_DEFAULTS,
     tasks: PRINCE2_DEFAULTS,
     workflow: DEFAULT_WORKFLOW,
+    rules: DEFAULT_PROJECT_TYPE_RULES,
   },
 ];
 

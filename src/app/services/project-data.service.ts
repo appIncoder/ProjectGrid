@@ -29,10 +29,17 @@ export interface ProjectTypeDefaults {
   activitiesDefault: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
   tasks: Array<{ id: string; label: string; phaseId: string; activityId: string; sequence?: number | null }>;
   workflow?: ProjectWorkflow;
+  rules?: ProjectTypeRules;
   displayInteractions?: ProjectSettings;
 }
 
 export type { ProjectWorkflow };
+
+export interface ProjectTypeRules {
+  proposePhaseActivityReportWhenPhaseReady: boolean;
+  proposePhaseChangeWhenAllActivitiesDoneAfterGo: boolean;
+  proposeParentActivityClosureWhenAllChildTasksDone: boolean;
+}
 
 export interface ProjectHealthDefaultRef {
   healthId: string;
@@ -388,6 +395,18 @@ export class ProjectDataService {
             dateLastUpdated: String(r?.dateLastUpdated ?? '').trim(),
             remainingRiskId: String(r?.remainingRiskId ?? '').trim(),
           }))
+        : [],
+      phaseActivityReports: Array.isArray(raw?.phaseActivityReports)
+        ? raw.phaseActivityReports.map((report: any) => ({
+            id: String(report?.id ?? '').trim(),
+            phaseId: String(report?.phaseId ?? '').trim() as PhaseId,
+            phaseLabel: String(report?.phaseLabel ?? report?.phaseId ?? '').trim(),
+            nextPhaseId: String(report?.nextPhaseId ?? '').trim() as PhaseId,
+            nextPhaseLabel: String(report?.nextPhaseLabel ?? '').trim(),
+            title: String(report?.title ?? '').trim(),
+            content: String(report?.content ?? '').trim(),
+            generatedAt: String(report?.generatedAt ?? '').trim(),
+          })).filter((report: any) => !!report.id && !!report.phaseId && !!report.title && !!report.content)
         : [],
       phases,
       phaseDefinitions: phaseDefinitions as any,

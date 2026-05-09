@@ -1,14 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AppButton } from '../design-system/button/button';
 
 import type { TaskComment } from '../../models';
 
 @Component({
   selector: 'app-project-kanban-task-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, AppButton],
+  imports: [CommonModule, FormsModule],
   templateUrl: './project-kanban-task-modal.html',
   styleUrls: ['./project-kanban-task-modal.scss'],
 })

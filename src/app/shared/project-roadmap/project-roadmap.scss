@@ -1,3 +1,13 @@
+:host {
+  display: block;
+  --roadmap-viewport-offset: 16.5rem;
+  --roadmap-bottom-gap: 0.5rem;
+  --roadmap-frame-height: min(
+    820px,
+    max(420px, calc(100dvh - var(--roadmap-viewport-offset) - var(--roadmap-bottom-gap)))
+  );
+}
+
 // ── Palette MS Project ────────────────────────────────────────────────────────
 $ms-bg:           #F0F0F0;      // fond général
 $ms-pane-bg:      #FFFFFF;      // fond des panneaux
@@ -24,17 +34,6 @@ $accent-projet:      #1565C0;
 $accent-metier:      #2E7D32;
 $accent-changement:  #C62828;
 $accent-technologie: #E65100;
-
-// ── Host ──────────────────────────────────────────────────────────────────────
-:host {
-  display: block;
-  --roadmap-viewport-offset: 25rem;  // header projet + tabs + toolbar card + marges
-  --roadmap-bottom-gap: 0.5rem;
-  --roadmap-frame-height: min(
-    700px,
-    max(350px, calc(100dvh - var(--roadmap-viewport-offset) - var(--roadmap-bottom-gap)))
-  );
-}
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 .roadmap-root {

@@ -1,0 +1,31 @@
+.password-field {
+  position: relative;
+}
+
+.password-field .form-control {
+  padding-right: 5.75rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #0d6efd;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.35rem 0.5rem;
+}
+
+.password-toggle:hover:not(:disabled),
+.password-toggle:focus-visible {
+  background: rgba(13, 110, 253, 0.1);
+}
+
+.password-toggle:disabled {
+  color: #6c757d;
+  cursor: not-allowed;
+}

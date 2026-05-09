@@ -20,11 +20,19 @@
         </div>
 
         <div class="avatar-actions">
-          <label class="btn">
+          <input
+            #avatarInput
+            type="file"
+            accept="image/*"
+            (change)="onAvatarFileSelected($event)"
+            hidden
+          />
+          <app-button type="button" variant="secondary" icon="↥" (pressed)="avatarInput.click()">
             Changer l’avatar
-            <input type="file" accept="image/*" (change)="onAvatarFileSelected($event)" hidden />
-          </label>
-          <button type="button" class="btn" (click)="removeAvatar()">Supprimer</button>
+          </app-button>
+          <app-button type="button" variant="ghost" icon="×" (pressed)="removeAvatar()">
+            Supprimer
+          </app-button>
           <p class="hint">Formats image. Stockage local (base64).</p>
         </div>
       </div>
@@ -80,16 +88,20 @@
         Pour changer votre mot de passe, cliquez sur le bouton ci-dessous.
       </p>
 
-      <button type="button" class="btn primary" (click)="openChangePasswordModal()">
+      <app-button type="button" variant="primary" icon="🔒" (pressed)="openChangePasswordModal()">
         Changer mon mot de passe
-      </button>
+      </app-button>
     </section>
 
   </form>
 
   <footer class="actions">
-    <button type="button" class="btn" (click)="reset()">Réinitialiser</button>
-    <button type="button" class="btn primary" (click)="save()">Enregistrer</button>
+    <app-button type="button" variant="secondary" icon="↺" (pressed)="reset()">
+      Réinitialiser
+    </app-button>
+    <app-button type="button" variant="primary" icon="✓" (pressed)="save()">
+      Enregistrer
+    </app-button>
 
     <span class="status ok" *ngIf="savedState === 'saved'">✅ Sauvegardé</span>
     <span class="status err" *ngIf="savedState === 'error'">
@@ -122,9 +134,6 @@
   .placeholder { font-size: 34px; color: #777; }
 
   .avatar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .btn { border: 1px solid #d0d0d0; background: #fff; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
-  .btn.small { padding: 6px 10px; border-radius: 10px; }
-  .btn.primary { border-color: #2a6; background: #2a6; color: #fff; }
 
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin: 10px 0; }
   .row.invalid .label { color: #a33; }

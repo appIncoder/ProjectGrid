@@ -11,6 +11,7 @@ import {
 import { AuthService } from '../../services/auth.service';
 import { FirebaseSdkService } from '../../services/firebase-sdk.service';
 import { ChangePasswordModalComponent } from '../../shared/change-password-modal/change-password-modal';
+import { AppButton } from '../../shared/design-system/button/button';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import type { ProfileType, AccountRole, AccountModel } from '../../models';
@@ -20,7 +21,7 @@ const STORAGE_KEY = 'projectgrid:account';
 @Component({
   selector: 'app-account-page',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, ChangePasswordModalComponent],
+  imports: [CommonModule, ReactiveFormsModule, ChangePasswordModalComponent, AppButton],
   templateUrl: './account-page.html',
 })
 export class AccountPage implements OnInit {

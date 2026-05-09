@@ -4,7 +4,7 @@ const AUTH_STORAGE_KEY = 'pg_auth_session';
 
 function readCurrentUserId(): string {
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY) ?? sessionStorage.getItem(AUTH_STORAGE_KEY);
     if (!raw) return '';
     const parsed = JSON.parse(raw) as { user?: { id?: unknown } };
     return String(parsed?.user?.id ?? '').trim();

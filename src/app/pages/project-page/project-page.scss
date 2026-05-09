@@ -8,8 +8,8 @@
 }
 
 .project-page-container {
-  --page-pad-x: clamp(0.4rem, 1.5vw, 1.1rem);
-  --page-gap: clamp(0.8rem, 1.8vw, 1.3rem);
+  --page-pad-x: clamp(0.25rem, 1vw, 0.75rem);
+  --page-gap: clamp(0.45rem, 1vw, 0.8rem);
   --panel-border: #d8dee8;
   --panel-bg: #f8fafc;
   --accent: #0d6efd;
@@ -30,32 +30,34 @@
 
 .project-header {
   border: 1px solid var(--panel-border);
-  border-radius: 0.9rem;
+  border-radius: 0.75rem;
   background: linear-gradient(180deg, #ffffff 0%, var(--panel-bg) 100%);
-  box-shadow: 0 8px 26px rgba(12, 30, 66, 0.06);
+  box-shadow: 0 4px 14px rgba(12, 30, 66, 0.05);
 
   .card-body {
-    padding: clamp(0.75rem, 2vw, 1.2rem);
+    padding: clamp(0.45rem, 1vw, 0.7rem) clamp(0.65rem, 1.4vw, 0.95rem);
   }
 
   h2 {
-    font-size: clamp(1.05rem, 1.2vw + 0.8rem, 1.5rem);
+    font-size: clamp(1rem, 0.7vw + 0.85rem, 1.25rem);
     font-weight: 700;
   }
 }
 
 .project-header-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.65rem;
 }
 
 .project-header-right {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 0.4rem;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .current-phase-badge {
@@ -66,8 +68,8 @@
   background: #e8f0fc;
   color: #1e4080;
   border-radius: 999px;
-  padding: 0.2rem 0.7rem;
-  font-size: 0.76rem;
+  padding: 0.14rem 0.55rem;
+  font-size: 0.72rem;
 
   strong {
     font-weight: 700;
@@ -82,8 +84,8 @@
   background: #fff;
   color: #425064;
   border-radius: 999px;
-  padding: 0.22rem 0.58rem;
-  font-size: 0.76rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.72rem;
   font-weight: 600;
 }
 
@@ -112,10 +114,10 @@
 
 .project-tabs {
   flex-wrap: nowrap;
-  gap: 0.4rem;
+  gap: 0.3rem;
   border-bottom: 0;
   min-width: max-content;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.12rem;
 }
 
 .project-tabs .nav-link {
@@ -124,10 +126,10 @@
   border-radius: 999px;
   background: #fff;
   color: #455266;
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.2;
-  padding: 0.46rem 0.78rem;
+  padding: 0.34rem 0.62rem;
   transition: all 0.16s ease;
 }
 
@@ -149,11 +151,11 @@
   border: 1px solid #d7deea;
   border-radius: 999px;
   background: #f4f7fc;
-  padding: 0.18rem 0.22rem 0.18rem 0.62rem;
+  padding: 0.12rem 0.16rem 0.12rem 0.5rem;
 }
 
 .project-tabs .detailed-tab-group-title {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #4b607e;
@@ -168,12 +170,152 @@
 
 .project-tabs .detailed-tab-button {
   margin: 0;
-  padding-inline: 0.68rem;
+  padding-inline: 0.55rem;
+}
+
+@media (max-width: 900px) {
+  .project-header-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .project-header-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .project-tab-panel {
   width: 100%;
   margin-inline: auto;
+}
+
+.workflow-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.55rem;
+  border: 1px solid #b8d2fb;
+  border-radius: 0.65rem;
+  background: #f5f9ff;
+  padding: 0.6rem 0.75rem;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.08);
+}
+
+.workflow-suggestion__content {
+  min-width: 0;
+
+  p {
+    margin: 0.08rem 0 0;
+    color: #26364a;
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+}
+
+.workflow-suggestion__eyebrow {
+  display: block;
+  color: #1554a6;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workflow-suggestion__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.workflow-suggestion__dismiss {
+  color: #536274;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.phase-report-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.38);
+  padding: 1rem;
+}
+
+.phase-report-dialog {
+  width: min(920px, 100%);
+  max-height: min(760px, calc(100vh - 2rem));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ccd7e8;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22);
+  overflow: hidden;
+}
+
+.phase-report-dialog__header,
+.phase-report-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  background: #f7f9fc;
+}
+
+.phase-report-dialog__header {
+  border-bottom: 1px solid #e1e7f0;
+
+  h3 {
+    margin: 0.1rem 0 0;
+    color: #1f2937;
+    font-size: 1rem;
+    font-weight: 800;
+  }
+}
+
+.phase-report-dialog__eyebrow {
+  display: block;
+  color: #1554a6;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.phase-report-dialog__body {
+  flex: 1 1 auto;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: #243247;
+  background: #fff;
+  padding: 0.9rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.phase-report-dialog__footer {
+  justify-content: flex-end;
+  border-top: 1px solid #e1e7f0;
+}
+
+@media (max-width: 800px) {
+  .workflow-suggestion {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workflow-suggestion__actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
 /* ===========================

@@ -1,7 +1,6 @@
 import { Routes } from '@angular/router';
 import { HomePage } from './pages/home-page/home-page';
 import { PrivatePage } from './pages/private-page/private-page';
-import { LoginPage } from './pages/login-page/login-page';
 import { SettingsPage } from './pages/settings-page/settings-page';
 import { AdminPage } from './pages/admin-page/admin-page';
 import { AccountPage } from './pages/account-page/account-page';
@@ -15,11 +14,6 @@ export const routes: Routes = [
     component: HomePage,
     title: 'Accueil',
     pathMatch: 'full',
-  },
-  {
-    path: 'login',
-    component: LoginPage,
-    title: 'Connexion'
   },
   {
     path: 'settings',

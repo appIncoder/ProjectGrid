@@ -25,7 +25,7 @@
 
     <div class="project-page-shell">
       <!-- Header du projet -->
-      <div class="project-header card mb-3">
+      <div class="project-header card mb-2">
         <div class="card-body">
           <div class="project-header-top">
             <h2 class="h5 mb-0">{{ p.name }}</h2>
@@ -54,7 +54,7 @@
       </div>
 
       <!-- Onglets -->
-      <div class="project-tabs-wrap mb-3">
+      <div class="project-tabs-wrap mb-2">
         <ul class="nav nav-tabs project-tabs">
           <li class="nav-item">
             <button class="nav-link" [class.active]="activeTab === 'scorecard'" type="button" (click)="setTab('scorecard')">
@@ -107,6 +107,72 @@
       </div>
 
       <div class="project-tab-panel">
+        <div *ngIf="workflowSuggestion as suggestion" class="workflow-suggestion">
+          <div class="workflow-suggestion__content">
+            <span class="workflow-suggestion__eyebrow">{{ workflowSuggestionTitle }}</span>
+            <p>{{ workflowSuggestionText }}</p>
+          </div>
+          <div class="workflow-suggestion__actions">
+            <button
+              *ngIf="suggestion.kind === 'phase'"
+              class="btn btn-sm btn-outline-primary"
+              type="button"
+              (click)="generatePhaseActivityReport()"
+            >
+              Générer le rapport
+            </button>
+            <button
+              class="btn btn-sm btn-primary"
+              type="button"
+              (click)="acceptWorkflowSuggestion()"
+              [disabled]="isSaving"
+            >
+              {{ workflowSuggestionPrimaryLabel }}
+            </button>
+            <button
+              *ngIf="suggestion.kind === 'phase'"
+              class="btn btn-sm btn-outline-secondary"
+              type="button"
+              (click)="rejectGoNoGoSuggestion()"
+              [disabled]="isSaving"
+            >
+              No Go
+            </button>
+            <button
+              class="btn btn-sm btn-link workflow-suggestion__dismiss"
+              type="button"
+              (click)="dismissWorkflowSuggestion()"
+              [disabled]="isSaving"
+            >
+              Ignorer
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="phaseActivityReport as report" class="phase-report-backdrop">
+          <section class="phase-report-dialog" role="dialog" aria-modal="true" aria-labelledby="phase-report-title">
+            <header class="phase-report-dialog__header">
+              <div>
+                <span class="phase-report-dialog__eyebrow">Réunion Go / No Go</span>
+                <h3 id="phase-report-title">{{ report.title }}</h3>
+              </div>
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                type="button"
+                (click)="closePhaseActivityReport()"
+              >
+                Fermer
+              </button>
+            </header>
+            <pre class="phase-report-dialog__body">{{ report.text }}</pre>
+            <footer class="phase-report-dialog__footer">
+              <button class="btn btn-sm btn-primary" type="button" (click)="copyPhaseActivityReport()">
+                Copier le rapport
+              </button>
+            </footer>
+          </section>
+        </div>
+
         <!-- Onglet 1 : Scorecard -->
         <app-project-score-card *ngIf="activeTab === 'scorecard'" [project]="p" [users]="users"></app-project-score-card>
 

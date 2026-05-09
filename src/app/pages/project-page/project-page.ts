@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 
-import type { ProjectDetail, ProjectTab, UserRef } from '../../models';
+import type { ActivityId, Item, PhaseId, ProjectDetail, ProjectPhaseActivityReport, ProjectTab, UserRef } from '../../models';
 import { ProjectDataService, type ProjectHealthDefaultRef } from '../../services/project-data.service';
 import { ProjectService } from '../../services/project.service';
 
@@ -19,6 +19,31 @@ import { ProjectChangeManagement } from '../../shared/project-change-management/
 import { ProjectProjectManagement } from '../../shared/project-project-management/project-project-management';
 import { ProjectBusinessManagement } from '../../shared/project-business-management/project-business-management';
 import { ProjectTechnologyManagement } from '../../shared/project-technology-management/project-technology-management';
+
+type WorkflowSuggestion =
+  | {
+      kind: 'phase';
+      key: string;
+      currentPhase: PhaseId;
+      nextPhase: PhaseId;
+      currentPhaseLabel: string;
+      nextPhaseLabel: string;
+    }
+  | {
+      kind: 'parent';
+      key: string;
+      activityId: ActivityId;
+      phase: PhaseId;
+      parentId: string;
+      parentLabel: string;
+      phaseLabel: string;
+    };
+
+interface PhaseActivityReport {
+  title: string;
+  text: string;
+  persistedId?: string;
+}
 
 @Component({
   selector: 'app-project-page',
@@ -54,8 +79,11 @@ export class ProjectPage implements OnInit, OnDestroy {
   saveError: string | null = null;
   isSaving = false;
   isUpdatingHealth = false;
+  workflowSuggestion: WorkflowSuggestion | null = null;
+  phaseActivityReport: PhaseActivityReport | null = null;
 
   private readonly subs = new Subscription();
+  private readonly dismissedWorkflowSuggestions = new Set<string>();
   private destroyed = false;
   private pendingSaveReason: string | null = null;
   private saveInFlight = false;
@@ -120,6 +148,7 @@ export class ProjectPage implements OnInit, OnDestroy {
       this.selectedHealthShortName = this.getActiveProjectHealthShortName(this.project) || 'Good';
       this.activeTab = this.activeTab || 'scorecard';
       this.projectService.currentProjectId = this.project.id;
+      this.evaluateWorkflowSuggestions();
 
       console.log('[ProjectPage] project bound to template', {
         id: this.project.id,
@@ -142,6 +171,7 @@ export class ProjectPage implements OnInit, OnDestroy {
 
   private schedulePersist(reason: string): void {
     this.pendingSaveReason = reason;
+    this.evaluateWorkflowSuggestions();
     void this.persistProjectProcedure();
   }
 
@@ -205,6 +235,160 @@ export class ProjectPage implements OnInit, OnDestroy {
     return defs?.[first]?.label ?? first;
   }
 
+  get workflowSuggestionTitle(): string {
+    if (!this.workflowSuggestion) return '';
+    return this.workflowSuggestion.kind === 'phase'
+      ? 'Changement de phase proposé'
+      : 'Clôture d’activité proposée';
+  }
+
+  get workflowSuggestionText(): string {
+    const suggestion = this.workflowSuggestion;
+    if (!suggestion) return '';
+    if (suggestion.kind === 'phase') {
+      return `Toutes les activités de la phase ${suggestion.currentPhaseLabel} sont terminées, non faites ou N/A. Vous pouvez générer le rapport de phase pour préparer la réunion Go / No Go.`;
+    }
+    return `Toutes les tâches filles de l’activité "${suggestion.parentLabel}" sont terminées. Vous pouvez clôturer cette activité mère.`;
+  }
+
+  get workflowSuggestionPrimaryLabel(): string {
+    const suggestion = this.workflowSuggestion;
+    if (!suggestion) return '';
+    return suggestion.kind === 'phase'
+      ? `GO - passer à ${suggestion.nextPhaseLabel}`
+      : 'Clôturer l’activité';
+  }
+
+  acceptWorkflowSuggestion(): void {
+    const suggestion = this.workflowSuggestion;
+    if (!this.project || !suggestion) return;
+
+    if (suggestion.kind === 'phase') {
+      this.applyPhaseChange(suggestion.currentPhase, suggestion.nextPhase);
+      this.dismissedWorkflowSuggestions.add(suggestion.key);
+      this.workflowSuggestion = null;
+      this.schedulePersist('workflow_phase_advanced');
+      return;
+    }
+
+    const parent = this.findParentItem(
+      this.project,
+      suggestion.activityId,
+      suggestion.phase,
+      suggestion.parentId
+    );
+    if (!parent) {
+      this.dismissWorkflowSuggestion();
+      return;
+    }
+
+    parent.status = 'done';
+    this.dismissedWorkflowSuggestions.add(suggestion.key);
+    this.workflowSuggestion = null;
+    this.schedulePersist('workflow_parent_activity_closed');
+  }
+
+  rejectGoNoGoSuggestion(): void {
+    const suggestion = this.workflowSuggestion;
+    if (!suggestion || suggestion.kind !== 'phase') return;
+    this.dismissedWorkflowSuggestions.add(suggestion.key);
+    this.workflowSuggestion = null;
+  }
+
+  dismissWorkflowSuggestion(): void {
+    if (this.workflowSuggestion) {
+      this.dismissedWorkflowSuggestions.add(this.workflowSuggestion.key);
+    }
+    this.workflowSuggestion = null;
+  }
+
+  generatePhaseActivityReport(): void {
+    if (!this.project || this.workflowSuggestion?.kind !== 'phase') return;
+
+    const suggestion = this.workflowSuggestion;
+    const lines: string[] = [];
+    const matrix = this.getActivityMatrix(this.project);
+    const childMatrix = this.getChildMatrix(this.project);
+    const generatedAt = new Date();
+    const generatedAtIso = generatedAt.toISOString();
+
+    lines.push(`Rapport d'activités - ${suggestion.currentPhaseLabel}`);
+    lines.push(`Projet: ${this.project.name}`);
+    lines.push(`Généré le: ${generatedAt.toLocaleString('fr-BE')}`);
+    lines.push(`Phase suivante proposée: ${suggestion.nextPhaseLabel}`);
+    lines.push('');
+
+    for (const activityId of Object.keys(this.project.activities ?? {}) as ActivityId[]) {
+      const activity = this.project.activities?.[activityId];
+      const parents = matrix?.[activityId]?.[suggestion.currentPhase] ?? [];
+      if (!parents.length) continue;
+
+      lines.push(`## ${activity?.label ?? activityId}`);
+
+      for (const parent of parents) {
+        const children = childMatrix?.[activityId]?.[suggestion.currentPhase]?.[parent.id] ?? [];
+        const childSummary = this.summarizeStatuses(children);
+        const parentStatus = this.getStatusLabel(parent.status);
+        const owner = this.getUserLabel(parent.responsibleId);
+        const reporter = this.getUserLabel(parent.reporterId);
+
+        lines.push(`- ${parent.label}`);
+        lines.push(`  Statut: ${parentStatus}`);
+        if (owner) lines.push(`  Assigné: ${owner}`);
+        if (reporter) lines.push(`  Rapporteur: ${reporter}`);
+        if (parent.startDate || parent.endDate) {
+          lines.push(`  Période: ${parent.startDate || 'n/a'} -> ${parent.endDate || 'n/a'}`);
+        }
+        lines.push(`  Tâches filles: ${children.length || 0}${childSummary ? ` (${childSummary})` : ''}`);
+
+        const comments = Array.isArray(parent.comments) ? parent.comments : [];
+        if (comments.length) {
+          lines.push(`  Commentaires activité: ${comments.length}`);
+        }
+
+        for (const child of children) {
+          lines.push(`    - ${child.label} [${this.getStatusLabel(child.status)}]`);
+        }
+      }
+
+      lines.push('');
+    }
+
+    const report: ProjectPhaseActivityReport = {
+      id: this.createPhaseReportId(suggestion.currentPhase),
+      phaseId: suggestion.currentPhase,
+      phaseLabel: suggestion.currentPhaseLabel,
+      nextPhaseId: suggestion.nextPhase,
+      nextPhaseLabel: suggestion.nextPhaseLabel,
+      title: `Rapport Go / No Go - ${suggestion.currentPhaseLabel}`,
+      content: lines.join('\n').trim(),
+      generatedAt: generatedAtIso,
+    };
+
+    this.project.phaseActivityReports = [
+      report,
+      ...((this.project.phaseActivityReports ?? []).filter((item) => item.id !== report.id)),
+    ];
+
+    this.phaseActivityReport = {
+      title: report.title,
+      text: report.content,
+      persistedId: report.id,
+    };
+
+    this.schedulePersist('workflow_phase_activity_report_generated');
+  }
+
+  closePhaseActivityReport(): void {
+    this.phaseActivityReport = null;
+  }
+
+  async copyPhaseActivityReport(): Promise<void> {
+    const text = this.phaseActivityReport?.text;
+    if (!text || typeof navigator === 'undefined' || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(text);
+  }
+
   setTab(tab: ProjectTab): void {
     this.activeTab = tab;
   }
@@ -266,8 +450,8 @@ export class ProjectPage implements OnInit, OnDestroy {
           ? (p as any).taskMatrix
           : {}));
     const taskMatrix = { ...matrix };
-    const projectTasksMatrix = ((((p as any)?.projectTasksMatrix) && typeof (p as any).projectTasksMatrix === 'object')
-      ? (p as any).projectTasksMatrix
+    const projectTasksMatrix = ((((p as any)?.projectItemsMatrix ?? (p as any)?.projectTasksMatrix) && typeof ((p as any)?.projectItemsMatrix ?? (p as any)?.projectTasksMatrix) === 'object')
+      ? ((p as any).projectItemsMatrix ?? (p as any).projectTasksMatrix)
       : {});
 
     for (const activityId of Object.keys(activities)) {
@@ -306,9 +490,193 @@ export class ProjectPage implements OnInit, OnDestroy {
       phaseDefinitions: Object.keys(phaseDefinitions).length ? phaseDefinitions : undefined,
       activityMatrix: taskMatrix,
       taskMatrix,
+      projectItemsMatrix: projectTasksMatrix,
       projectTasksMatrix,
       milestones: Array.isArray((p as any)?.milestones) ? (p as any).milestones : [],
+      phaseActivityReports: Array.isArray((p as any)?.phaseActivityReports) ? (p as any).phaseActivityReports : [],
       otherResources: Array.isArray((p as any)?.otherResources) ? (p as any).otherResources : [],
     } as ProjectDetail;
+  }
+
+  private evaluateWorkflowSuggestions(): void {
+    if (!this.project || this.workflowSuggestion) return;
+
+    const parentSuggestion = this.findParentClosureSuggestion(this.project);
+    if (parentSuggestion) {
+      this.workflowSuggestion = parentSuggestion;
+      return;
+    }
+
+    const phaseSuggestion = this.findPhaseChangeSuggestion(this.project);
+    if (phaseSuggestion) {
+      this.workflowSuggestion = phaseSuggestion;
+    }
+  }
+
+  private findPhaseChangeSuggestion(project: ProjectDetail): WorkflowSuggestion | null {
+    const currentPhase = this.getCurrentPhaseId(project);
+    if (!currentPhase) return null;
+
+    const nextPhase = this.getNextPhaseId(project, currentPhase);
+    if (!nextPhase) return null;
+
+    const key = `phase:${project.id}:${currentPhase}:${nextPhase}`;
+    if (this.dismissedWorkflowSuggestions.has(key)) return null;
+
+    const matrix = this.getActivityMatrix(project);
+    const phaseActivities: Item[] = [];
+    for (const activityId of Object.keys(project.activities ?? {}) as ActivityId[]) {
+      phaseActivities.push(...(matrix?.[activityId]?.[currentPhase] ?? []));
+    }
+
+    if (!phaseActivities.length) return null;
+    if (!phaseActivities.every((item) => this.isPhaseReadyStatus(item?.status))) return null;
+
+    return {
+      kind: 'phase',
+      key,
+      currentPhase,
+      nextPhase,
+      currentPhaseLabel: this.getPhaseLabel(project, currentPhase),
+      nextPhaseLabel: this.getPhaseLabel(project, nextPhase),
+    };
+  }
+
+  private findParentClosureSuggestion(project: ProjectDetail): WorkflowSuggestion | null {
+    const parentMatrix = this.getActivityMatrix(project);
+    const childMatrix = this.getChildMatrix(project);
+    const phases = Array.isArray(project.phases) ? project.phases : [];
+
+    for (const activityId of Object.keys(project.activities ?? {}) as ActivityId[]) {
+      for (const phase of phases) {
+        const parents = parentMatrix?.[activityId]?.[phase] ?? [];
+        for (const parent of parents) {
+          if (!parent?.id || this.isClosureReadyStatus(parent.status)) continue;
+
+          const children = childMatrix?.[activityId]?.[phase]?.[parent.id] ?? [];
+          if (!children.length) continue;
+          if (!children.every((child) => this.isClosureReadyStatus(child?.status))) continue;
+
+          const key = `parent:${project.id}:${activityId}:${phase}:${parent.id}`;
+          if (this.dismissedWorkflowSuggestions.has(key)) continue;
+
+          return {
+            kind: 'parent',
+            key,
+            activityId,
+            phase,
+            parentId: parent.id,
+            parentLabel: parent.label || parent.id,
+            phaseLabel: this.getPhaseLabel(project, phase),
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private applyPhaseChange(currentPhase: PhaseId, nextPhase: PhaseId): void {
+    if (!this.project) return;
+    const phaseDefinitions = ((this.project as any).phaseDefinitions ?? {}) as Record<string, any>;
+    for (const phase of this.project.phases ?? []) {
+      phaseDefinitions[phase] = {
+        ...(phaseDefinitions[phase] ?? {}),
+        isCurrent: phase === nextPhase,
+      };
+    }
+    if (!phaseDefinitions[currentPhase]) {
+      phaseDefinitions[currentPhase] = { id: currentPhase, isCurrent: false };
+    } else {
+      phaseDefinitions[currentPhase].isCurrent = false;
+    }
+    if (!phaseDefinitions[nextPhase]) {
+      phaseDefinitions[nextPhase] = { id: nextPhase, isCurrent: true };
+    } else {
+      phaseDefinitions[nextPhase].isCurrent = true;
+    }
+    (this.project as any).phaseDefinitions = phaseDefinitions;
+  }
+
+  private findParentItem(
+    project: ProjectDetail,
+    activityId: ActivityId,
+    phase: PhaseId,
+    parentId: string
+  ): Item | null {
+    return this.getActivityMatrix(project)?.[activityId]?.[phase]?.find((item) => item.id === parentId) ?? null;
+  }
+
+  private getCurrentPhaseId(project: ProjectDetail): PhaseId | null {
+    const defs = (project as any).phaseDefinitions as Record<string, { isCurrent?: boolean }> | undefined;
+    const current = (project.phases ?? []).find((phase) => defs?.[phase]?.isCurrent === true);
+    return current ?? project.phases?.[0] ?? null;
+  }
+
+  private getNextPhaseId(project: ProjectDetail, currentPhase: PhaseId): PhaseId | null {
+    const phases = project.phases ?? [];
+    const index = phases.indexOf(currentPhase);
+    return index >= 0 ? phases[index + 1] ?? null : null;
+  }
+
+  private getPhaseLabel(project: ProjectDetail, phase: PhaseId): string {
+    return (project as any).phaseDefinitions?.[phase]?.label ?? phase;
+  }
+
+  private getActivityMatrix(project: ProjectDetail): Record<ActivityId, Record<PhaseId, Item[]>> {
+    return ((project as any).activityMatrix ?? project.taskMatrix ?? {}) as Record<ActivityId, Record<PhaseId, Item[]>>;
+  }
+
+  private getChildMatrix(project: ProjectDetail): Record<ActivityId, Record<PhaseId, Record<string, Item[]>>> {
+    return ((project as any).projectItemsMatrix ?? (project as any).projectTasksMatrix ?? {}) as Record<ActivityId, Record<PhaseId, Record<string, Item[]>>>;
+  }
+
+  private isPhaseReadyStatus(status: unknown): boolean {
+    const normalized = String(status ?? '').toLowerCase();
+    return normalized === 'done' || normalized === 'notdone' || normalized === 'notapplicable';
+  }
+
+  private isClosureReadyStatus(status: unknown): boolean {
+    const normalized = String(status ?? '').toLowerCase();
+    return normalized === 'done' || normalized === 'notapplicable';
+  }
+
+  private summarizeStatuses(items: Item[]): string {
+    if (!items.length) return '';
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      const label = this.getStatusLabel(item.status);
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).map(([label, count]) => `${label}: ${count}`).join(', ');
+  }
+
+  private getStatusLabel(status: unknown): string {
+    switch (String(status ?? '').toLowerCase()) {
+      case 'todo':
+        return 'To Do';
+      case 'inprogress':
+        return 'In Progress';
+      case 'onhold':
+        return 'On Hold';
+      case 'done':
+        return 'Terminé';
+      case 'notdone':
+        return 'Non fait';
+      case 'notapplicable':
+        return 'N/A';
+      default:
+        return String(status ?? 'n/a') || 'n/a';
+    }
+  }
+
+  private getUserLabel(userId: string | undefined): string {
+    const id = String(userId ?? '').trim();
+    if (!id) return '';
+    return this.users.find((user) => user.id === id)?.label ?? id;
+  }
+
+  private createPhaseReportId(phase: PhaseId): string {
+    return `phase-report-${phase}-${Date.now().toString(36)}`;
   }
 }

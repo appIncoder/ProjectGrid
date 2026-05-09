@@ -1,13 +1,14 @@
 import { Injectable } from '@angular/core';
 import {
   browserLocalPersistence,
+  browserSessionPersistence,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
-import type { AuthBackend, AuthUser } from './auth-backend';
+import type { AuthBackend, AuthUser, LoginOptions } from './auth-backend';
 import { FirebaseSdkService } from './firebase-sdk.service';
 
 @Injectable({ providedIn: 'root' })
@@ -81,11 +82,14 @@ export class FirebaseAuthBackendService implements AuthBackend {
     return normalized;
   }
 
-  async login(username: string, password: string): Promise<AuthUser | null> {
+  async login(username: string, password: string, options: LoginOptions = {}): Promise<AuthUser | null> {
     const login = String(username ?? '').trim();
     if (!login || !password) return null;
 
-    await setPersistence(this.firebaseSdk.auth(), browserLocalPersistence);
+    await setPersistence(
+      this.firebaseSdk.auth(),
+      options.remember === false ? browserSessionPersistence : browserLocalPersistence,
+    );
     const email = await this.resolveLoginEmail(login);
     const credential = await signInWithEmailAndPassword(this.firebaseSdk.auth(), email, password);
     return this.toAuthUser(credential.user);

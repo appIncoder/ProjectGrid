@@ -26,6 +26,7 @@ type AuthSession = {
     label: string;
   };
   accessCheckMode?: AccessCheckMode | null;
+  remember?: boolean;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -33,6 +34,7 @@ export class AuthService {
   private _isAuthenticated = false;
   private _user: AuthSession['user'] | null = null;
   private _accessCheckMode: AccessCheckMode | null = null;
+  private _rememberSession = true;
   private readonly readyPromise: Promise<void>;
   private readonly backend: AuthBackend = inject(FirebaseAuthBackendService);
 
@@ -70,9 +72,9 @@ export class AuthService {
     return this.readyPromise;
   }
 
-  async login(username: string, password: string): Promise<boolean> {
+  async login(username: string, password: string, remember = true): Promise<boolean> {
     await this.readyPromise;
-    const user = await this.backend.login(username, password);
+    const user = await this.backend.login(username, password, { remember });
     if (!user?.id) {
       this.logout();
       return false;
@@ -85,6 +87,7 @@ export class AuthService {
       label: String(user.label),
     };
     this._accessCheckMode = null;
+    this._rememberSession = remember;
     this.persistToStorage();
     return true;
   }
@@ -154,6 +157,7 @@ export class AuthService {
       if (!user?.id) {
         this._isAuthenticated = false;
         this._user = null;
+        this._rememberSession = true;
         this.clearStorage();
         return;
       }
@@ -167,11 +171,13 @@ export class AuthService {
       if (!this.isRealSysAdmin) {
         this._accessCheckMode = null;
       }
+      this._rememberSession = this.readStoredRememberPreference();
       this.persistToStorage();
     } catch {
       this._isAuthenticated = false;
       this._user = null;
       this._accessCheckMode = null;
+      this._rememberSession = true;
       this.clearStorage();
     }
   }
@@ -181,18 +187,20 @@ export class AuthService {
     this._isAuthenticated = false;
     this._user = null;
     this._accessCheckMode = null;
+    this._rememberSession = true;
     this.clearStorage();
   }
 
   private restoreFromStorage(): void {
     try {
-      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY) ?? sessionStorage.getItem(AUTH_STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as AuthSession;
       if (parsed?.isAuthenticated) {
         this._isAuthenticated = true;
         this._user = parsed.user ?? null;
         this._accessCheckMode = parsed.accessCheckMode ?? null;
+        this._rememberSession = parsed.remember !== false;
         if (!this.isRealSysAdmin) {
           this._accessCheckMode = null;
         }
@@ -208,8 +216,15 @@ export class AuthService {
         isAuthenticated: this._isAuthenticated,
         user: this._user ?? undefined,
         accessCheckMode: this.isRealSysAdmin ? this._accessCheckMode : null,
+        remember: this._rememberSession,
       };
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
+      if (this._rememberSession) {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
+        sessionStorage.removeItem(AUTH_STORAGE_KEY);
+      } else {
+        sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
     } catch {
       // ignore
     }
@@ -218,8 +233,20 @@ export class AuthService {
   private clearStorage(): void {
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      sessionStorage.removeItem(AUTH_STORAGE_KEY);
     } catch {
       // ignore
+    }
+  }
+
+  private readStoredRememberPreference(): boolean {
+    try {
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY) ?? sessionStorage.getItem(AUTH_STORAGE_KEY);
+      if (!raw) return true;
+      const parsed = JSON.parse(raw) as AuthSession;
+      return parsed.remember !== false;
+    } catch {
+      return true;
     }
   }
 }

@@ -14,10 +14,12 @@ import { AuthService } from '../../services/auth.service';
 export class LoginBox {
   loading = false;
   errorMessage = '';
+  showPassword = false;
 
   model = {
     username: '',
-    password: ''
+    password: '',
+    remember: true,
   };
 
   constructor(private auth: AuthService, private router: Router) {}
@@ -27,7 +29,7 @@ export class LoginBox {
     this.errorMessage = '';
     this.loading = true;
     try {
-      const ok = await this.auth.login(this.model.username, this.model.password);
+      const ok = await this.auth.login(this.model.username, this.model.password, this.model.remember);
       if (!ok) {
         this.errorMessage = "Nom d'utilisateur ou mot de passe incorrect.";
         return;
@@ -39,5 +41,9 @@ export class LoginBox {
     } finally {
       this.loading = false;
     }
+  }
+
+  togglePasswordVisibility(): void {
+    this.showPassword = !this.showPassword;
   }
 }
