@@ -1,28 +1,27 @@
 // ── Variables JIRA ────────────────────────────────────────────────────────────
-$board-bg:        #F4F5F7;
-$lane-meta-bg:    #EBECF0;
-$lane-border:     #DFE1E6;
+$board-bg:        var(--pg-color-bg-stripe);
+$lane-meta-bg:    var(--pg-color-bg-head);
+$lane-border:     var(--pg-color-border);
 $card-bg:         #fff;
 $card-shadow:     0 1px 2px rgba(9, 30, 66, 0.25);
-$card-radius:     3px;
-$text-dark:       #172B4D;
-$text-muted:      #42526E;
-$text-subtle:     #6B778C;
+$card-radius:     var(--pg-radius);
+$text-dark:       var(--pg-color-text);
+$text-muted:      var(--pg-color-text-secondary);
+$text-subtle:     var(--pg-color-text-tertiary);
 $col-min-width:   160px;
 $meta-width:      200px;
 
-$c-todo:           #6B778C;
-$c-inprogress:     #0052CC;
-$c-onhold:         #FF8B00;
-$c-done:           #00875A;
-$c-notdone:        #DE350B;
-$c-notapplicable:  #97A0AF;
+$c-todo:           var(--pg-status-neutral-fg);
+$c-inprogress:     var(--pg-status-inprogress-fg);
+$c-onhold:         var(--pg-status-review-fg);
+$c-done:           var(--pg-status-done-fg);
+$c-notdone:        var(--pg-status-alert-fg);
+$c-notapplicable:  var(--pg-status-neutral-fg);
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 .tm-detail-card {
   --tm-fullscreen-top: 0px;
   --tm-fullscreen-bottom: 0px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 0.86rem;
   * { box-sizing: border-box; line-height: 1.3; }
 
@@ -70,16 +69,16 @@ $c-notapplicable:  #97A0AF;
   justify-content: center;
   width: 24px;
   height: 24px;
-  border: 1px solid #A5ADBA;
-  border-radius: 4px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
   background: #fff;
   color: $text-muted;
   cursor: pointer;
   transition: background 100ms, border-color 100ms, color 100ms, transform 100ms;
 
   &:hover {
-    background: #F4F5F7;
-    border-color: #6B778C;
+    background: var(--pg-color-bg-head);
+    border-color: var(--pg-color-navy);
     transform: translateY(-1px);
   }
 }
@@ -106,7 +105,7 @@ $c-notapplicable:  #97A0AF;
 
 .tm-filter-chip {
   border: none;
-  border-radius: 3px;
+  border-radius: var(--pg-radius);
   background: $lane-meta-bg;
   color: $text-muted;
   font-size: 0.76rem;
@@ -127,12 +126,12 @@ $c-notapplicable:  #97A0AF;
 
 // ── Save feedback ─────────────────────────────────────────────────────────────
 .tm-save-state { font-size: 0.74rem; color: $text-subtle; margin-bottom: 4px; }
-.tm-save-error { font-size: 0.74rem; color: #DE350B; margin-bottom: 4px; }
+.tm-save-error { font-size: 0.74rem; color: var(--pg-status-alert-fg); margin-bottom: 4px; }
 
 // ── Board wrap ────────────────────────────────────────────────────────────────
 .tm-board-wrap {
   background: $board-bg;
-  border-radius: 4px;
+  border-radius: var(--pg-radius);
   overflow-x: auto;
   overflow-y: auto;
   padding-bottom: 12px;
@@ -141,8 +140,8 @@ $c-notapplicable:  #97A0AF;
 .tm-detail-card--fullscreen .tm-board-wrap {
   flex: 1 1 auto;
   min-height: 0;
-  border: 1px solid #D7E0EF;
-  border-radius: 14px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
   box-shadow: 0 18px 40px rgba(9, 30, 66, 0.12);
 }
 
@@ -168,7 +167,7 @@ $c-notapplicable:  #97A0AF;
   letter-spacing: 0.04em;
   padding: 4px 8px;
   background: $lane-meta-bg;
-  border-radius: 3px;
+  border-radius: var(--pg-radius);
 }
 
 .tm-board-columns {
@@ -205,7 +204,7 @@ $c-notapplicable:  #97A0AF;
     font-weight: 700;
     background: #DFE1E6;
     color: $text-muted;
-    border-radius: 999px;
+    border-radius: var(--pg-radius);
     padding: 1px 6px;
     flex-shrink: 0;
   }
@@ -224,7 +223,7 @@ $c-notapplicable:  #97A0AF;
   font-size: 0.82rem;
   color: $text-subtle;
   border: 2px dashed $lane-border;
-  border-radius: 4px;
+  border-radius: var(--pg-radius);
   margin: 6px;
 }
 
@@ -236,7 +235,7 @@ $c-notapplicable:  #97A0AF;
   grid-template-columns: $meta-width 1fr;
   gap: 6px;
   border: 1px solid $lane-border;
-  border-radius: 4px;
+  border-radius: var(--pg-radius);
   overflow: hidden;
   background: $board-bg;
 }
@@ -277,7 +276,7 @@ $c-notapplicable:  #97A0AF;
 .tm-lane-col {
   min-height: 60px;
   padding: 4px;
-  border-radius: 3px;
+  border-radius: var(--pg-radius);
   background: transparent;
   transition: background 100ms;
 
@@ -321,13 +320,13 @@ $c-notapplicable:  #97A0AF;
 .tm-task-body { padding: 36px 12px 8px 12px; }
 .tm-task-footer { display: flex; align-items: center; justify-content: flex-end; padding: 6px 12px 10px; }
 .tm-task-status-tag {
-  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; border-radius: 3px; padding: 2px 7px; white-space: nowrap; text-transform: uppercase;
-  &.tm-task-status-tag--todo { background: #F4F5F7; color: #6B778C; }
-  &.tm-task-status-tag--inprogress { background: #DEEBFF; color: #0052CC; }
-  &.tm-task-status-tag--onhold { background: #FFF0B3; color: #974F0C; }
-  &.tm-task-status-tag--done { background: #E3FCEF; color: #006644; }
-  &.tm-task-status-tag--notdone { background: #FFEBE6; color: #BF2600; }
-  &.tm-task-status-tag--notapplicable { background: #F4F5F7; color: #6B778C; }
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; border-radius: var(--pg-radius); padding: 2px 7px; white-space: nowrap; text-transform: uppercase;
+  &.tm-task-status-tag--todo { background: var(--pg-status-neutral-bg); color: var(--pg-status-neutral-fg); }
+  &.tm-task-status-tag--inprogress { background: var(--pg-status-inprogress-bg); color: var(--pg-status-inprogress-fg); }
+  &.tm-task-status-tag--onhold { background: var(--pg-status-review-bg); color: var(--pg-status-review-fg); }
+  &.tm-task-status-tag--done { background: var(--pg-status-done-bg); color: var(--pg-status-done-fg); }
+  &.tm-task-status-tag--notdone { background: var(--pg-status-alert-bg); color: var(--pg-status-alert-fg); }
+  &.tm-task-status-tag--notapplicable { background: var(--pg-status-neutral-bg); color: var(--pg-status-neutral-fg); }
 }
 
 .tm-status-todo          { border-left-color: $c-todo; }

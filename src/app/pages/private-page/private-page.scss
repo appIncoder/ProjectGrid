@@ -9,17 +9,57 @@
 
   h2 {
     margin-bottom: 0.25rem;
+    font-size: 20px;
+    color: var(--pg-color-text);
   }
 
   p {
     margin-bottom: 0;
-    color: #6c757d;
-    font-size: 0.9rem;
+    color: var(--pg-color-text-secondary);
+    font-size: 13px;
+
+    strong {
+      color: var(--pg-color-text);
+    }
   }
 }
 
+/* Buttons */
+.dashboard-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 33px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+  background: #ffffff;
+  color: var(--pg-color-navy);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.dashboard-btn:hover:not(:disabled) {
+  background: var(--pg-color-bg-head);
+}
+
+.dashboard-btn--primary {
+  border: none;
+  background: var(--pg-color-navy);
+  color: #ffffff;
+}
+
+.dashboard-btn--primary:hover:not(:disabled) {
+  background: #0f1622;
+  color: #ffffff;
+}
+
 .card {
-  border-radius: 0.5rem;
+  border-radius: var(--pg-radius);
 }
 
 .table-hover tbody tr {
@@ -42,21 +82,41 @@
 }
 
 .health-good {
-  background-color: #198754;
+  background-color: var(--pg-status-done-fg);
 }
 
 .health-warning {
-  background-color: #fd7e14;
+  background-color: var(--pg-status-review-fg);
 }
 
 .health-critical {
-  background-color: #dc3545;
+  background-color: var(--pg-status-alert-fg);
+}
+
+.info-value.health-text-good {
+  color: var(--pg-status-done-fg);
+}
+
+.info-value.health-text-warning {
+  color: var(--pg-status-review-fg);
+}
+
+.info-value.health-text-critical {
+  color: var(--pg-status-alert-fg);
 }
 
 .project-general-panel {
-  padding: 0.75rem;
+  padding: 16px 18px;
   background-color: #ffffff;
-  border-radius: 0.5rem;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+
+  > h4 {
+    font-family: var(--pg-font-heading);
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--pg-color-text);
+  }
 }
 
 .project-info-bar {
@@ -64,8 +124,11 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.75rem;
   padding: 0;
+  padding-top: 12px;
+  margin-top: 12px;
   background-color: transparent;
   border-radius: 0;
+  border-top: 1px solid var(--pg-color-border-light);
 
   .info-item {
     display: flex;
@@ -74,14 +137,17 @@
   }
 
   .info-label {
-    color: #6c757d;
-    font-size: 0.75rem;
+    color: var(--pg-color-text-secondary);
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.4px;
   }
 
   .info-value {
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pg-color-navy);
   }
 }
 
@@ -95,6 +161,13 @@
   padding: 0;
   background-color: transparent;
   border-radius: 0;
+
+  h5 {
+    font-family: var(--pg-font-heading);
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--pg-color-text);
+  }
 }
 
 .team-member {
@@ -102,29 +175,33 @@
   flex-direction: column;
   gap: 0.2rem;
   padding: 0.6rem 0.75rem;
-  border: 1px solid #e9ecef;
-  border-radius: 0.5rem;
+  border: 1px solid var(--pg-color-border-light);
+  border-radius: var(--pg-radius);
   background-color: #fff;
 }
 
 .team-member-label {
-  font-size: 0.72rem;
-  color: #6c757d;
+  font-size: 11px;
+  color: var(--pg-color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.4px;
 }
 
 .team-member-value {
-  font-size: 0.92rem;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pg-color-navy);
 }
 
 .activity-matrix {
   th {
-    background-color: #f1f3f5;
-    font-size: 0.8rem;
+    background-color: var(--pg-color-bg-head);
+    color: var(--pg-color-text-secondary);
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.4px;
   }
 
   td {
@@ -142,7 +219,7 @@
 // Override for dot-only indicator: canonical status-todo is white (pill with border),
 // but here it's used as a filled circle where white would be invisible.
 .status-todo {
-  background-color: #adb5bd;
+  background-color: var(--pg-status-neutral-fg, #7c8288);
 }
 
 .dashboard-columns {
@@ -158,19 +235,31 @@
 }
 
 .dashboard-card {
-  border: 1px solid #e9ecef;
-  border-radius: 0.5rem;
-  padding: 0.75rem;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+  padding: 14px 16px;
   background-color: #fff;
+
+  > h4 {
+    font-family: var(--pg-font-heading);
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--pg-color-text);
+  }
 }
 
 .dashboard-table {
   th {
     white-space: nowrap;
-    font-size: 0.78rem;
-    color: #6c757d;
+    font-size: 11px;
+    color: var(--pg-color-text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+
+  small {
+    color: var(--pg-color-text-secondary);
   }
 }
 
@@ -188,48 +277,62 @@
 
 .progress-track {
   width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background-color: #e9ecef;
+  height: 6px;
+  border-radius: var(--pg-radius);
+  background-color: var(--pg-color-border);
   overflow: hidden;
   margin-bottom: 0.2rem;
 }
 
 .progress-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--pg-radius);
 }
 
+// good = terminé (100%), warning = en cours (mi-parcours), critical = faible avancement
 .progress-good {
-  background-color: #198754;
+  background-color: var(--pg-status-done-fg);
 }
 
 .progress-warning {
-  background-color: #fd7e14;
+  background-color: var(--pg-status-inprogress-fg);
 }
 
 .progress-critical {
-  background-color: #dc3545;
+  background-color: var(--pg-status-review-fg);
+}
+
+.badge.risk-low,
+.badge.risk-medium,
+.badge.risk-high,
+.badge.risk-critical,
+.badge.due-normal,
+.badge.due-soon,
+.badge.due-overdue {
+  border-radius: var(--pg-radius);
+  padding: 2px 8px;
+  font-weight: 600;
+  font-size: 11px;
 }
 
 .badge.risk-low {
-  background-color: #adb5bd;
-  color: #fff;
+  background-color: var(--pg-status-neutral-bg);
+  color: var(--pg-status-neutral-fg);
 }
 
 .badge.risk-medium {
-  background-color: #fd7e14;
-  color: #fff;
+  background-color: var(--pg-status-review-bg);
+  color: var(--pg-status-review-fg);
 }
 
 .badge.risk-high {
-  background-color: #dc3545;
-  color: #fff;
+  background-color: var(--pg-status-alert-bg);
+  color: var(--pg-status-alert-fg);
 }
 
 .badge.risk-critical {
-  background-color: #7a1f26;
-  color: #fff;
+  background-color: var(--pg-status-alert-bg);
+  color: var(--pg-status-alert-fg);
 }
 
 .risk-matrix-shell {
@@ -245,7 +348,7 @@
   text-align: center;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #4f5f76;
+  color: var(--pg-color-text-secondary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   display: flex;
@@ -261,7 +364,7 @@
   text-align: center;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #4f5f76;
+  color: var(--pg-color-text-secondary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 0.35rem;
@@ -291,34 +394,34 @@
 }
 
 .risk-dot-low {
-  background-color: #adb5bd;
+  background-color: var(--pg-status-neutral-fg);
 }
 
 .risk-dot-medium {
-  background-color: #fd7e14;
+  background-color: var(--pg-status-review-fg);
 }
 
 .risk-dot-high {
-  background-color: #dc3545;
+  background-color: var(--pg-status-alert-fg);
 }
 
 .risk-dot-critical {
-  background-color: #7a1f26;
+  background-color: var(--pg-status-alert-fg);
 }
 
 .badge.due-normal {
-  background-color: #198754;
-  color: #fff;
+  background-color: var(--pg-status-neutral-bg);
+  color: var(--pg-status-neutral-fg);
 }
 
 .badge.due-soon {
-  background-color: #fd7e14;
-  color: #fff;
+  background-color: var(--pg-status-review-bg);
+  color: var(--pg-status-review-fg);
 }
 
 .badge.due-overdue {
-  background-color: #dc3545;
-  color: #fff;
+  background-color: var(--pg-status-alert-bg);
+  color: var(--pg-status-alert-fg);
 }
 
 .alert {
@@ -337,7 +440,7 @@
   gap: 1rem;
   padding: 3rem 1rem;
   text-align: center;
-  color: #6c757d;
+  color: var(--pg-color-text-secondary);
 }
 
 .dashboard-layout {
@@ -352,8 +455,8 @@
 }
 
 .master-header {
-  border-bottom: 1px solid #e9ecef;
-  background-color: #f8f9fa;
+  border-bottom: 1px solid var(--pg-color-border-light);
+  background-color: var(--pg-color-bg-head);
 }
 
 .master-table-wrap {
@@ -365,14 +468,14 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background-color: #f8f9fa;
+  background-color: var(--pg-color-bg-head);
 }
 
 .dashboard-detail > .card-body {
   overflow: auto;
   background-color: #f1f3f5;
   padding: 0.9rem;
-  border-radius: 0.5rem;
+  border-radius: var(--pg-radius);
 }
 
 .dashboard-detail .project-general-panel,

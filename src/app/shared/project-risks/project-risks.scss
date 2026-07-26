@@ -63,6 +63,47 @@
   min-width: 128px;
 }
 
+.risk-matrix-main .table-responsive {
+  border: 1px solid var(--pg-color-border, #dcdfe3);
+  border-radius: var(--pg-radius, 2px);
+  overflow: hidden;
+}
+
+.risk-matrix {
+  --bs-table-border-color: var(--pg-color-border-light, #e7e9eb);
+
+  th,
+  td {
+    vertical-align: middle;
+  }
+
+  thead th {
+    text-align: center;
+  }
+
+  tbody td.text-start strong {
+    color: var(--pg-color-navy, #1a2332);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+}
+
+.risk-cell {
+  min-height: 2.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.1rem;
+}
+
+.risk-context-menu {
+  border: 1px solid var(--pg-color-border, #dcdfe3);
+  border-radius: var(--pg-radius, 2px);
+  box-shadow: none;
+}
+
 .risk-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -76,12 +117,15 @@
 
 .risk-modal {
   width: min(560px, 100%);
+  border: 1px solid var(--pg-color-border, #dcdfe3);
+  border-radius: var(--pg-radius, 2px);
+  box-shadow: none;
 }
 
 .top-risks-table {
   th,
   td {
-    border-color: transparent !important;
+    border-color: var(--pg-color-border-light, #e7e9eb) !important;
   }
 
   .form-control,

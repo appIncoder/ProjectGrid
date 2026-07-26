@@ -21,10 +21,11 @@
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  border: 1px solid #d8dee8;
-  border-radius: 0.8rem;
+  border: 1px solid var(--pg-color-border, #dcdfe3);
+  border-radius: var(--pg-radius, 2px);
   padding: 1rem 1.1rem;
   background: white;
+  box-shadow: none;
 }
 
 .scorecard-toolbar-left h3 {
@@ -216,15 +217,13 @@
   line-height: 1.25;
   text-align: left;
   cursor: pointer;
-  color: #172b4d;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 253, 0.98) 100%);
-  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.22);
+  color: var(--task-status-accent, #1a2332);
+  background: #ffffff;
+  box-shadow: none;
   transition:
     background 120ms ease,
     border-color 120ms ease,
-    box-shadow 120ms ease,
-    transform 120ms ease;
+    color 120ms ease;
 
   &::before {
     content: '';
@@ -239,40 +238,37 @@
   }
 
   &:hover {
-    border-color: #c8d2e1;
-    box-shadow: 0 5px 12px rgba(9, 30, 66, 0.22);
-    transform: translateY(-1px);
+    border-color: var(--task-status-accent, #c8d2e1);
   }
 
   &.status-done {
-    --task-status-accent: #22c55e;
-    background: linear-gradient(180deg, #f7fffa 0%, #eefbf3 100%);
+    --task-status-accent: var(--pg-status-done-fg, #2f8a52);
+    background: var(--pg-status-done-bg, #e5f5ea);
   }
 
   &.status-todo {
-    --task-status-accent: #8993a4;
-    background: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+    --task-status-accent: var(--pg-status-neutral-fg, #7c8288);
+    background: #ffffff;
   }
 
   &.status-inprogress {
-    --task-status-accent: #f59e0b;
-    background: linear-gradient(180deg, #fffaf0 0%, #fff3d8 100%);
+    --task-status-accent: var(--pg-status-inprogress-fg, #2f5fa8);
+    background: var(--pg-status-inprogress-bg, #e9f0fb);
   }
 
   &.status-onhold {
-    --task-status-accent: #2563eb;
-    background: linear-gradient(180deg, #f7fbff 0%, #eaf2ff 100%);
+    --task-status-accent: var(--pg-status-review-fg, #a8752f);
+    background: var(--pg-status-review-bg, #faf1e0);
   }
 
   &.status-notdone {
-    --task-status-accent: #ef4444;
-    background: linear-gradient(180deg, #fff8f7 0%, #ffeceb 100%);
+    --task-status-accent: var(--pg-status-alert-fg, #b8452f);
+    background: var(--pg-status-alert-bg, #fbe8e2);
   }
 
   &.status-notapplicable {
-    --task-status-accent: #94a3b8;
-    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-    color: #475569;
+    --task-status-accent: var(--pg-status-neutral-fg, #7c8288);
+    background: var(--pg-status-neutral-bg, #e7e9eb);
   }
 }
 

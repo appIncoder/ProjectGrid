@@ -551,57 +551,57 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   getStatusAccentColor(status: KanbanStatus): string {
     switch (status) {
       case 'todo':
-        return '#6B778C';
+        return '#7c8288';
       case 'inprogress':
-        return '#0052CC';
+        return '#2f5fa8';
       case 'onhold':
-        return '#FF8B00';
+        return '#a8752f';
       case 'done':
-        return '#00875A';
+        return '#2f8a52';
       case 'notdone':
-        return '#DE350B';
+        return '#b8452f';
       case 'notapplicable':
-        return '#97A0AF';
+        return '#7c8288';
       default:
-        return '#6554C0';
+        return '#7c8288';
     }
   }
 
   getStatusTagBackground(status: KanbanStatus): string {
     switch (status) {
       case 'todo':
-        return '#F4F5F7';
+        return '#e7e9eb';
       case 'inprogress':
-        return '#DEEBFF';
+        return '#e9f0fb';
       case 'onhold':
-        return '#FFF0B3';
+        return '#faf1e0';
       case 'done':
-        return '#E3FCEF';
+        return '#e5f5ea';
       case 'notdone':
-        return '#FFEBE6';
+        return '#fbe8e2';
       case 'notapplicable':
-        return '#F1F2F4';
+        return '#e7e9eb';
       default:
-        return '#EEE9FF';
+        return '#e7e9eb';
     }
   }
 
   getStatusTagColor(status: KanbanStatus): string {
     switch (status) {
       case 'todo':
-        return '#6B778C';
+        return '#7c8288';
       case 'inprogress':
-        return '#0052CC';
+        return '#2f5fa8';
       case 'onhold':
-        return '#974F0C';
+        return '#a8752f';
       case 'done':
-        return '#006644';
+        return '#2f8a52';
       case 'notdone':
-        return '#AE2E24';
+        return '#b8452f';
       case 'notapplicable':
-        return '#5E6C84';
+        return '#7c8288';
       default:
-        return '#403294';
+        return '#7c8288';
     }
   }
 

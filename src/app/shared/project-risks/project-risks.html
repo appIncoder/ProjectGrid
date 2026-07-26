@@ -147,7 +147,7 @@
 
     <!-- Menu contextuel -->
     <div *ngIf="contextMenu.visible"
-         class="card shadow position-fixed"
+         class="card risk-context-menu position-fixed"
          [style.left.px]="contextMenu.x"
          [style.top.px]="contextMenu.y"
          style="z-index: 2000; min-width: 240px;"
@@ -192,7 +192,7 @@
 
     <!-- Popup ajout de risque -->
     <div *ngIf="isAddRiskModalOpen" class="risk-modal-backdrop" (click)="closeAddRiskModal()">
-      <div class="risk-modal card shadow" (click)="$event.stopPropagation()">
+      <div class="risk-modal card" (click)="$event.stopPropagation()">
         <div class="card-body">
           <h4 class="h6 mb-3">Ajouter un risque</h4>
 

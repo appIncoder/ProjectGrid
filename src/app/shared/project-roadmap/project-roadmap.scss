@@ -8,39 +8,38 @@
   );
 }
 
-// ── Palette MS Project ────────────────────────────────────────────────────────
-$ms-bg:           #F0F0F0;      // fond général
-$ms-pane-bg:      #FFFFFF;      // fond des panneaux
-$ms-header-bg:    #E6ECEF;      // en-têtes de colonnes
-$ms-header-alt:   #D8E0E6;      // en-têtes hover
-$ms-border:       #C8D4DB;      // bordures générales
-$ms-border-light: #E0E6EA;      // séparateurs légers
-$ms-text:         #1F2937;      // texte principal
-$ms-text-muted:   #4B5563;      // texte secondaire
-$ms-text-subtle:  #6B7280;      // texte faible
+// ── Palette Executive Slate (tokens globaux, cf. src/styles.scss) ─────────────
+$ms-pane-bg:      #FFFFFF;                            // fond des panneaux
+$ms-header-bg:    var(--pg-color-bg-head);             // en-têtes de colonnes
+$ms-header-alt:   var(--pg-color-border);               // en-têtes hover / pressed
+$ms-border:       var(--pg-color-border);               // bordures générales
+$ms-border-light: var(--pg-color-border-light);         // séparateurs légers
+$ms-text:         var(--pg-color-text);                 // texte principal
+$ms-text-muted:   var(--pg-color-text-secondary);       // texte secondaire
+$ms-text-subtle:  var(--pg-color-text-tertiary);        // texte faible
 
-// Barres de tâches
-$ms-bar-projet:       #1565C0;
-$ms-bar-metier:       #2E7D32;
-$ms-bar-changement:   #C62828;
-$ms-bar-technologie:  #E65100;
-$ms-bar-summary:      #37474F;
+// Barres de tâches — remappées sur la palette de statut consolidée
+$ms-bar-projet:       var(--pg-status-inprogress-fg);
+$ms-bar-metier:       var(--pg-status-done-fg);
+$ms-bar-changement:   var(--pg-status-alert-fg);
+$ms-bar-technologie:  var(--pg-status-review-fg);
+$ms-bar-summary:      var(--pg-color-navy);
 
 // Statuts
-$ms-today:    #D92B2B;          // ligne aujourd'hui (rouge MS Project)
+$ms-today:    var(--pg-status-alert-fg);          // ligne aujourd'hui
 
-// Accents de type d'activité (bordure gauche)
-$accent-projet:      #1565C0;
-$accent-metier:      #2E7D32;
-$accent-changement:  #C62828;
-$accent-technologie: #E65100;
+// Accents de type d'activité (bordure gauche) — alignés sur les barres ci-dessus
+$accent-projet:      var(--pg-status-inprogress-fg);
+$accent-metier:      var(--pg-status-done-fg);
+$accent-changement:  var(--pg-status-alert-fg);
+$accent-technologie: var(--pg-status-review-fg);
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 .roadmap-root {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--pg-font-body);
   font-size: 0.76rem;
   color: $ms-text;
-  background: $ms-bg;
+  background: transparent;
   * { box-sizing: border-box; }
 }
 
@@ -121,14 +120,15 @@ $accent-technologie: #E65100;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  height: 32px;
+  padding: 0 12px;
   font-family: inherit;
   font-size: 0.74rem;
   font-weight: 500;
   color: $ms-text;
   background: $ms-pane-bg;
   border: 1px solid $ms-border;
-  border-radius: 2px;
+  border-radius: var(--pg-radius);
   cursor: pointer;
   white-space: nowrap;
   transition: background 80ms, border-color 80ms;
@@ -139,30 +139,67 @@ $accent-technologie: #E65100;
   &:disabled {
     cursor: not-allowed;
     opacity: 0.55;
-    background: #F3F4F6;
+    background: var(--pg-color-bg-stripe);
     color: $ms-text-subtle;
   }
 
   &--active {
-    background: #D0E4F7;
-    border-color: #5B9BD5;
-    color: #1A3A5C;
+    background: var(--pg-color-navy);
+    border-color: var(--pg-color-navy);
+    color: #fff;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
   }
 
   &--accent {
-    background: #2B579A;
-    border-color: #1E3F73;
+    background: var(--pg-color-navy);
+    border-color: var(--pg-color-navy);
     color: #fff;
     font-weight: 600;
-    &:hover { background: #1E3F73; }
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    &:hover { background: #262f40; border-color: #262f40; }
   }
 
   &--success {
-    background: #EAF4EB;
-    border-color: #6FAF72;
-    color: #1B5E20;
-    &:hover { background: #D7EDD8; }
+    background: var(--pg-status-done-bg);
+    border-color: var(--pg-status-done-fg);
+    color: var(--pg-status-done-fg);
+    &:hover { filter: brightness(0.96); }
+  }
+}
+
+// ── Bouton "+ Ajouter une activité" (Bootstrap .btn.btn-add) ──────────────────
+// Le style global .btn-add (src/styles.scss) est encore l'ancien bleu arrondi ;
+// on le recale localement sur le traitement "primaire" Executive Slate.
+.roadmap-toolbar {
+  .btn-add {
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    background: var(--pg-color-navy);
+    color: #fff;
+    border: 1px solid var(--pg-color-navy);
+    border-radius: var(--pg-radius);
+    padding: 0 14px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+
+    &:hover:not(:disabled) {
+      background: #262f40;
+      border-color: #262f40;
+      color: #fff;
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      background: var(--pg-color-bg-stripe);
+      border-color: var(--pg-color-border);
+      color: $ms-text-subtle;
+    }
   }
 }
 
@@ -171,8 +208,8 @@ $accent-technologie: #E65100;
 
   .roadmap-btn {
     border-radius: 0;
-    &:first-child { border-radius: 2px 0 0 2px; }
-    &:last-child  { border-radius: 0 2px 2px 0; margin-left: -1px; }
+    &:first-child { border-radius: var(--pg-radius) 0 0 var(--pg-radius); }
+    &:last-child  { border-radius: 0 var(--pg-radius) var(--pg-radius) 0; margin-left: -1px; }
     &:not(:first-child) { margin-left: -1px; }
   }
 }
@@ -185,12 +222,12 @@ $accent-technologie: #E65100;
   color: $ms-text;
   background: $ms-pane-bg;
   border: 1px solid $ms-border;
-  border-radius: 2px;
+  border-radius: var(--pg-radius);
   cursor: pointer;
-  height: 26px;
+  height: 32px;
 
   &--sm { height: 24px; font-size: 0.7rem; width: 100%; padding: 2px 4px; }
-  &:focus { outline: 2px solid #5B9BD5; outline-offset: -1px; }
+  &:focus { outline: 2px solid #2563eb; outline-offset: -1px; }
 }
 
 .roadmap-input {
@@ -200,23 +237,23 @@ $accent-technologie: #E65100;
   color: $ms-text;
   background: $ms-pane-bg;
   border: 1px solid $ms-border;
-  border-radius: 2px;
-  height: 26px;
+  border-radius: var(--pg-radius);
+  height: 32px;
   width: 100%;
 
   &--date { font-size: 0.7rem; padding: 2px 4px; height: 24px; }
   &--error { border-color: $ms-today; }
-  &:focus { outline: 2px solid #5B9BD5; outline-offset: -1px; }
+  &:focus { outline: 2px solid #2563eb; outline-offset: -1px; }
   &:disabled {
     cursor: default;
-    background: #F8FAFC;
+    background: var(--pg-color-bg-stripe);
     color: $ms-text-subtle;
   }
 }
 
 .roadmap-select:disabled {
   cursor: default;
-  background: #F8FAFC;
+  background: var(--pg-color-bg-stripe);
   color: $ms-text-subtle;
 }
 
@@ -226,12 +263,12 @@ $accent-technologie: #E65100;
 .roadmap-status {
   font-size: 0.7rem;
   padding: 3px 8px;
-  border-radius: 2px;
+  border-radius: var(--pg-radius);
   border: 1px solid;
 
-  &--saving { background: #FFF9E6; border-color: #D4A900; color: #7A5E00; }
-  &--ok     { background: #EAF4EB; border-color: #6FAF72; color: #1B5E20; }
-  &--error  { background: #FDECEA; border-color: #E57373; color: #8B0000; }
+  &--saving { background: var(--pg-status-review-bg); border-color: var(--pg-status-review-fg); color: var(--pg-status-review-fg); }
+  &--ok     { background: var(--pg-status-done-bg); border-color: var(--pg-status-done-fg); color: var(--pg-status-done-fg); }
+  &--error  { background: var(--pg-status-alert-bg); border-color: var(--pg-status-alert-fg); color: var(--pg-status-alert-fg); }
 }
 
 // ── Scroll frame ──────────────────────────────────────────────────────────────
@@ -243,7 +280,7 @@ $accent-technologie: #E65100;
   overflow-y: auto;
   overflow-x: hidden;
   border: 1px solid $ms-border;
-  border-radius: 2px;
+  border-radius: var(--pg-radius);
   background: $ms-pane-bg;
 }
 
@@ -285,7 +322,7 @@ $accent-technologie: #E65100;
   cursor: col-resize;
   z-index: 2;
 
-  &:hover { background: rgba(43, 87, 154, 0.12); }
+  &:hover { background: rgba(26, 35, 50, 0.12); }
 }
 
 // ── Table grid ────────────────────────────────────────────────────────────────
@@ -311,10 +348,10 @@ $accent-technologie: #E65100;
   padding: 0 8px;
   background: $ms-header-bg;
   border-top: 1px solid $ms-border;
-  border-bottom: 2px solid $ms-border;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: $ms-text-muted;
+  border-bottom: 1px solid $ms-border;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--pg-color-navy);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   white-space: nowrap;
@@ -342,11 +379,11 @@ $accent-technologie: #E65100;
     left: 4px;
     width: 2px;
     border-radius: 1px;
-    background: rgba(50, 80, 120, 0.2);
+    background: rgba(26, 35, 50, 0.2);
     transition: background 100ms;
   }
 
-  &:hover::before { background: #2B579A; }
+  &:hover::before { background: var(--pg-color-navy); }
 }
 
 // ── Table body cells ──────────────────────────────────────────────────────────
@@ -372,7 +409,7 @@ $accent-technologie: #E65100;
 .roadmap-row-header-cell {
   padding-left: 0 !important;
   padding-right: 4px !important;
-  background: #EEF2F6;
+  background: $ms-header-bg;
   border-top: 1px solid $ms-border !important;
 
   &.activity-projet      { border-left: 4px solid $accent-projet; }
@@ -393,10 +430,10 @@ $accent-technologie: #E65100;
   cursor: pointer;
   text-align: left;
   padding: 2px 4px;
-  border-radius: 2px;
+  border-radius: var(--pg-radius);
   font-family: inherit;
 
-  &:hover { background: rgba(43, 87, 154, 0.06); }
+  &:hover { background: rgba(26, 35, 50, 0.06); }
 }
 
 .roadmap-row-toggle-indicator {
@@ -442,9 +479,9 @@ $accent-technologie: #E65100;
 
 .roadmap-row-progress {
   font-size: 0.64rem;
-  color: #1B5E20;
-  background: #EAF4EB;
-  border: 1px solid #A5D6A7;
+  color: var(--pg-status-done-fg);
+  background: var(--pg-status-done-bg);
+  border: 1px solid var(--pg-status-done-fg);
   border-radius: 10px;
   padding: 1px 6px;
   min-width: 2.4rem;
@@ -455,7 +492,7 @@ $accent-technologie: #E65100;
 .roadmap-row-task-cell {
   background: $ms-pane-bg;
 
-  &:nth-child(14n) { background: #F5F7FA; } // approximation alternance (7 cols par ligne)
+  &:nth-child(14n) { background: var(--pg-color-bg-stripe); } // approximation alternance (7 cols par ligne)
 }
 
 .roadmap-row-task-label {
@@ -492,7 +529,7 @@ $accent-technologie: #E65100;
   color: $ms-text-muted;
   background: $ms-header-bg;
   border: 1px solid $ms-border;
-  border-radius: 2px;
+  border-radius: var(--pg-radius);
   padding: 1px 5px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -501,12 +538,14 @@ $accent-technologie: #E65100;
 // ── Table helpers ─────────────────────────────────────────────────────────────
 .roadmap-dash { color: $ms-text-subtle; font-size: 0.8rem; }
 
+// Phase = libellé libre (par projet), pas un statut fixe : chip neutre plutôt
+// que la teinte bleue ad-hoc d'origine.
 .roadmap-phase-chip {
   font-size: 0.68rem;
-  color: #1A3A5C;
-  background: #D0E4F7;
-  border: 1px solid #A0C0E0;
-  border-radius: 2px;
+  color: var(--pg-color-navy);
+  background: $ms-header-bg;
+  border: 1px solid $ms-border;
+  border-radius: var(--pg-radius);
   padding: 1px 6px;
   white-space: nowrap;
 }
@@ -536,7 +575,7 @@ $accent-technologie: #E65100;
 
 .roadmap-progress-bar {
   height: 100%;
-  background: $ms-bar-projet;
+  background: var(--pg-status-inprogress-fg);
   transition: width 200ms;
 }
 
@@ -552,7 +591,7 @@ $accent-technologie: #E65100;
 
 .gantt-svg {
   display: block;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--pg-font-body);
 }
 
 // ── Header mois ───────────────────────────────────────────────────────────────
@@ -565,21 +604,24 @@ $accent-technologie: #E65100;
 
 .gantt-month-text {
   font-size: 0.66rem;
-  font-weight: 600;
+  font-weight: 700;
   text-anchor: middle;
-  fill: $ms-text-muted;
+  fill: var(--pg-color-navy);
 }
 
 // ── Jalons ────────────────────────────────────────────────────────────────────
+// Couleur alignée sur le fix global (project-page.scss, ViewEncapsulation.None) :
+// ces règles locales sont plus spécifiques (encapsulation Angular) et gagneraient
+// sinon sur l'override global, d'où le recalage sur le même token ici.
 .gantt-milestone { cursor: pointer; }
 .gantt-milestone--readonly { cursor: default; }
-.gantt-milestone-dot  { fill: #8B0000; }
-.gantt-milestone-text { font-size: 0.58rem; fill: #8B0000; text-anchor: middle; }
-.gantt-milestone:hover .gantt-milestone-dot { fill: #B00000; }
-.gantt-milestone:hover .gantt-milestone-text { fill: #B00000; text-decoration: underline; }
+.gantt-milestone-dot  { fill: var(--pg-status-alert-fg); }
+.gantt-milestone-text { font-size: 0.58rem; fill: var(--pg-status-alert-fg); text-anchor: middle; }
+.gantt-milestone:hover .gantt-milestone-dot { fill: #9a3a26; }
+.gantt-milestone:hover .gantt-milestone-text { fill: #9a3a26; text-decoration: underline; }
 
-.gantt-milestone--readonly:hover .gantt-milestone-dot { fill: #8B0000; }
-.gantt-milestone--readonly:hover .gantt-milestone-text { fill: #8B0000; text-decoration: none; }
+.gantt-milestone--readonly:hover .gantt-milestone-dot { fill: var(--pg-status-alert-fg); }
+.gantt-milestone--readonly:hover .gantt-milestone-text { fill: var(--pg-status-alert-fg); text-decoration: none; }
 
 .roadmap-root--readonly {
   .gantt-bar,
@@ -589,19 +631,49 @@ $accent-technologie: #E65100;
   }
 }
 
+// ── Modal jalon (Bootstrap .btn-*) — recalées localement sur Executive Slate ──
 .milestone-modal-footer {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 
+  .btn {
+    border-radius: var(--pg-radius);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .btn-primary {
+    background: var(--pg-color-navy);
+    border-color: var(--pg-color-navy);
+    color: #fff;
+
+    &:hover, &:focus { background: #262f40; border-color: #262f40; }
+  }
+
+  .btn-outline-secondary {
+    background: #fff;
+    border-color: var(--pg-color-border);
+    color: var(--pg-color-text);
+
+    &:hover, &:focus { background: var(--pg-color-bg-head); border-color: var(--pg-color-border); color: var(--pg-color-text); }
+  }
+
   .btn-outline-danger {
     margin-right: auto;
+    background: #fff;
+    border-color: var(--pg-status-alert-fg);
+    color: var(--pg-status-alert-fg);
+
+    &:hover, &:focus { background: var(--pg-status-alert-fg); border-color: var(--pg-status-alert-fg); color: #fff; }
   }
 }
 
 // ── Grille ────────────────────────────────────────────────────────────────────
 .gantt-row-stripe--even { fill: #FFFFFF; }
-.gantt-row-stripe--odd  { fill: #F5F7FA; }
+.gantt-row-stripe--odd  { fill: var(--pg-color-bg-stripe); }
 
 .gantt-grid-line {
   stroke: $ms-border-light;
@@ -644,7 +716,7 @@ $accent-technologie: #E65100;
   &:hover { opacity: 0.85; filter: brightness(1.1); }
 
   &--highlight {
-    stroke: #FFC107;
+    stroke: var(--pg-color-amber);
     stroke-width: 2;
     opacity: 1 !important;
   }
@@ -652,10 +724,10 @@ $accent-technologie: #E65100;
 }
 
 .gantt-bar-summary {
-  rx: 0;
-  ry: 0;
+  rx: 2px;
+  ry: 2px;
   fill: $ms-bar-summary;
-  opacity: 0.8;
+  opacity: 0.85;
   cursor: grab;
 }
 
@@ -668,12 +740,12 @@ $accent-technologie: #E65100;
 // ── Click hint (icône éditer) ─────────────────────────────────────────────────
 .gantt-click-hint circle {
   fill: rgba(255,255,255,0.92);
-  stroke: rgba(30,40,60,0.35);
+  stroke: rgba(26,35,50,0.35);
   stroke-width: 0.8;
   pointer-events: none;
 }
 .gantt-click-hint text {
-  fill: #1F2937;
+  fill: var(--pg-color-text);
   font-size: 0.62rem;
   pointer-events: none;
 }
@@ -681,18 +753,18 @@ $accent-technologie: #E65100;
 // ── Liens de dépendance ───────────────────────────────────────────────────────
 .gantt-link {
   fill: none;
-  stroke: #7B8EA1;
+  stroke: var(--pg-color-text-tertiary);
   stroke-width: 1;
   stroke-linejoin: round;
   stroke-linecap: round;
   transition: opacity 100ms, stroke-width 100ms;
 }
-.gantt-link--hover  { stroke: #1565C0; stroke-width: 2; opacity: 1 !important; }
-.gantt-link--focus  { stroke: #1565C0; stroke-width: 1.6; opacity: 0.95; }
+.gantt-link--hover  { stroke: var(--pg-status-inprogress-fg); stroke-width: 2; opacity: 1 !important; }
+.gantt-link--focus  { stroke: var(--pg-status-inprogress-fg); stroke-width: 1.6; opacity: 0.95; }
 .gantt-link--dim    { opacity: 0.1; }
-.gantt-link--draft  { stroke: #1565C0; stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.9; }
+.gantt-link--draft  { stroke: var(--pg-status-inprogress-fg); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.9; }
 
-.gantt-link-target-anchor { fill: #fff; stroke: #1565C0; stroke-width: 2; }
+.gantt-link-target-anchor { fill: #fff; stroke: var(--pg-status-inprogress-fg); stroke-width: 2; }
 
 // ── Bullets (handles début/fin) ───────────────────────────────────────────────
 .gantt-bar-bullet {
@@ -708,14 +780,16 @@ $accent-technologie: #E65100;
 .gantt-bullet--technologie { stroke: $ms-bar-technologie; }
 .gantt-bar-bullet:hover    { stroke-width: 2; }
 .gantt-bar-bullet-end      { cursor: ew-resize; }
-.gantt-bullet--highlight   { stroke: #FFC107; stroke-width: 2.2; opacity: 1; }
+.gantt-bullet--highlight   { stroke: var(--pg-color-amber); stroke-width: 2.2; opacity: 1; }
 .gantt-bullet--dim         { opacity: 0.15; }
 
 // ── Tooltips (hints) ─────────────────────────────────────────────────────────
-.gantt-hint-bg    { fill: rgba(30, 40, 60, 0.88); }
+// rx/ry recalés à 2px (au lieu de 3-4px définis inline dans le HTML) pour rester
+// cohérent avec --pg-radius sans devoir toucher le markup.
+.gantt-hint-bg    { fill: rgba(26, 35, 50, 0.9); rx: 2px; ry: 2px; }
 .gantt-hint-text  { fill: #fff; font-size: 0.62rem; pointer-events: none; }
 
-.gantt-link-tooltip-bg  { fill: rgba(30, 40, 60, 0.88); pointer-events: none; }
+.gantt-link-tooltip-bg  { fill: rgba(26, 35, 50, 0.9); pointer-events: none; rx: 2px; ry: 2px; }
 .gantt-link-tooltip-text { fill: #fff; font-size: 0.62rem; pointer-events: none; }
 
 // ── Responsive ────────────────────────────────────────────────────────────────

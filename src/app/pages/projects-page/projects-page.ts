@@ -6,20 +6,19 @@ import { NavigationEnd, Router, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
-import { ProjectDataService, type ProjectTypeDefaults, type ProjectTypeRef } from '../../services/project-data.service';
-import { AuthService } from '../../services/auth.service';
-import { DEFAULT_PROJECT_SETTINGS, type ActivityId, type ActivityStatus, type Health, type PhaseId, type ProjectDetail, type ProjectListItem, type ProjectRole, type ProjectStatus } from '../../models';
+import { ProjectDataService } from '../../services/project-data.service';
+import { type ActivityStatus, type Health, type PhaseId, type ProjectDetail, type ProjectListItem, type ProjectStatus } from '../../models';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { ProjectCreateWizard } from '../../shared/project-create-wizard/project-create-wizard';
 
 @Component({
   selector: 'app-projects-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, NgbDropdownModule, ConfirmDialog],
+  imports: [CommonModule, FormsModule, RouterModule, NgbDropdownModule, ConfirmDialog, ProjectCreateWizard],
   templateUrl: './projects-page.html',
   styleUrls: ['./projects-page.scss'],
 })
 export class ProjectsPage implements OnInit, OnDestroy {
-  private static readonly PROJECT_OWNER_EMAIL = 'etienne.darquennes@eglisemlk.fr';
   searchTerm = '';
   statusFilter: ProjectStatus | 'Tous' = 'Tous';
   healthFilter: Health | 'Tous' = 'Tous';
@@ -29,16 +28,7 @@ export class ProjectsPage implements OnInit, OnDestroy {
   projects: ProjectListItem[] = [];
   isLoading = false;
   loadError: string | null = null;
-  isCreateModalOpen = false;
-  isCreatingProject = false;
-  isLoadingProjectTypes = false;
-  createProjectError: string | null = null;
-  projectTypeOptions: ProjectTypeRef[] = [];
-  createProjectForm = {
-    projectTypeId: '',
-    name: '',
-    description: '',
-  };
+  isCreateWizardOpen = false;
   isDeleteModalOpen = false;
   isDeletingProject = false;
   deleteProjectError: string | null = null;
@@ -52,7 +42,6 @@ export class ProjectsPage implements OnInit, OnDestroy {
   constructor(
     private router: Router,
     private projectData: ProjectDataService,
-    private auth: AuthService,
     private cdr: ChangeDetectorRef
   ) {}
 
@@ -116,20 +105,6 @@ export class ProjectsPage implements OnInit, OnDestroy {
       health: this.computeHealth(detail),
       healthName,
       currentPhase: currentPhase.replace('Phase', 'Phase '),
-    };
-  }
-
-  private async resolveProjectOwner(): Promise<{ id: string; label: string; email: string }> {
-    const users = await this.projectData.listUsers();
-    const owner = users.find((user) => String(user.email ?? '').trim().toLowerCase() === ProjectsPage.PROJECT_OWNER_EMAIL);
-    if (!owner?.id) {
-      throw new Error(`Configured project owner not found: ${ProjectsPage.PROJECT_OWNER_EMAIL}`);
-    }
-
-    return {
-      id: String(owner.id).trim(),
-      label: String(owner.label || owner.email || ProjectsPage.PROJECT_OWNER_EMAIL).trim(),
-      email: String(owner.email || ProjectsPage.PROJECT_OWNER_EMAIL).trim(),
     };
   }
 
@@ -240,135 +215,13 @@ export class ProjectsPage implements OnInit, OnDestroy {
   }
 
   // Actions
-  get connectedOwnerLabel(): string {
-    const user = this.auth.user;
-    return String(user?.label ?? user?.username ?? '—').trim() || '—';
-  }
-
   onCreateProject(): void {
-    this.isCreateModalOpen = true;
-    this.createProjectError = null;
-    this.createProjectForm = {
-      projectTypeId: '',
-      name: '',
-      description: '',
-    };
-    void this.loadProjectTypesForCreation();
+    this.isCreateWizardOpen = true;
   }
 
-  closeCreateProjectModal(): void {
-    if (this.isCreatingProject) return;
-    this.isCreateModalOpen = false;
-    this.createProjectError = null;
-  }
-
-  async submitCreateProject(): Promise<void> {
-    const projectTypeId = this.createProjectForm.projectTypeId.trim();
-    const name = this.createProjectForm.name.trim();
-    const description = this.createProjectForm.description.trim();
-
-    if (!projectTypeId) {
-      this.createProjectError = 'Le type de projet est obligatoire.';
-      return;
-    }
-
-    if (!name) {
-      this.createProjectError = 'Le nom du projet est obligatoire.';
-      return;
-    }
-
-    let ownerUser: { id: string; label: string; email: string };
-    try {
-      ownerUser = await this.resolveProjectOwner();
-    } catch (e) {
-      console.error('[ProjectsPage] resolveProjectOwner error', e);
-      this.createProjectError = 'Le compte owner configuré est introuvable dans Firestore.';
-      return;
-    }
-
-    const owner = ownerUser.label;
-    const projectId =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `p-${Date.now()}`;
-
-    const defaults = await this.projectData.getProjectTypeDefaults(projectTypeId);
-    if (!defaults) {
-      this.createProjectError = 'Impossible de charger les données du type de projet sélectionné.';
-      return;
-    }
-
-    const seeded = this.buildProjectSeedFromType(defaults, owner);
-    if (!seeded) {
-      this.createProjectError = "Le type de projet sélectionné n'est pas compatible avec la structure attendue.";
-      return;
-    }
-
-    const memberRoles: Record<string, ProjectRole[]> = {
-      [ownerUser.id]: ['projectManager'],
-    };
-    const currentUserId = String(this.auth.user?.id ?? '').trim();
-    if (currentUserId) {
-      memberRoles[currentUserId] = Array.from(new Set([...(memberRoles[currentUserId] ?? []), 'projectManager']));
-    }
-
-    const payload: ProjectDetail & {
-      owner?: string;
-      createdBy?: string;
-      projectManager?: string;
-      memberRoles?: Record<string, ProjectRole[]>;
-      risks?: unknown[];
-      budgetSummary?: {
-        initial: number;
-        engaged: number;
-        spent: number;
-        forecast: number;
-        currency: string;
-      };
-      budgetLines?: unknown[];
-    } = {
-      id: projectId,
-      name,
-      description,
-      phases: seeded.phases,
-      phaseDefinitions: seeded.phaseDefinitions,
-      activities: seeded.activities,
-      activityMatrix: seeded.taskMatrix,
-      taskMatrix: seeded.taskMatrix,
-      owner,
-      createdBy: this.connectedOwnerLabel,
-      projectManager: owner,
-      projectTypeId,
-      displayInteractions: defaults.displayInteractions ?? DEFAULT_PROJECT_SETTINGS,
-      ...(defaults.workflow ? { workflow: defaults.workflow } : {}),
-      memberRoles,
-      risks: [],
-      budgetSummary: {
-        initial: 0,
-        engaged: 0,
-        spent: 0,
-        forecast: 0,
-        currency: '€',
-      },
-      budgetLines: [],
-    };
-
-    this.isCreatingProject = true;
-    this.createProjectError = null;
-    try {
-      await this.projectData.saveProject(payload);
-      await this.loadProjectsFromApi();
-      this.isCreateModalOpen = false;
-      await this.router.navigate(['/project', projectId]);
-    } catch (e) {
-      console.error('[ProjectsPage] submitCreateProject error', e);
-      this.createProjectError = "Impossible de créer le projet pour l'instant.";
-    } finally {
-      this.isCreatingProject = false;
-      if (!this.destroyed) {
-        this.cdr.detectChanges();
-      }
-    }
+  onCreateWizardClosed(): void {
+    this.isCreateWizardOpen = false;
+    void this.loadProjectsFromApi();
   }
 
   // 🔹 Ouvrir la page détail du projet
@@ -442,92 +295,4 @@ export class ProjectsPage implements OnInit, OnDestroy {
     }
   }
 
-  private async loadProjectTypesForCreation(): Promise<void> {
-    this.isLoadingProjectTypes = true;
-    try {
-      const rows = await this.projectData.listProjectTypes();
-      this.projectTypeOptions = rows;
-      if (!this.createProjectForm.projectTypeId && rows.length === 1) {
-        this.createProjectForm.projectTypeId = rows[0].id;
-      }
-    } catch (e) {
-      console.error('[ProjectsPage] loadProjectTypesForCreation error', e);
-      this.projectTypeOptions = [];
-      this.createProjectError = "Impossible de charger la liste des projets types.";
-    } finally {
-      this.isLoadingProjectTypes = false;
-      if (!this.destroyed) this.cdr.detectChanges();
-    }
-  }
-
-  private buildProjectSeedFromType(defaults: ProjectTypeDefaults, owner: string): {
-    phases: PhaseId[];
-    phaseDefinitions: NonNullable<ProjectDetail['phaseDefinitions']>;
-    activities: ProjectDetail['activities'];
-    taskMatrix: ProjectDetail['taskMatrix'];
-  } | null {
-    const phases = defaults.phases
-      .map((p) => String(p.id ?? '').trim())
-      .filter((id): id is PhaseId => !!id);
-    const activitiesRaw = defaults.activities
-      .map((a) => ({
-        id: String(a.id ?? '').trim() as ActivityId,
-        label: String(a.label ?? '').trim(),
-        sequence: a.sequence ?? null,
-      }))
-      .filter((a) => !!a.id);
-
-    if (!phases.length || !activitiesRaw.length) return null;
-
-    const activities = {} as ProjectDetail['activities'];
-    const phaseDefinitions = {} as NonNullable<ProjectDetail['phaseDefinitions']>;
-    const taskMatrix = {} as ProjectDetail['taskMatrix'];
-
-    for (const p of defaults.phases) {
-      const phaseId = String(p.id ?? '').trim() as PhaseId;
-      if (!phaseId) continue;
-      phaseDefinitions[phaseId] = {
-        id: phaseId,
-        label: String(p.label ?? phaseId).trim() || phaseId,
-        startDate: '',
-        endDate: '',
-      };
-    }
-
-    for (const a of activitiesRaw) {
-      const aid = a.id as ActivityId;
-      activities[aid] = {
-        id: aid,
-        label: a.label || aid,
-        owner,
-        sequence: a.sequence ?? null,
-      };
-      taskMatrix[aid] = {} as Record<PhaseId, any[]>;
-      for (const ph of phases) {
-        taskMatrix[aid][ph] = [];
-      }
-    }
-
-    const uniqueByCell = new Set<string>();
-    const defaultsActivities = Array.isArray(defaults.activitiesDefault) && defaults.activitiesDefault.length
-      ? defaults.activitiesDefault
-      : defaults.tasks;
-    for (const t of defaultsActivities) {
-      const aid = t.activityId as ActivityId;
-      const ph = t.phaseId as PhaseId;
-      if (!taskMatrix[aid] || !Array.isArray(taskMatrix[aid][ph])) continue;
-      const taskId = t.id || `${aid}-${ph}-${taskMatrix[aid][ph].length + 1}`;
-      const cellKey = `${aid}|${ph}|${taskId}`;
-      if (uniqueByCell.has(cellKey)) continue;
-      uniqueByCell.add(cellKey);
-      taskMatrix[aid][ph].push({
-        id: taskId,
-        label: t.label || taskId,
-        status: 'todo',
-        phase: ph,
-      });
-    }
-
-    return { phases, phaseDefinitions, activities, taskMatrix };
-  }
 }

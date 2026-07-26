@@ -1,0 +1,184 @@
+<div *ngIf="open" class="wizard-backdrop" (click)="cancel()" aria-hidden="true"></div>
+
+<div *ngIf="open" class="wizard" role="dialog" aria-modal="true" aria-labelledby="wizardTitle">
+  <div class="wizard__panel" (click)="$event.stopPropagation()">
+
+    <div class="wizard__header">
+      <h3 id="wizardTitle" class="mb-0">Nouveau projet</h3>
+      <button type="button" class="btn-close" aria-label="Fermer" [disabled]="isCreating" (click)="cancel()"></button>
+    </div>
+
+    <!-- Fil d'étapes (tunnel) -->
+    <div class="wizard__steps">
+      <ng-container *ngFor="let s of steps; let i = index">
+        <button
+          type="button"
+          class="wizard__step"
+          [class.wizard__step--active]="step === s.id"
+          [class.wizard__step--done]="step > s.id"
+          [disabled]="s.id >= step"
+          (click)="goToStep(s.id)">
+          <span class="wizard__step-index">{{ step > s.id ? '✓' : s.id }}</span>
+          <span class="wizard__step-label">{{ s.label }}</span>
+        </button>
+        <span *ngIf="i < steps.length - 1" class="wizard__step-connector"></span>
+      </ng-container>
+    </div>
+
+    <div class="wizard__body">
+
+      <!-- ÉTAPE 1 : Cadrage -->
+      <div *ngIf="step === 1">
+        <p class="text-muted small mb-3">
+          Démarrez à partir d'un framework de gestion de projet existant, ou à blanc.
+        </p>
+
+        <div *ngIf="step1Error" class="alert alert-danger py-2 mb-3">{{ step1Error }}</div>
+
+        <div class="mb-3">
+          <label class="form-label">Point de départ <span class="text-danger">*</span></label>
+          <div class="wizard__mode-toggle">
+            <button
+              type="button"
+              class="wizard__mode-btn"
+              [class.wizard__mode-btn--active]="mode === 'blank'"
+              (click)="mode = 'blank'">
+              À blanc
+            </button>
+            <button
+              type="button"
+              class="wizard__mode-btn"
+              [class.wizard__mode-btn--active]="mode === 'framework'"
+              (click)="mode = 'framework'">
+              À partir d'un framework
+            </button>
+          </div>
+        </div>
+
+        <div class="mb-3" *ngIf="mode === 'framework'">
+          <label class="form-label">Framework <span class="text-danger">*</span></label>
+          <select class="form-select" [(ngModel)]="projectTypeId" [disabled]="isLoadingRefData">
+            <option value="" disabled>Sélectionnez un framework</option>
+            <option *ngFor="let pt of projectTypeOptions" [value]="pt.id">{{ pt.name }}</option>
+          </select>
+          <div *ngIf="isLoadingRefData" class="small text-muted mt-1">Chargement des frameworks...</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Nom du projet <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" [(ngModel)]="name" placeholder="Ex: Programme Transformation CRM" />
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" rows="3" [(ngModel)]="description" placeholder="Contexte et objectifs du projet"></textarea>
+        </div>
+
+        <div class="mb-0">
+          <label class="form-label">Date de début du projet <span class="text-danger">*</span></label>
+          <input type="date" class="form-control" [(ngModel)]="startDate" />
+        </div>
+      </div>
+
+      <!-- ÉTAPE 2 : Équipe -->
+      <div *ngIf="step === 2">
+        <p class="text-muted small mb-3">
+          Qui sont les membres d'équipe principaux (managers) de ce projet ?
+        </p>
+
+        <div *ngIf="step2Error" class="alert alert-danger py-2 mb-3">{{ step2Error }}</div>
+
+        <div class="wizard__creator-row mb-3">
+          <div class="wizard__creator-label">{{ creatorLabel }}</div>
+          <div class="wizard__badges">
+            <span class="wizard__badge">Propriétaire</span>
+            <span class="wizard__badge">Manager du volet Projet</span>
+            <span *ngIf="isRealSysAdmin" class="wizard__badge wizard__badge--admin">Administrateur système</span>
+          </div>
+        </div>
+
+        <div class="wizard__manager-list mb-3" *ngIf="managers.length">
+          <div class="wizard__manager-row" *ngFor="let m of managers">
+            <div class="wizard__creator-label">{{ m.label }}</div>
+            <span class="wizard__badge">{{ getManagerRoleLabel(m.role) }}</span>
+            <button type="button" class="wizard__remove-btn" (click)="removeManager(m.userId)" aria-label="Retirer">×</button>
+          </div>
+        </div>
+
+        <div class="wizard__add-manager" *ngIf="availableManagerRoleOptions.length">
+          <select class="form-select" [(ngModel)]="addManagerUserId" [disabled]="isLoadingRefData">
+            <option value="" disabled>Sélectionnez un utilisateur</option>
+            <option *ngFor="let u of availableUsersForManager" [value]="u.id">{{ u.label }}</option>
+          </select>
+          <select class="form-select" [(ngModel)]="addManagerRole">
+            <option value="" disabled>Sélectionnez le volet</option>
+            <option *ngFor="let r of availableManagerRoleOptions" [value]="r.value">{{ r.label }}</option>
+          </select>
+          <app-button variant="secondary" size="md" (pressed)="addManager()">+ Ajouter</app-button>
+        </div>
+        <p *ngIf="!availableManagerRoleOptions.length" class="small text-muted mb-0">
+          Tous les volets métier, changement et technologie ont un manager assigné.
+        </p>
+      </div>
+
+      <!-- ÉTAPE 3 : Risques -->
+      <div *ngIf="step === 3">
+        <p class="text-muted small mb-3">
+          Existe-t-il des risques à mentionner dès maintenant ? Cette étape est facultative.
+        </p>
+
+        <div *ngIf="step3Error" class="alert alert-danger py-2 mb-3">{{ step3Error }}</div>
+
+        <div class="wizard__risk-list mb-3" *ngIf="risks.length">
+          <div class="wizard__risk-row" *ngFor="let r of risks; let i = index">
+            <div class="wizard__risk-info">
+              <div class="wizard__risk-title">{{ r.title }}</div>
+              <div class="wizard__risk-meta">{{ r.probability }} · {{ getCriticityLabel(r.criticity) }}</div>
+            </div>
+            <button type="button" class="wizard__remove-btn" (click)="removeRisk(i)" aria-label="Retirer">×</button>
+          </div>
+        </div>
+
+        <div class="wizard__risk-form">
+          <div class="mb-2">
+            <label class="form-label small mb-1">Intitulé du risque</label>
+            <input class="form-control form-control-sm" [(ngModel)]="newRisk.title" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">Description</label>
+            <textarea class="form-control form-control-sm" rows="2" [(ngModel)]="newRisk.description"></textarea>
+          </div>
+          <div class="wizard__risk-form-row">
+            <div>
+              <label class="form-label small mb-1">Probabilité</label>
+              <select class="form-select form-select-sm" [(ngModel)]="newRisk.probability">
+                <option *ngFor="let p of riskProbabilityLevels" [ngValue]="p">{{ p }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small mb-1">Criticité</label>
+              <select class="form-select form-select-sm" [(ngModel)]="newRisk.criticity">
+                <option *ngFor="let c of riskCriticityLevels" [ngValue]="c.value">{{ c.label }}</option>
+              </select>
+            </div>
+          </div>
+          <app-button variant="secondary" size="sm" (pressed)="addRisk()">+ Ajouter ce risque</app-button>
+        </div>
+      </div>
+
+      <div *ngIf="createError" class="alert alert-danger py-2 mt-3 mb-0">{{ createError }}</div>
+    </div>
+
+    <div class="wizard__footer">
+      <app-button variant="secondary" [disabled]="isCreating" (pressed)="cancel()">Annuler</app-button>
+      <div class="wizard__footer-nav">
+        <app-button *ngIf="step > 1" variant="secondary" [disabled]="isCreating" (pressed)="goBack()">Précédent</app-button>
+        <app-button *ngIf="step < 3" variant="primary" (pressed)="goNext()">Suivant</app-button>
+        <app-button *ngIf="step === 3" variant="primary" [disabled]="isCreating" (pressed)="submitCreate()">
+          {{ isCreating ? 'Création...' : 'Créer le projet' }}
+        </app-button>
+      </div>
+    </div>
+
+  </div>
+</div>

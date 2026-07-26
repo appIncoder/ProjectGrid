@@ -1,0 +1,294 @@
+:host {
+  display: block;
+}
+
+.wizard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(2px);
+}
+
+.wizard {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.wizard__panel {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(10, 30, 66, 0.2);
+}
+
+.wizard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1rem 0.8rem;
+  border-bottom: 1px solid var(--pg-color-border-light);
+
+  h3 {
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: var(--pg-color-navy);
+  }
+}
+
+/* Fil d'étapes */
+.wizard__steps {
+  display: flex;
+  align-items: center;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--pg-color-border-light);
+  background: var(--pg-color-bg-head);
+}
+
+.wizard__step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.55;
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.wizard__step--active,
+.wizard__step--done {
+  opacity: 1;
+}
+
+.wizard__step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--pg-color-border);
+  background: #ffffff;
+  color: var(--pg-color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wizard__step--active .wizard__step-index {
+  border-color: var(--pg-color-navy);
+  background: var(--pg-color-navy);
+  color: #ffffff;
+}
+
+.wizard__step--done .wizard__step-index {
+  border-color: var(--pg-status-done-fg);
+  background: var(--pg-status-done-bg);
+  color: var(--pg-status-done-fg);
+}
+
+.wizard__step-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--pg-color-text-secondary);
+}
+
+.wizard__step--active .wizard__step-label {
+  color: var(--pg-color-navy);
+}
+
+.wizard__step-connector {
+  flex: 1 1 24px;
+  height: 1px;
+  margin: 0 0.75rem;
+  background: var(--pg-color-border);
+}
+
+.wizard__body {
+  padding: 1.1rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+
+  .form-control,
+  .form-select {
+    border-radius: var(--pg-radius);
+    border-color: var(--pg-color-border);
+  }
+}
+
+.wizard__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem 1rem;
+  border-top: 1px solid var(--pg-color-border-light);
+}
+
+.wizard__footer-nav {
+  display: flex;
+  gap: 0.55rem;
+}
+
+/* Étape 1 : mode toggle */
+.wizard__mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.wizard__mode-btn {
+  flex: 1 1 0;
+  height: 38px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+  background: #ffffff;
+  color: var(--pg-color-navy);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wizard__mode-btn--active {
+  border-color: var(--pg-color-navy);
+  background: var(--pg-color-navy);
+  color: #ffffff;
+}
+
+/* Étape 2 : équipe */
+.wizard__creator-row,
+.wizard__manager-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--pg-color-border-light);
+  border-radius: var(--pg-radius);
+  background: var(--pg-color-bg-stripe);
+}
+
+.wizard__manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wizard__creator-label {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--pg-color-navy);
+  flex: 1 1 auto;
+}
+
+.wizard__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.wizard__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--pg-status-inprogress-fg);
+  background: var(--pg-status-inprogress-bg);
+  color: var(--pg-status-inprogress-fg);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wizard__badge--admin {
+  border-color: var(--pg-color-amber);
+  background: var(--pg-status-review-bg);
+  color: var(--pg-color-amber);
+}
+
+.wizard__add-manager {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.wizard__remove-btn {
+  border: none;
+  background: none;
+  color: var(--pg-status-alert-fg);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+/* Étape 3 : risques */
+.wizard__risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wizard__risk-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--pg-color-border-light);
+  border-radius: var(--pg-radius);
+  background: var(--pg-color-bg-stripe);
+}
+
+.wizard__risk-info {
+  flex: 1 1 auto;
+}
+
+.wizard__risk-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--pg-color-navy);
+}
+
+.wizard__risk-meta {
+  font-size: 12px;
+  color: var(--pg-color-text-secondary);
+}
+
+.wizard__risk-form {
+  border: 1px solid var(--pg-color-border-light);
+  border-radius: var(--pg-radius);
+  padding: 0.75rem;
+  background: var(--pg-color-bg-stripe);
+}
+
+.wizard__risk-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+@media (max-width: 767.98px) {
+  .wizard {
+    padding: 0.6rem;
+  }
+
+  .wizard__add-manager {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard__risk-form-row {
+    grid-template-columns: 1fr;
+  }
+}

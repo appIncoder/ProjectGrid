@@ -186,6 +186,104 @@ export class ProjectDataService {
     return this.backend.getProjectTypeDefaults(projectTypeId);
   }
 
+  /** Construit la structure (phases/activités/matrice de tâches) d'un projet à partir d'un projet type. */
+  buildProjectSeed(defaults: ProjectTypeDefaults, owner: string): {
+    phases: PhaseId[];
+    phaseDefinitions: NonNullable<ProjectDetail['phaseDefinitions']>;
+    activities: ProjectDetail['activities'];
+    taskMatrix: ProjectDetail['taskMatrix'];
+  } | null {
+    const phases = defaults.phases
+      .map((p) => String(p.id ?? '').trim())
+      .filter((id): id is PhaseId => !!id);
+    const activitiesRaw = defaults.activities
+      .map((a) => ({
+        id: String(a.id ?? '').trim() as ActivityId,
+        label: String(a.label ?? '').trim(),
+        sequence: a.sequence ?? null,
+      }))
+      .filter((a) => !!a.id);
+
+    if (!phases.length || !activitiesRaw.length) return null;
+
+    const activities = {} as ProjectDetail['activities'];
+    const phaseDefinitions = {} as NonNullable<ProjectDetail['phaseDefinitions']>;
+    const taskMatrix = {} as ProjectDetail['taskMatrix'];
+
+    for (const p of defaults.phases) {
+      const phaseId = String(p.id ?? '').trim() as PhaseId;
+      if (!phaseId) continue;
+      phaseDefinitions[phaseId] = {
+        id: phaseId,
+        label: String(p.label ?? phaseId).trim() || phaseId,
+        startDate: '',
+        endDate: '',
+      };
+    }
+
+    for (const a of activitiesRaw) {
+      const aid = a.id as ActivityId;
+      activities[aid] = {
+        id: aid,
+        label: a.label || aid,
+        owner,
+        sequence: a.sequence ?? null,
+      };
+      taskMatrix[aid] = {} as Record<PhaseId, any[]>;
+      for (const ph of phases) {
+        taskMatrix[aid][ph] = [];
+      }
+    }
+
+    const uniqueByCell = new Set<string>();
+    const defaultsActivities = Array.isArray(defaults.activitiesDefault) && defaults.activitiesDefault.length
+      ? defaults.activitiesDefault
+      : defaults.tasks;
+    for (const t of defaultsActivities) {
+      const aid = t.activityId as ActivityId;
+      const ph = t.phaseId as PhaseId;
+      if (!taskMatrix[aid] || !Array.isArray(taskMatrix[aid][ph])) continue;
+      const taskId = t.id || `${aid}-${ph}-${taskMatrix[aid][ph].length + 1}`;
+      const cellKey = `${aid}|${ph}|${taskId}`;
+      if (uniqueByCell.has(cellKey)) continue;
+      uniqueByCell.add(cellKey);
+      taskMatrix[aid][ph].push({
+        id: taskId,
+        label: t.label || taskId,
+        status: 'todo',
+        phase: ph,
+      });
+    }
+
+    return { phases, phaseDefinitions, activities, taskMatrix };
+  }
+
+  /** Construit un projet "à blanc" : structure standard (6 phases, 4 activités) sans aucune tâche pré-remplie. */
+  buildBlankProjectSeed(owner: string): {
+    phases: PhaseId[];
+    phaseDefinitions: NonNullable<ProjectDetail['phaseDefinitions']>;
+    activities: ProjectDetail['activities'];
+    taskMatrix: ProjectDetail['taskMatrix'];
+  } {
+    const phases = ProjectDataService.DEFAULT_PHASES;
+    const phaseDefinitions = {} as NonNullable<ProjectDetail['phaseDefinitions']>;
+    for (const ph of phases) {
+      phaseDefinitions[ph] = { id: ph, label: ph, startDate: '', endDate: '' };
+    }
+
+    const activities = {} as ProjectDetail['activities'];
+    const taskMatrix = {} as ProjectDetail['taskMatrix'];
+    for (const [id, def] of Object.entries(ProjectDataService.DEFAULT_ACTIVITIES) as Array<[ActivityId, ActivityDefinition]>) {
+      activities[id] = { ...def, owner };
+      taskMatrix[id] = {} as Record<PhaseId, any[]>;
+      for (const ph of phases) {
+        taskMatrix[id][ph] = [];
+      }
+    }
+
+    return { phases, phaseDefinitions, activities, taskMatrix };
+  }
+
   async getProjectById(projectId: string | null): Promise<ProjectDetail | null> {
     const requestedProjectId = projectId;
 

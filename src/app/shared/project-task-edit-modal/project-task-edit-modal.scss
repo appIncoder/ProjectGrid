@@ -181,27 +181,27 @@
 }
 
 .status-todo .segment-dot {
-  background: #64748b;
+  background: var(--pg-status-neutral-fg, #7c8288);
 }
 
 .status-inprogress .segment-dot {
-  background: #f59e0b;
+  background: var(--pg-status-inprogress-fg, #2f5fa8);
 }
 
 .status-onhold .segment-dot {
-  background: #3b82f6;
+  background: var(--pg-status-review-fg, #a8752f);
 }
 
 .status-done .segment-dot {
-  background: #10b981;
+  background: var(--pg-status-done-fg, #2f8a52);
 }
 
 .status-notdone .segment-dot {
-  background: #ef4444;
+  background: var(--pg-status-alert-fg, #b8452f);
 }
 
 .status-notapplicable .segment-dot {
-  background: #9ca3af;
+  background: var(--pg-status-neutral-fg, #7c8288);
 }
 
 .phase-pills {
@@ -254,12 +254,12 @@
   border-radius: 50%;
   flex-shrink: 0;
 
-  &.status-dot--todo          { background: #64748b; }
-  &.status-dot--inprogress    { background: #f59e0b; }
-  &.status-dot--onhold        { background: #3b82f6; }
-  &.status-dot--done          { background: #10b981; }
-  &.status-dot--notdone       { background: #ef4444; }
-  &.status-dot--notapplicable { background: #9ca3af; }
+  &.status-dot--todo          { background: var(--pg-status-neutral-fg, #7c8288); }
+  &.status-dot--inprogress    { background: var(--pg-status-inprogress-fg, #2f5fa8); }
+  &.status-dot--onhold        { background: var(--pg-status-review-fg, #a8752f); }
+  &.status-dot--done          { background: var(--pg-status-done-fg, #2f8a52); }
+  &.status-dot--notdone       { background: var(--pg-status-alert-fg, #b8452f); }
+  &.status-dot--notapplicable { background: var(--pg-status-neutral-fg, #7c8288); }
 }
 
 .child-task-label {

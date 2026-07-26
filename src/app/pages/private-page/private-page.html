@@ -9,10 +9,10 @@
     </div>
 
     <div class="d-flex gap-2">
-      <button class="btn btn-add" (click)="goToProjects()">
+      <button class="btn dashboard-btn" (click)="goToProjects()">
         ⇄ Changer de projet
       </button>
-      <button class="btn btn-add" (click)="goToProject()" *ngIf="selectedProject">
+      <button class="btn dashboard-btn dashboard-btn--primary" (click)="goToProject()" *ngIf="selectedProject">
         ✏️ Éditer le projet
       </button>
     </div>
@@ -77,7 +77,13 @@
         </div>
         <div class="info-item">
           <span class="info-label">État de santé</span>
-          <span class="info-value">
+          <span
+            class="info-value"
+            [ngClass]="{
+              'health-text-good': p.health === 'good',
+              'health-text-warning': p.health === 'warning',
+              'health-text-critical': p.health === 'critical'
+            }">
             <span
               class="health-dot align-middle me-1"
               [ngClass]="{

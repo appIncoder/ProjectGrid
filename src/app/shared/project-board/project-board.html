@@ -117,7 +117,8 @@
         *ngFor="let st of statuses; trackBy: trackByStatusId"
         cdkDrag
         [cdkDragDisabled]="!canManageColumnOrder || workflowSaveState === 'saving'"
-        [style.--status-accent]="getStatusAccentColor(st.id)">
+        [style.--status-accent]="getStatusAccentColor(st.id)"
+        [style.background]="getStatusTagBackground(st.id)">
         <span
           *ngIf="canManageColumnOrder"
           class="bch-grip"
