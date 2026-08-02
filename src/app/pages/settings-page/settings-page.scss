@@ -110,7 +110,7 @@
 
 .settings-section.card {
   border: 1px solid var(--pg-color-border);
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
   padding: 16px 18px;
   background: #fff;
 }
@@ -327,9 +327,9 @@
   background: var(--pg-status-review-bg);
 
   .access-value-icon {
-    background: var(--pg-color-navy);
-    border: 1px solid var(--pg-color-navy);
-    color: var(--pg-color-navy);
+    background: var(--pg-color-accent);
+    border: 1px solid var(--pg-color-accent);
+    color: var(--pg-color-accent);
     width: 14px;
     height: 14px;
     font-size: 0;
@@ -476,30 +476,26 @@ textarea.field-control {
   &.btn-primary,
   &.btn-add {
     border: none;
-    background: var(--pg-color-navy);
+    background: var(--pg-color-accent);
     color: #fff;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    font-weight: 700;
 
     &:hover:not(:disabled),
     &:focus:not(:disabled),
     &:active:not(:disabled) {
-      background: #232f45;
+      background: var(--pg-color-accent-hover);
       color: #fff;
     }
   }
 
   &.btn-outline-primary {
     background: #fff;
-    border: 1px solid var(--pg-color-navy);
-    color: var(--pg-color-navy);
+    border: 1px solid var(--pg-color-accent);
+    color: var(--pg-color-accent);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
 
     &:hover:not(:disabled) {
-      background: var(--pg-color-bg-stripe);
+      background: var(--pg-color-accent-soft);
     }
   }
 
@@ -697,8 +693,8 @@ textarea.field-control {
   background: #fff;
 
   &.is-open {
-    border-color: var(--pg-color-navy);
-    box-shadow: 0 0 0 2px rgba(26, 35, 50, 0.12);
+    border-color: var(--pg-color-accent);
+    box-shadow: 0 0 0 2px oklch(0.45 0.13 195 / 0.12);
   }
 }
 
@@ -813,14 +809,14 @@ textarea.field-control {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #7a869a;
+  background: var(--pg-status-neutral-dot);
 
-  &--todo          { background: #6B778C; }
-  &--inprogress    { background: #0052CC; }
-  &--onhold        { background: #FF8B00; }
-  &--done          { background: #00875A; }
-  &--notdone       { background: #DE350B; }
-  &--notapplicable { background: #97A0AF; }
+  &--todo          { background: var(--pg-status-neutral-dot); }
+  &--inprogress    { background: var(--pg-status-inprogress-dot); }
+  &--onhold        { background: var(--pg-status-review-dot); }
+  &--done          { background: var(--pg-status-done-dot); }
+  &--notdone       { background: var(--pg-status-alert-dot); }
+  &--notapplicable { background: var(--pg-status-neutral-dot); }
 }
 
 /* ── Utilitaires ─────────────────────────────────────────── */

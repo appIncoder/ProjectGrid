@@ -25,7 +25,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--pg-color-border);
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
   background: #ffffff;
   box-shadow: 0 24px 70px rgba(10, 30, 66, 0.2);
 }
@@ -88,8 +88,8 @@
 }
 
 .wizard__step--active .wizard__step-index {
-  border-color: var(--pg-color-navy);
-  background: var(--pg-color-navy);
+  border-color: var(--pg-color-accent);
+  background: var(--pg-color-accent);
   color: #ffffff;
 }
 
@@ -108,7 +108,7 @@
 }
 
 .wizard__step--active .wizard__step-label {
-  color: var(--pg-color-navy);
+  color: var(--pg-color-accent);
 }
 
 .wizard__step-connector {
@@ -162,8 +162,8 @@
 }
 
 .wizard__mode-btn--active {
-  border-color: var(--pg-color-navy);
-  background: var(--pg-color-navy);
+  border-color: var(--pg-color-accent);
+  background: var(--pg-color-accent);
   color: #ffffff;
 }
 
@@ -212,9 +212,9 @@
 }
 
 .wizard__badge--admin {
-  border-color: var(--pg-color-amber);
+  border-color: var(--pg-status-review-fg);
   background: var(--pg-status-review-bg);
-  color: var(--pg-color-amber);
+  color: var(--pg-status-review-fg);
 }
 
 .wizard__add-manager {

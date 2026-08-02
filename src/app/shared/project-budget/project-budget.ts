@@ -7,6 +7,7 @@ import { BudgetLine, BudgetSummary } from '../../models';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './project-budget.html',
+  styleUrls: ['./project-budget.scss'],
 })
 export class ProjectBudget {
   budgetSummary: BudgetSummary = {

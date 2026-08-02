@@ -1,14 +1,14 @@
 .project-board {
   --col-min-width: 220px;
   --lane-gap: 8px;
-  --board-bg: var(--pg-color-bg-stripe, #fafbfb);
-  --card-radius: var(--pg-radius, 2px);
+  --board-bg: var(--pg-color-bg-board);
+  --card-radius: 14px;
   --project-board-fullscreen-top: 0px;
   --project-board-fullscreen-bottom: 0px;
 
-  font-family: var(--pg-font-body, 'Source Sans 3', sans-serif);
+  font-family: var(--pg-font-body);
   font-size: 0.86rem;
-  color: var(--pg-color-text, #1a2332);
+  color: var(--pg-color-text);
 
   * {
     box-sizing: border-box;
@@ -46,7 +46,7 @@
   }
 
   .board-sprint-label {
-    font-family: var(--pg-font-heading, 'Source Serif 4', serif);
+    font-family: var(--pg-font-heading);
     font-weight: 700;
     font-size: 14.5px;
     color: var(--pg-color-navy, #1a2332);
@@ -542,8 +542,8 @@
     font-weight: 700;
     cursor: default;
     flex-shrink: 0;
-    background: #e6e7e9;
-    color: #666c72;
+    background: var(--pg-color-bg-head);
+    color: var(--pg-color-text-secondary);
     border: none;
     box-shadow: none;
 

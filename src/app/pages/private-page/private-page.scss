@@ -33,12 +33,10 @@
   border: 1px solid var(--pg-color-border);
   border-radius: var(--pg-radius);
   background: #ffffff;
-  color: var(--pg-color-navy);
+  color: var(--pg-color-text-heading);
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
   padding: 0 14px;
   white-space: nowrap;
 }
@@ -49,17 +47,18 @@
 
 .dashboard-btn--primary {
   border: none;
-  background: var(--pg-color-navy);
+  background: var(--pg-color-accent);
   color: #ffffff;
+  font-weight: 700;
 }
 
 .dashboard-btn--primary:hover:not(:disabled) {
-  background: #0f1622;
+  background: var(--pg-color-accent-hover);
   color: #ffffff;
 }
 
 .card {
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
 }
 
 .table-hover tbody tr {
@@ -67,11 +66,11 @@
 }
 
 .table-hover tbody tr.table-active {
-  background-color: #eef4ff;
+  background-color: var(--pg-color-accent-soft);
 }
 
 .table-hover tbody tr:hover {
-  background-color: #f8f9fa;
+  background-color: var(--pg-color-bg-head);
 }
 
 .health-dot {
@@ -172,12 +171,33 @@
 
 .team-member {
   display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--pg-color-border-light);
   border-radius: var(--pg-radius);
   background-color: #fff;
+}
+
+.team-member-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--pg-radius-sm);
+  background: var(--pg-color-accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.team-member-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
 .team-member-label {
@@ -194,34 +214,6 @@
   color: var(--pg-color-navy);
 }
 
-.activity-matrix {
-  th {
-    background-color: var(--pg-color-bg-head);
-    color: var(--pg-color-text-secondary);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-  }
-
-  td {
-    padding: 0.35rem;
-  }
-}
-
-.status-pill {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-}
-
-// Override for dot-only indicator: canonical status-todo is white (pill with border),
-// but here it's used as a filled circle where white would be invisible.
-.status-todo {
-  background-color: var(--pg-status-neutral-fg, #7c8288);
-}
-
 .dashboard-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -236,7 +228,7 @@
 
 .dashboard-card {
   border: 1px solid var(--pg-color-border);
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
   padding: 14px 16px;
   background-color: #fff;
 
@@ -246,6 +238,39 @@
     font-weight: 600;
     color: var(--pg-color-text);
   }
+}
+
+// Zones d'information cliquables : renvoient vers l'onglet d'encodage équivalent.
+.dashboard-clickable {
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+
+  &:hover {
+    border-color: var(--pg-color-accent);
+    box-shadow: 0 4px 14px rgba(20, 40, 50, 0.08);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--pg-color-accent);
+    outline-offset: 2px;
+  }
+}
+
+.dashboard-card-link {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pg-color-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.dashboard-card-link:hover {
+  color: var(--pg-color-accent-hover);
+  text-decoration: underline;
 }
 
 .dashboard-table {
@@ -261,18 +286,6 @@
   small {
     color: var(--pg-color-text-secondary);
   }
-}
-
-.risk-list-wrap {
-  max-height: 274px;
-  overflow-y: auto;
-}
-
-.risk-list-wrap thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background-color: #fff;
 }
 
 .progress-track {
@@ -302,14 +315,186 @@
   background-color: var(--pg-status-review-fg);
 }
 
+// ── Roadmap synthétique (look 5d) ────────────────────────────────────────────
+.mini-gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mini-gantt-header {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--pg-color-border-light);
+}
+
+.mini-gantt-header-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--pg-color-text-tertiary);
+}
+
+.mini-gantt-header-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+
+.mini-gantt-header-phase {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--pg-color-text-tertiary);
+  border-radius: var(--pg-radius-sm);
+  padding: 2px 0;
+}
+
+.mini-gantt-header-phase--current {
+  color: var(--pg-color-accent-hover);
+  background-color: var(--pg-color-accent-soft);
+}
+
+.mini-gantt-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.mini-gantt-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pg-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-gantt-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+}
+
+.mini-gantt-dot--projet {
+  background-color: var(--pg-status-inprogress-fg);
+}
+
+.mini-gantt-dot--metier {
+  background-color: var(--pg-status-done-fg);
+}
+
+.mini-gantt-dot--changement {
+  background-color: var(--pg-status-alert-fg);
+}
+
+.mini-gantt-dot--technologie {
+  background-color: var(--pg-status-review-fg);
+}
+
+.mini-gantt-track {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  height: 22px;
+}
+
+.mini-gantt-guide-col {
+  border-radius: var(--pg-radius-sm);
+  background-color: var(--pg-color-bg-head);
+}
+
+.mini-gantt-guide-col--current {
+  background-color: var(--pg-color-accent-soft);
+}
+
+// Barre continue positionnée en left%/width% sur la piste, comme les barres
+// SVG (x/width en jours) du vrai Gantt de project-roadmap — même rx/couleurs.
+.mini-gantt-bar {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  box-shadow: 0 1px 2px rgba(20, 40, 50, 0.15);
+}
+
+.mini-gantt-bar--projet {
+  background-color: var(--pg-status-inprogress-fg);
+}
+
+.mini-gantt-bar--metier {
+  background-color: var(--pg-status-done-fg);
+}
+
+.mini-gantt-bar--changement {
+  background-color: var(--pg-status-alert-fg);
+}
+
+.mini-gantt-bar--technologie {
+  background-color: var(--pg-status-review-fg);
+}
+
+.mini-gantt-bar-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.mini-gantt-milestones {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pg-color-border-light);
+  font-size: 11.5px;
+}
+
+.mini-gantt-milestones-label {
+  font-weight: 600;
+  color: var(--pg-color-text-secondary);
+}
+
+.mini-gantt-milestone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--pg-color-text);
+}
+
+.mini-gantt-milestone-diamond {
+  width: 8px;
+  height: 8px;
+  background-color: var(--pg-color-accent);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
 .badge.risk-low,
 .badge.risk-medium,
 .badge.risk-high,
-.badge.risk-critical,
-.badge.due-normal,
-.badge.due-soon,
-.badge.due-overdue {
-  border-radius: var(--pg-radius);
+.badge.risk-critical {
+  border-radius: var(--pg-radius-sm);
   padding: 2px 8px;
   font-weight: 600;
   font-size: 11px;
@@ -335,11 +520,50 @@
   color: var(--pg-status-alert-fg);
 }
 
+// ── Risques : KPI + matrice (look 5e) ──────────────────────────────────────
+.risk-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.risk-kpi {
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-lg);
+  padding: 10px 12px;
+}
+
+.risk-kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--pg-color-text-tertiary);
+}
+
+.risk-kpi-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--pg-color-text-heading);
+  margin-top: 2px;
+}
+
+.risk-kpi-value--alert {
+  color: var(--pg-status-alert-fg);
+}
+
+.risk-kpi-value--done {
+  color: var(--pg-status-done-fg);
+}
+
 .risk-matrix-shell {
   display: grid;
   grid-template-columns: 42px 1fr;
   gap: 0.5rem;
   align-items: stretch;
+  margin-bottom: 14px;
 }
 
 .impact-axis-label {
@@ -371,14 +595,40 @@
 }
 
 .risk-matrix-table {
-  td,
+  border-collapse: separate;
+  border-spacing: 4px;
+
   th {
-    min-width: 96px;
+    border: none;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--pg-color-text-tertiary);
+  }
+
+  td {
+    border: none;
+    min-width: 84px;
+    border-radius: var(--pg-radius);
   }
 }
 
+.risk-heat-low {
+  background-color: var(--pg-status-neutral-bg);
+}
+
+.risk-heat-medium {
+  background-color: var(--pg-status-review-bg);
+}
+
+.risk-heat-high,
+.risk-heat-critical {
+  background-color: var(--pg-status-alert-bg);
+}
+
 .risk-cell-dots {
-  min-height: 34px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -409,19 +659,155 @@
   background-color: var(--pg-status-alert-fg);
 }
 
-.badge.due-normal {
-  background-color: var(--pg-status-neutral-bg);
-  color: var(--pg-status-neutral-fg);
+.risk-priority-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.badge.due-soon {
-  background-color: var(--pg-status-review-bg);
-  color: var(--pg-status-review-fg);
+.risk-priority-card {
+  border: 1px solid var(--pg-color-border);
+  border-left: 4px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-lg);
+  padding: 10px 14px;
 }
 
-.badge.due-overdue {
+.risk-priority-card--low {
+  border-left-color: var(--pg-status-neutral-fg);
+}
+
+.risk-priority-card--medium {
+  border-left-color: var(--pg-status-review-fg);
+}
+
+.risk-priority-card--high,
+.risk-priority-card--critical {
+  border-left-color: var(--pg-status-alert-fg);
+}
+
+.risk-priority-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--pg-color-text-heading);
+}
+
+.risk-priority-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--pg-color-text-secondary);
+}
+
+// ── Fil d'activité (look 5a) ──────────────────────────────────────────────────
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.activity-feed-entry {
+  display: flex;
+  gap: 10px;
+}
+
+.activity-feed-avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.activity-feed-avatar--0 { background-color: oklch(0.55 0.16 195); }
+.activity-feed-avatar--1 { background-color: oklch(0.60 0.14 150); }
+.activity-feed-avatar--2 { background-color: oklch(0.72 0.14 60); }
+.activity-feed-avatar--3 { background-color: oklch(0.65 0.15 320); }
+.activity-feed-avatar--4 { background-color: oklch(0.55 0.18 25); }
+
+.activity-feed-body {
+  min-width: 0;
+}
+
+.activity-feed-text {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--pg-color-text-secondary);
+  line-height: 1.45;
+
+  strong {
+    color: var(--pg-color-text-heading);
+  }
+}
+
+.activity-feed-time {
+  font-size: 11px;
+  color: var(--pg-color-text-tertiary);
+}
+
+// ── Échéances proches (look 5a) ───────────────────────────────────────────────
+.due-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.due-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--pg-radius);
+}
+
+.due-row-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.due-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--pg-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.due-row-proximity {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.due-row--due-overdue {
   background-color: var(--pg-status-alert-bg);
-  color: var(--pg-status-alert-fg);
+
+  .due-row-dot { background-color: var(--pg-status-alert-dot); }
+  .due-row-proximity { color: var(--pg-status-alert-fg); }
+}
+
+.due-row--due-soon {
+  background-color: var(--pg-status-review-bg);
+
+  .due-row-dot { background-color: var(--pg-status-review-dot); }
+  .due-row-proximity { color: var(--pg-status-review-fg); }
+}
+
+.due-row--due-normal {
+  background-color: var(--pg-color-bg-head);
+
+  .due-row-dot { background-color: var(--pg-status-inprogress-dot); }
+  .due-row-proximity { color: var(--pg-color-text-secondary); }
 }
 
 .alert {

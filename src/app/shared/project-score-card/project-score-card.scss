@@ -22,7 +22,7 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   border: 1px solid var(--pg-color-border, #dcdfe3);
-  border-radius: var(--pg-radius, 2px);
+  border-radius: var(--pg-radius-lg);
   padding: 1rem 1.1rem;
   background: white;
   box-shadow: none;
@@ -80,8 +80,8 @@
   position: absolute;
   z-index: 30;
   width: 220px;
-  border: 1px solid #d5dce8;
-  border-radius: 0.55rem;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
   background: #fff;
   box-shadow: 0 10px 28px rgba(17, 32, 61, 0.18);
   padding: 0.35rem;
@@ -90,30 +90,31 @@
 .task-context-menu__title {
   font-size: 0.68rem;
   font-weight: 700;
-  color: #47566f;
+  color: var(--pg-color-text-secondary);
   padding: 0.2rem 0.35rem 0.35rem;
 }
 
 .task-context-menu__item {
   width: 100%;
   text-align: left;
-  border: 1px solid #d3deef;
-  background: #f7faff;
+  border: 1px solid var(--pg-color-border);
+  background: var(--pg-color-bg-head);
   border-radius: 999px;
   padding: 0.28rem 0.6rem;
   font-size: 0.72rem;
   line-height: 1.2;
-  color: #1f2c3d;
+  color: var(--pg-color-text);
   margin-bottom: 0.22rem;
 }
 
 .task-context-menu__item:hover {
-  background: #eaf2ff;
+  background: var(--pg-color-accent-soft);
 }
 
 .task-context-menu__item.is-active {
-  border-color: #8eb1e5;
-  background: #e3eeff;
+  border-color: var(--pg-color-accent);
+  background: var(--pg-color-accent-soft);
+  color: var(--pg-color-accent-hover);
   font-weight: 700;
 }
 
@@ -148,8 +149,8 @@
 }
 
 .phase-cell.drop-target {
-  background-color: rgba(13, 110, 253, 0.08);
-  box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.35);
+  background-color: oklch(0.45 0.13 195 / 0.08);
+  box-shadow: inset 0 0 0 2px oklch(0.45 0.13 195 / 0.35);
 }
 
 .activity-name {
@@ -175,8 +176,8 @@
   height: 1.2rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: #eef6ff;
-  color: #1d4ed8;
+  background: var(--pg-color-accent-soft);
+  color: var(--pg-color-accent-hover);
   font-size: 0.64rem;
   font-weight: 750;
 }

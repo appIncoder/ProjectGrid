@@ -1,0 +1,35 @@
+.budget-summary-item {
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-lg);
+  padding: 16px 18px;
+
+  .label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--pg-color-text-tertiary);
+    margin-bottom: 4px;
+  }
+
+  .value {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    color: var(--pg-color-text-heading);
+  }
+
+  &.is-over-forecast .value {
+    color: var(--pg-status-alert-fg);
+  }
+}
+
+.budget-table {
+  th {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--pg-color-text-secondary);
+  }
+}

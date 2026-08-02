@@ -4,7 +4,7 @@ $lane-meta-bg:    var(--pg-color-bg-head);
 $lane-border:     var(--pg-color-border);
 $card-bg:         #fff;
 $card-shadow:     0 1px 2px rgba(9, 30, 66, 0.25);
-$card-radius:     var(--pg-radius);
+$card-radius:     14px;
 $text-dark:       var(--pg-color-text);
 $text-muted:      var(--pg-color-text-secondary);
 $text-subtle:     var(--pg-color-text-tertiary);
@@ -78,15 +78,15 @@ $c-notapplicable:  var(--pg-status-neutral-fg);
 
   &:hover {
     background: var(--pg-color-bg-head);
-    border-color: var(--pg-color-navy);
+    border-color: var(--pg-color-accent);
     transform: translateY(-1px);
   }
 }
 
 .tm-window-btn--maximize:hover {
-  background: #DEEBFF;
-  color: #0747A6;
-  border-color: #4C9AFF;
+  background: var(--pg-color-accent-soft);
+  color: var(--pg-color-accent-hover);
+  border-color: var(--pg-color-accent);
 }
 
 .tm-board-title {
@@ -118,10 +118,10 @@ $c-notapplicable:  var(--pg-status-neutral-fg);
   &:disabled { opacity: 0.45; cursor: not-allowed; }
 
   &--primary {
-    &.is-active { background: #0052CC; color: #fff; }
+    &.is-active { background: var(--pg-color-accent); color: #fff; }
   }
 
-  &--active { background: #0052CC; color: #fff; }
+  &--active { background: var(--pg-color-accent); color: #fff; }
 }
 
 // ── Save feedback ─────────────────────────────────────────────────────────────
@@ -280,7 +280,7 @@ $c-notapplicable:  var(--pg-status-neutral-fg);
   background: transparent;
   transition: background 100ms;
 
-  &--drop-target { background: #DEEBFF; }
+  &--drop-target { background: var(--pg-color-accent-soft); }
 }
 
 // ── Task cards ────────────────────────────────────────────────────────────────

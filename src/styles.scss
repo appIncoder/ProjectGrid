@@ -1,38 +1,65 @@
 /* You can add global styles to this file, and also import other style files */
 
 /* =========================================================
-   Design tokens — "Executive Slate"
+   Design tokens — "Lumen"
    ========================================================= */
 
 :root {
-  --pg-color-navy: #1a2332;
-  --pg-color-amber: #c98a2e;
+  --pg-color-accent: oklch(0.45 0.13 195);
+  --pg-color-accent-hover: oklch(0.40 0.13 195);
+  --pg-color-accent-soft: oklch(0.95 0.03 195);
 
-  --pg-color-border: #dcdfe3;
-  --pg-color-border-light: #e7e9eb;
-  --pg-color-bg-head: #f0f1f2;
-  --pg-color-bg-stripe: #fafbfb;
+  /* Alias de compatibilité pour ne pas retoucher tous les fichiers d'un coup :
+     --pg-color-navy servait à la fois de couleur de texte fort ET d'accent en
+     Executive Slate (même hex) — en Lumen les deux divergent, donc l'alias par
+     défaut suit le texte foncé ; chaque fichier reskinné en Phase 2+ bascule
+     explicitement ses usages "accent/actif" vers --pg-color-accent (teal).
+     --pg-color-amber servait presque partout d'indicateur actif/surlignage :
+     l'alias vers l'accent unique de Lumen est donc correct par défaut. */
+  --pg-color-navy: var(--pg-color-text-heading);
+  --pg-color-navy-hover: var(--pg-color-text-heading);
+  --pg-color-amber: var(--pg-color-accent);
 
-  --pg-color-text: #1a2332;
-  --pg-color-text-secondary: #7c8288;
-  --pg-color-text-tertiary: #8a9096;
+  --pg-color-border: oklch(0.93 0.006 195);
+  --pg-color-border-light: oklch(0.955 0.006 195);
+  --pg-color-bg-head: oklch(0.975 0.006 195);
+  --pg-color-bg-board: oklch(0.985 0.004 195);
+  --pg-color-bg-stripe: oklch(0.988 0.004 195);
 
-  --pg-radius: 2px;
+  --pg-color-text: oklch(0.22 0.03 200);
+  --pg-color-text-heading: oklch(0.24 0.03 200);
+  --pg-color-text-secondary: oklch(0.53 0.02 200);
+  --pg-color-text-tertiary: oklch(0.58 0.02 200);
 
-  --pg-font-body: 'Source Sans 3', sans-serif;
-  --pg-font-heading: 'Source Serif 4', serif;
+  --pg-radius-sm: 9px;
+  --pg-radius: 11px;
+  --pg-radius-lg: 16px;
+
+  --pg-font-body: 'Space Grotesk', sans-serif;
+  --pg-font-heading: 'Space Grotesk', sans-serif;
+
+  --pg-avatar-1: oklch(0.55 0.16 195);
+  --pg-avatar-2: oklch(0.60 0.14 150);
+  --pg-avatar-3: oklch(0.72 0.14 60);
+  --pg-avatar-4: oklch(0.65 0.15 320);
+  --pg-avatar-5: oklch(0.55 0.18 25);
 
   /* Statut consolidé — En cours / Terminé-OK / Attention-Revue / Alerte-Critique / Neutre */
-  --pg-status-inprogress-fg: #2f5fa8;
-  --pg-status-inprogress-bg: #e9f0fb;
-  --pg-status-done-fg: #2f8a52;
-  --pg-status-done-bg: #e5f5ea;
-  --pg-status-review-fg: #a8752f;
-  --pg-status-review-bg: #faf1e0;
-  --pg-status-alert-fg: #b8452f;
-  --pg-status-alert-bg: #fbe8e2;
-  --pg-status-neutral-fg: #7c8288;
-  --pg-status-neutral-bg: #e7e9eb;
+  --pg-status-inprogress-fg: oklch(0.40 0.13 195);
+  --pg-status-inprogress-bg: oklch(0.95 0.03 195);
+  --pg-status-inprogress-dot: oklch(0.55 0.16 195);
+  --pg-status-done-fg: oklch(0.42 0.13 150);
+  --pg-status-done-bg: oklch(0.96 0.05 150);
+  --pg-status-done-dot: oklch(0.60 0.16 150);
+  --pg-status-review-fg: oklch(0.50 0.13 75);
+  --pg-status-review-bg: oklch(0.96 0.05 85);
+  --pg-status-review-dot: oklch(0.75 0.15 85);
+  --pg-status-alert-fg: oklch(0.48 0.16 25);
+  --pg-status-alert-bg: oklch(0.96 0.05 25);
+  --pg-status-alert-dot: oklch(0.60 0.19 25);
+  --pg-status-neutral-fg: oklch(0.50 0.02 200);
+  --pg-status-neutral-bg: oklch(0.96 0.006 195);
+  --pg-status-neutral-dot: oklch(0.72 0.01 200);
 }
 
 body {
@@ -42,16 +69,17 @@ body {
 
 h1, h2, h3, h4 {
   font-family: var(--pg-font-heading);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 /* =========================================================
-   Bootstrap base overrides — Executive Slate
+   Bootstrap base overrides — Lumen
    ========================================================= */
 
 .card {
   border-color: var(--pg-color-border);
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
   box-shadow: none;
 }
 
@@ -71,7 +99,7 @@ h1, h2, h3, h4 {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    color: var(--pg-color-navy);
+    color: var(--pg-color-text-heading);
     vertical-align: middle;
   }
 
@@ -90,8 +118,8 @@ h1, h2, h3, h4 {
 .roadmap-card-body,
 .project-board .board-card-body {
   background: #ffffff;
-  border: 1px solid var(--pg-color-border, #dcdfe3);
-  border-radius: var(--pg-radius, 2px);
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-lg);
 }
 
 .scorecard-kpi,
@@ -99,12 +127,12 @@ h1, h2, h3, h4 {
 .project-board .board-kpi {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--pg-color-border, #d7e0ef);
-  border-radius: var(--pg-radius, 2px);
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-sm);
   padding: 0.12rem 0.5rem;
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--pg-color-text-secondary, #45556d);
+  color: var(--pg-color-text-secondary);
   background: #ffffff;
 }
 
@@ -113,7 +141,7 @@ h1, h2, h3, h4 {
 .project-board .board-add-task-hint {
   margin-top: 0.28rem;
   font-size: 0.7rem;
-  color: #4f5f76;
+  color: var(--pg-color-text-secondary);
 }
 
 /* =========================================================
@@ -123,18 +151,18 @@ h1, h2, h3, h4 {
 // Always used with Bootstrap's .btn base class.
 // Only defines overrides: colors, sizing, and nowrap.
 .btn-add {
-  background: #0d6efd;
+  background: var(--pg-color-accent);
   color: #fff;
-  border-color: #0d6efd;
-  border-radius: 6px;
+  border-color: var(--pg-color-accent);
+  border-radius: var(--pg-radius);
   padding: 5px 14px;
   font-size: 0.84rem;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 
   &:hover:not(:disabled) {
-    background: #0b5ed7;
-    border-color: #0a58ca;
+    background: var(--pg-color-accent-hover);
+    border-color: var(--pg-color-accent-hover);
     color: #fff;
   }
 }

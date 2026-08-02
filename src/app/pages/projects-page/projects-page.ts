@@ -10,11 +10,12 @@ import { ProjectDataService } from '../../services/project-data.service';
 import { type ActivityStatus, type Health, type PhaseId, type ProjectDetail, type ProjectListItem, type ProjectStatus } from '../../models';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { ProjectCreateWizard } from '../../shared/project-create-wizard/project-create-wizard';
+import { AppButton } from '../../shared/design-system/button/button';
 
 @Component({
   selector: 'app-projects-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, NgbDropdownModule, ConfirmDialog, ProjectCreateWizard],
+  imports: [CommonModule, FormsModule, RouterModule, NgbDropdownModule, ConfirmDialog, ProjectCreateWizard, AppButton],
   templateUrl: './projects-page.html',
   styleUrls: ['./projects-page.scss'],
 })
@@ -96,15 +97,22 @@ export class ProjectsPage implements OnInit, OnDestroy {
   private toProjectListItem(detail: ProjectDetail): ProjectListItem {
     const currentPhase = this.computeCurrentPhase(detail);
     const healthName = this.getActiveHealthShortName(detail) || 'Good';
+    const stats = this.computeTaskStats(detail);
+    const progressPct = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
+    const activeCount = stats.inProgress + stats.onHold + stats.todo;
+    const riskCount = Array.isArray(detail.projectRisks) ? detail.projectRisks.length : 0;
     return {
       id: detail.id,
       name: detail.name,
       owner: this.extractOwner(detail),
       role: 'Membre',
-      status: this.computeStatus(detail),
+      status: this.computeStatus(stats),
       health: this.computeHealth(detail),
       healthName,
       currentPhase: currentPhase.replace('Phase', 'Phase '),
+      progressPct,
+      activeCount,
+      riskCount,
     };
   }
 
@@ -158,12 +166,13 @@ export class ProjectsPage implements OnInit, OnDestroy {
     return String(active?.shortName ?? '').trim();
   }
 
-  private computeStatus(detail: ProjectDetail): ProjectStatus {
+  private computeTaskStats(detail: ProjectDetail): { total: number; done: number; inProgress: number; onHold: number; todo: number } {
     const matrix: any = detail.taskMatrix ?? {};
     let total = 0;
     let done = 0;
     let inProgress = 0;
     let onHold = 0;
+    let todo = 0;
 
     for (const actId of Object.keys(matrix)) {
       const byPhase = matrix[actId] ?? {};
@@ -173,12 +182,18 @@ export class ProjectsPage implements OnInit, OnDestroy {
           total++;
           const s = (t?.status ?? 'todo') as ActivityStatus;
           if (s === 'done' || s === 'notapplicable') done++;
-          if (s === 'inprogress') inProgress++;
-          if (s === 'onhold') onHold++;
+          else if (s === 'inprogress') inProgress++;
+          else if (s === 'onhold') onHold++;
+          else todo++;
         }
       }
     }
 
+    return { total, done, inProgress, onHold, todo };
+  }
+
+  private computeStatus(stats: { total: number; done: number; inProgress: number; onHold: number }): ProjectStatus {
+    const { total, done, inProgress, onHold } = stats;
     if (total === 0) return 'Planifié';
     if (done === total) return 'Clôturé';
     if (inProgress > 0) return 'En cours';

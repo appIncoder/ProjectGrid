@@ -13,8 +13,8 @@
   max-height: 92vh;
   overflow: auto;
   background: #fff;
-  border-radius: 0.75rem;
-  border: 1px solid #d6e1ef;
+  border-radius: var(--pg-radius-lg);
+  border: 1px solid var(--pg-color-border);
   box-shadow: 0 12px 30px rgb(13 28 43 / 22%);
 }
 
@@ -24,7 +24,7 @@
   justify-content: space-between;
   gap: 0.6rem;
   padding: 0.8rem 1rem;
-  border-bottom: 1px solid #e6edf6;
+  border-bottom: 1px solid var(--pg-color-border-light);
 }
 
 .pkm-modal-head h4 {
@@ -35,7 +35,7 @@
 .pkm-modal-close {
   border: 0;
   background: transparent;
-  color: #44596f;
+  color: var(--pg-color-text-secondary);
   font-weight: 700;
   cursor: pointer;
 }
@@ -54,23 +54,23 @@
 .pkm-field > span {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #3d556b;
+  color: var(--pg-color-text-secondary);
 }
 
 .pkm-field input,
 .pkm-field select,
 .pkm-field textarea {
-  border: 1px solid #cfdbe9;
-  border-radius: 0.45rem;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-sm);
   padding: 0.45rem 0.55rem;
   font-size: 0.78rem;
 }
 
 .pkm-comments {
-  border: 1px solid #e2e9f2;
-  border-radius: 0.45rem;
+  border: 1px solid var(--pg-color-border-light);
+  border-radius: var(--pg-radius-sm);
   padding: 0.5rem;
-  background: #f9fbfe;
+  background: var(--pg-color-bg-head);
   display: grid;
   gap: 0.45rem;
   max-height: 180px;
@@ -78,8 +78,8 @@
 }
 
 .pkm-comment {
-  border: 1px solid #e2e9f2;
-  border-radius: 0.4rem;
+  border: 1px solid var(--pg-color-border-light);
+  border-radius: var(--pg-radius-sm);
   background: #fff;
   padding: 0.35rem 0.45rem;
 }
@@ -89,22 +89,22 @@
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.66rem;
-  color: #60758a;
+  color: var(--pg-color-text-secondary);
 }
 
 .pkm-comment-text {
   margin-top: 0.2rem;
   font-size: 0.74rem;
-  color: #31495f;
+  color: var(--pg-color-text);
 }
 
 .pkm-comments-empty {
   font-size: 0.73rem;
-  color: #6b7f93;
+  color: var(--pg-color-text-secondary);
 }
 
 .pkm-modal-actions {
-  border-top: 1px solid #e6edf6;
+  border-top: 1px solid var(--pg-color-border-light);
   padding: 0.7rem 1rem;
   display: flex;
   justify-content: flex-end;
@@ -113,8 +113,8 @@
 
 .pkm-btn-secondary,
 .pkm-btn-primary {
-  border: 1px solid #cfdbe9;
-  border-radius: 0.45rem;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-sm);
   padding: 0.42rem 0.75rem;
   font-size: 0.76rem;
   font-weight: 700;
@@ -122,13 +122,13 @@
 }
 
 .pkm-btn-secondary {
-  background: #f5f8fb;
-  color: #41576d;
+  background: var(--pg-color-bg-head);
+  color: var(--pg-color-text-heading);
 }
 
 .pkm-btn-primary {
-  background: #2e7ec4;
-  border-color: #2e7ec4;
+  background: var(--pg-color-accent);
+  border-color: var(--pg-color-accent);
   color: #fff;
 }
 
@@ -140,5 +140,5 @@
 
 .pkm-modal-error {
   font-size: 0.74rem;
-  color: #b2293d;
+  color: var(--pg-status-alert-fg);
 }

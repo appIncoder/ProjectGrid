@@ -24,16 +24,14 @@
 .admin-page .btn-add,
 .admin-page .btn-primary {
   border: none;
-  background: var(--pg-color-navy);
+  background: var(--pg-color-accent);
   color: #fff;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-weight: 700;
 }
 
 .admin-page .btn-add:hover:not(:disabled),
 .admin-page .btn-primary:hover:not(:disabled) {
-  background: #232f45;
+  background: var(--pg-color-accent-hover);
   color: #fff;
 }
 
@@ -61,7 +59,7 @@
   gap: 1rem;
   padding: 1.25rem 1.5rem;
   border: 1px solid var(--pg-color-border);
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
   background: #fff;
 }
 
@@ -91,9 +89,9 @@
   display: inline-flex;
   align-items: center;
   padding: 5px 12px;
-  border-radius: var(--pg-radius);
-  background: var(--pg-color-amber);
-  color: var(--pg-color-navy);
+  border-radius: var(--pg-radius-sm);
+  background: var(--pg-color-accent-soft);
+  color: var(--pg-color-accent-hover);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -110,7 +108,7 @@
 .admin-card {
   padding: 14px 16px;
   border: 1px solid var(--pg-color-border);
-  border-radius: var(--pg-radius);
+  border-radius: var(--pg-radius-lg);
   background: #fff;
 }
 

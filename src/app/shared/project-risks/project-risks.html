@@ -9,6 +9,22 @@
       </div>
     </div>
 
+    <!-- KPIs -->
+    <div class="risk-kpis">
+      <div class="risk-kpi">
+        <div class="risk-kpi-label">Risques ouverts</div>
+        <div class="risk-kpi-value">{{ openRisksCount }}</div>
+      </div>
+      <div class="risk-kpi">
+        <div class="risk-kpi-label">Niveau élevé</div>
+        <div class="risk-kpi-value risk-kpi-value--alert">{{ highRisksCount }}</div>
+      </div>
+      <div class="risk-kpi">
+        <div class="risk-kpi-label">Mitigés ce mois</div>
+        <div class="risk-kpi-value risk-kpi-value--done">{{ mitigatedThisMonthCount }}</div>
+      </div>
+    </div>
+
     <!-- Matrice des risques -->
     <div class="card mb-2 risk-matrix-card">
       <div class="card-body">
@@ -21,7 +37,7 @@
             <div class="prob-axis-label">Probabilité</div>
 
             <div class="table-responsive">
-              <table class="table table-bordered table-sm risk-matrix text-center align-middle mb-0">
+              <table class="table table-sm risk-matrix text-center align-middle mb-0">
                 <thead>
                   <tr>
                     <th class="text-start risk-header-col"></th>
@@ -32,23 +48,21 @@
                   <tr *ngFor="let impact of riskImpactLevels">
                     <td class="text-start"><strong>{{ impact }}</strong></td>
 
-                    <td *ngFor="let prob of riskProbabilityLevels">
-                      <div
-                        class="risk-cell"
-                        (dragover)="onRiskDragOver($event)"
-                        (drop)="onRiskDrop($event, impact, prob)">
-
-                        <div
+                    <td
+                      *ngFor="let prob of riskProbabilityLevels"
+                      [ngClass]="getMatrixHeatClass(impact, prob)"
+                      (dragover)="onRiskDragOver($event)"
+                      (drop)="onRiskDrop($event, impact, prob)">
+                      <div class="risk-cell-dots">
+                        <span
                           *ngFor="let item of getRiskCellItems(impact, prob)"
-                          class="risk-pill"
-                          [ngClass]="getRiskLevelClass(item.level)"
+                          class="risk-dot"
+                          [ngClass]="'risk-dot-' + item.level"
                           [attr.title]="item.longName || item.label"
                           draggable="true"
                           (dragstart)="onRiskDragStart($event, item, impact, prob)"
                           (contextmenu)="onRiskContextMenu($event, item)">
-                          {{ item.shortName || item.label }}
-                        </div>
-
+                        </span>
                       </div>
                     </td>
 
@@ -110,7 +124,8 @@
 
             <!-- Criticité editable => met à jour style pastille -->
             <td>
-              <select class="form-select form-select-sm"
+              <select class="form-select form-select-sm risk-level-select"
+                      [ngClass]="getRiskLevelClass(risk.level)"
                       [(ngModel)]="risk.level"
                       (change)="onTopRiskLevelChange(risk)">
                 <option *ngFor="let lvl of levelOptions" [ngValue]="lvl">{{ lvl | titlecase }}</option>

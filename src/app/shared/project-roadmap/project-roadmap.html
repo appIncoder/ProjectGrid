@@ -566,15 +566,16 @@
   </div>
 
   <div class="modal-footer milestone-modal-footer">
-    <button
+    <app-button
       *ngIf="editingMilestoneId"
       type="button"
-      class="btn btn-sm btn-outline-danger"
-      (click)="deleteMilestone(modal)"
+      variant="danger"
+      size="sm"
+      (pressed)="deleteMilestone(modal)"
     >
       Supprimer
-    </button>
-    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="modal.dismiss()">Annuler</button>
-    <button type="button" class="btn btn-sm btn-primary" (click)="saveMilestone(modal)">Enregistrer</button>
+    </app-button>
+    <app-button type="button" variant="secondary" size="sm" (pressed)="modal.dismiss()">Annuler</app-button>
+    <app-button type="button" variant="primary" size="sm" (pressed)="saveMilestone(modal)">Enregistrer</app-button>
   </div>
 </ng-template>

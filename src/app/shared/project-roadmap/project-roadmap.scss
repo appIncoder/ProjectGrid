@@ -111,7 +111,6 @@ $accent-technologie: var(--pg-status-review-fg);
   width: 1px;
   height: 22px;
   background: $ms-border;
-  margin: 0 4px;
   flex-shrink: 0;
 }
 
@@ -144,22 +143,18 @@ $accent-technologie: var(--pg-status-review-fg);
   }
 
   &--active {
-    background: var(--pg-color-navy);
-    border-color: var(--pg-color-navy);
+    background: var(--pg-color-accent);
+    border-color: var(--pg-color-accent);
     color: #fff;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    font-weight: 700;
   }
 
   &--accent {
-    background: var(--pg-color-navy);
-    border-color: var(--pg-color-navy);
+    background: var(--pg-color-accent);
+    border-color: var(--pg-color-accent);
     color: #fff;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    &:hover { background: #262f40; border-color: #262f40; }
+    font-weight: 700;
+    &:hover { background: var(--pg-color-accent-hover); border-color: var(--pg-color-accent-hover); }
   }
 
   &--success {
@@ -170,48 +165,21 @@ $accent-technologie: var(--pg-status-review-fg);
   }
 }
 
-// ── Bouton "+ Ajouter une activité" (Bootstrap .btn.btn-add) ──────────────────
-// Le style global .btn-add (src/styles.scss) est encore l'ancien bleu arrondi ;
-// on le recale localement sur le traitement "primaire" Executive Slate.
+// Le bouton "+ Ajouter une activité" (.btn.btn-add) hérite du style global
+// Lumen défini dans src/styles.scss — juste aligné en hauteur avec .roadmap-btn.
 .roadmap-toolbar {
   .btn-add {
     height: 32px;
     display: inline-flex;
     align-items: center;
-    background: var(--pg-color-navy);
-    color: #fff;
-    border: 1px solid var(--pg-color-navy);
-    border-radius: var(--pg-radius);
-    padding: 0 14px;
     font-size: 0.74rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-
-    &:hover:not(:disabled) {
-      background: #262f40;
-      border-color: #262f40;
-      color: #fff;
-    }
-
-    &:disabled {
-      opacity: 0.55;
-      background: var(--pg-color-bg-stripe);
-      border-color: var(--pg-color-border);
-      color: $ms-text-subtle;
-    }
   }
 }
 
 .roadmap-btn-group {
   display: inline-flex;
-
-  .roadmap-btn {
-    border-radius: 0;
-    &:first-child { border-radius: var(--pg-radius) 0 0 var(--pg-radius); }
-    &:last-child  { border-radius: 0 var(--pg-radius) var(--pg-radius) 0; margin-left: -1px; }
-    &:not(:first-child) { margin-left: -1px; }
-  }
+  align-items: center;
+  gap: 8px;
 }
 
 // ── Inputs / Selects ──────────────────────────────────────────────────────────
@@ -227,7 +195,7 @@ $accent-technologie: var(--pg-status-review-fg);
   height: 32px;
 
   &--sm { height: 24px; font-size: 0.7rem; width: 100%; padding: 2px 4px; }
-  &:focus { outline: 2px solid #2563eb; outline-offset: -1px; }
+  &:focus { outline: 2px solid var(--pg-color-accent); outline-offset: -1px; }
 }
 
 .roadmap-input {
@@ -243,7 +211,7 @@ $accent-technologie: var(--pg-status-review-fg);
 
   &--date { font-size: 0.7rem; padding: 2px 4px; height: 24px; }
   &--error { border-color: $ms-today; }
-  &:focus { outline: 2px solid #2563eb; outline-offset: -1px; }
+  &:focus { outline: 2px solid var(--pg-color-accent); outline-offset: -1px; }
   &:disabled {
     cursor: default;
     background: var(--pg-color-bg-stripe);
@@ -650,7 +618,7 @@ $accent-technologie: var(--pg-status-review-fg);
     border-color: var(--pg-color-navy);
     color: #fff;
 
-    &:hover, &:focus { background: #262f40; border-color: #262f40; }
+    &:hover, &:focus { background: var(--pg-color-accent-hover); border-color: var(--pg-color-accent-hover); }
   }
 
   .btn-outline-secondary {
@@ -702,8 +670,8 @@ $accent-technologie: var(--pg-status-review-fg);
 
 // ── Barres de tâches ──────────────────────────────────────────────────────────
 .gantt-bar {
-  rx: 2px;
-  ry: 2px;
+  rx: 6px;
+  ry: 6px;
   cursor: pointer;
   opacity: 1;
   transition: opacity 100ms, filter 100ms;
@@ -724,8 +692,8 @@ $accent-technologie: var(--pg-status-review-fg);
 }
 
 .gantt-bar-summary {
-  rx: 2px;
-  ry: 2px;
+  rx: 6px;
+  ry: 6px;
   fill: $ms-bar-summary;
   opacity: 0.85;
   cursor: grab;

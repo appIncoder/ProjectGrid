@@ -16,6 +16,7 @@ import type {
   ProjectDetail,
   ProjectMember,
   ProjectRole,
+  ProjectTab,
   RiskLevel,
   Task,
 } from '../../models';
@@ -46,8 +47,6 @@ type DashboardRiskRow = {
   dueDate: string;
 };
 
-type RiskDisplayMode = 'table' | 'matrix';
-
 type DashboardDueTaskRow = {
   taskId: string;
   taskLabel: string;
@@ -57,6 +56,15 @@ type DashboardDueTaskRow = {
   dueTs: number;
   daysRemaining: number;
   status: ActivityStatus;
+};
+
+type DashboardActivityEntry = {
+  id: string;
+  authorName: string;
+  taskLabel: string;
+  action: 'comment' | 'update' | 'risk';
+  createdAt: string;
+  createdTs: number;
 };
 
 @Component({
@@ -82,7 +90,7 @@ export class PrivatePage implements OnInit, OnDestroy {
   progressRows: DashboardProgressRow[] = [];
   topRiskRows: DashboardRiskRow[] = [];
   dueItemRows: DashboardDueTaskRow[] = [];
-  riskDisplayMode: RiskDisplayMode = 'table';
+  activityFeed: DashboardActivityEntry[] = [];
   readonly riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
   readonly riskProbabilityLevels: string[] = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
 
@@ -144,6 +152,7 @@ export class PrivatePage implements OnInit, OnDestroy {
         this.progressRows = [];
         this.topRiskRows = [];
         this.dueItemRows = [];
+        this.activityFeed = [];
         return;
       }
 
@@ -168,6 +177,7 @@ export class PrivatePage implements OnInit, OnDestroy {
       this.progressRows = [];
       this.topRiskRows = [];
       this.dueItemRows = [];
+      this.activityFeed = [];
     } finally {
       this.isLoading = false;
       if (!this.destroyed) this.cdr.detectChanges();
@@ -326,19 +336,52 @@ export class PrivatePage implements OnInit, OnDestroy {
       .map((a) => ({ id: a.id, label: a.label }));
   }
 
-  getSelectedCellStatus(activityId: ActivityId, phase: PhaseId): ActivityStatus {
-    const detail = this.selectedProjectDetail;
-    if (!detail) return 'todo';
-    return detail.taskMatrix?.[activityId]?.[phase]?.length
-      ? this.aggregateCellStatus(detail.taskMatrix[activityId][phase] as any[])
-      : 'todo';
-  }
-
   getPhaseLongName(phase: PhaseId): string {
     const detail = this.selectedProjectDetail as any;
     const fromDefinitions = String(detail?.phaseDefinitions?.[phase]?.label ?? '').trim();
     if (fromDefinitions) return fromDefinitions;
     return this.defaultPhaseLongNames[phase] ?? String(phase);
+  }
+
+  // ── Roadmap synthétique (même convention que project-roadmap : 1 phase = 1 mois) ─
+
+  private get ganttStartDate(): Date {
+    return this.projectService.getDefaultGanttStartDate();
+  }
+
+  getGanttMonthLabel(index: number): string {
+    const d = new Date(this.ganttStartDate.getFullYear(), this.ganttStartDate.getMonth() + index, 1);
+    return d.toLocaleString('fr-BE', { month: 'short' });
+  }
+
+  getActivityBarRange(row: DashboardProgressRow): { startIndex: number; span: number; percent: number } | null {
+    let firstIdx = -1;
+    let lastIdx = -1;
+    let doneSum = 0;
+    let totalSum = 0;
+
+    row.cells.forEach((cell, idx) => {
+      if (cell.total > 0) {
+        if (firstIdx === -1) firstIdx = idx;
+        lastIdx = idx;
+        doneSum += cell.done;
+        totalSum += cell.total;
+      }
+    });
+
+    if (firstIdx === -1) return null;
+    const percent = totalSum > 0 ? Math.round((doneSum / totalSum) * 100) : 0;
+    return { startIndex: firstIdx, span: lastIdx - firstIdx + 1, percent };
+  }
+
+  getBarLeftPercent(bar: { startIndex: number }): number {
+    const n = this.getSelectedPhases().length || 1;
+    return (bar.startIndex / n) * 100;
+  }
+
+  getBarWidthPercent(bar: { span: number }): number {
+    const n = this.getSelectedPhases().length || 1;
+    return (bar.span / n) * 100;
   }
 
   getHealthLabel(health: Project['health']): string {
@@ -347,18 +390,6 @@ export class PrivatePage implements OnInit, OnDestroy {
       case 'warning': return 'Attention';
       case 'critical': return 'Alerte';
       default:        return '';
-    }
-  }
-
-  getStatusClass(status: ActivityStatus | undefined): string {
-    switch (status) {
-      case 'done':          return 'status-done';
-      case 'todo':          return 'status-todo';
-      case 'inprogress':    return 'status-inprogress';
-      case 'notdone':       return 'status-notdone';
-      case 'onhold':        return 'status-onhold';
-      case 'notapplicable': return 'status-notapplicable';
-      default:              return 'status-todo';
     }
   }
 
@@ -372,6 +403,11 @@ export class PrivatePage implements OnInit, OnDestroy {
     }
   }
 
+  goToProjectTab(tab: ProjectTab): void {
+    if (!this.selectedProject?.id) return;
+    this.router.navigate(['/project', this.selectedProject.id], { queryParams: { tab } });
+  }
+
   // ── Dashboard data ─────────────────────────────────────────────────────────
 
   private refreshDashboardData(): void {
@@ -380,11 +416,13 @@ export class PrivatePage implements OnInit, OnDestroy {
       this.progressRows = [];
       this.topRiskRows = [];
       this.dueItemRows = [];
+      this.activityFeed = [];
       return;
     }
     this.progressRows = this.buildProgressRows(detail);
     this.topRiskRows = this.readTopRisks(detail);
     this.dueItemRows = this.buildDueItemRows(detail);
+    this.activityFeed = this.buildActivityFeed(detail);
   }
 
   private async refreshProjectRiskSnapshot(projectId: string): Promise<void> {
@@ -468,12 +506,37 @@ export class PrivatePage implements OnInit, OnDestroy {
     return matched ?? this.riskProbabilityLevels[2];
   }
 
-  setRiskDisplayMode(mode: RiskDisplayMode): void {
-    this.riskDisplayMode = mode;
-  }
-
   getRiskMatrixDots(impact: string, probability: string): DashboardRiskRow[] {
     return this.topRiskRows.filter((risk) => risk.impact === impact && risk.probability === probability);
+  }
+
+  getMatrixHeatClass(impact: string, probability: string): string {
+    const i = this.riskImpactLevels.indexOf(impact);
+    const p = this.riskProbabilityLevels.indexOf(probability);
+    const score = (i + 1) * (p + 1);
+    if (score <= 4) return 'risk-heat-low';
+    if (score <= 8) return 'risk-heat-medium';
+    if (score <= 15) return 'risk-heat-high';
+    return 'risk-heat-critical';
+  }
+
+  get openRisksCount(): number {
+    return this.topRiskRows.filter((r) => !['resolved', 'closed'].includes(r.status.toLowerCase())).length;
+  }
+
+  get highRisksCount(): number {
+    return this.topRiskRows.filter((r) => r.level === 'high' || r.level === 'critical').length;
+  }
+
+  get mitigatedThisMonthCount(): number {
+    const now = new Date();
+    return this.topRiskRows.filter((r) => {
+      if (!['resolved', 'closed'].includes(r.status.toLowerCase())) return false;
+      const ts = Date.parse(r.dueDate);
+      if (Number.isNaN(ts)) return false;
+      const d = new Date(ts);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
   }
 
   private buildDueItemRows(detail: ProjectDetail): DashboardDueTaskRow[] {
@@ -518,6 +581,79 @@ export class PrivatePage implements OnInit, OnDestroy {
     return rows.sort((a, b) => a.dueTs - b.dueTs).slice(0, 5);
   }
 
+  // Fil d'activité : construit à partir des vraies mutations tracées côté modèle
+  // (commentaires, horodatage/auteur des tâches et des risques — aucune collection
+  // "activity log" dédiée n'existe côté back, on ne fabrique rien, on affiche ce
+  // qui existe déjà).
+  private buildActivityFeed(detail: ProjectDetail): DashboardActivityEntry[] {
+    const entries: DashboardActivityEntry[] = [];
+    const taskMatrix = detail.taskMatrix ?? {};
+
+    for (const activityId of Object.keys(taskMatrix) as ActivityId[]) {
+      const phaseMap = taskMatrix[activityId];
+      for (const phaseId of Object.keys(phaseMap ?? {}) as PhaseId[]) {
+        const tasks = phaseMap[phaseId] ?? [];
+        for (const task of tasks as Task[]) {
+          const comments = task.comments ?? [];
+          for (const comment of comments) {
+            const ts = Date.parse(comment.createdAt ?? '');
+            if (Number.isNaN(ts)) continue;
+            entries.push({
+              id: `${task.id}-comment-${entries.length}`,
+              authorName: String(comment.authorName ?? '').trim() || 'Utilisateur',
+              taskLabel: String(task.label ?? ''),
+              action: 'comment',
+              createdAt: comment.createdAt ?? '',
+              createdTs: ts,
+            });
+          }
+
+          // Mise à jour de la tâche (statut, affectation, création...) — ignorée si elle
+          // coïncide avec l'ajout d'un commentaire déjà listé ci-dessus (même mutation),
+          // pour ne pas afficher deux entrées pour un seul événement utilisateur.
+          const updateTs = Date.parse(task.updatedAt ?? '');
+          if (!Number.isNaN(updateTs) && task.updatedByLabel) {
+            const matchesComment = comments.some((comment) => {
+              const cTs = Date.parse(comment.createdAt ?? '');
+              return !Number.isNaN(cTs) && Math.abs(cTs - updateTs) < 3000;
+            });
+            if (!matchesComment) {
+              entries.push({
+                id: `${task.id}-update`,
+                authorName: task.updatedByLabel,
+                taskLabel: String(task.label ?? ''),
+                action: 'update',
+                createdAt: task.updatedAt ?? '',
+                createdTs: updateTs,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    for (const risk of detail.projectRisks ?? []) {
+      const ts = Date.parse(risk.dateLastUpdated ?? '');
+      if (Number.isNaN(ts) || !risk.updatedByLabel) continue;
+      entries.push({
+        id: `risk-${risk.riskId}`,
+        authorName: risk.updatedByLabel,
+        taskLabel: risk.longName || risk.title || '',
+        action: 'risk',
+        createdAt: risk.dateLastUpdated,
+        createdTs: ts,
+      });
+    }
+
+    return entries.sort((a, b) => b.createdTs - a.createdTs).slice(0, 6);
+  }
+
+  getActivityVerb(entry: DashboardActivityEntry): string {
+    if (entry.action === 'comment') return 'a commenté';
+    if (entry.action === 'risk') return 'a mis à jour le risque';
+    return 'a mis à jour';
+  }
+
   getProgressBarClass(percent: number): string {
     if (percent >= 80) return 'progress-good';
     if (percent >= 50) return 'progress-warning';
@@ -542,5 +678,31 @@ export class PrivatePage implements OnInit, OnDestroy {
     if (daysRemaining < 0) return 'due-overdue';
     if (daysRemaining <= 3) return 'due-soon';
     return 'due-normal';
+  }
+
+  getInitials(name: string): string {
+    return (name || '').trim().slice(0, 2).toUpperCase();
+  }
+
+  getAvatarColorIndex(name: string): number {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = (hash + name.charCodeAt(i)) % 5;
+    }
+    return hash;
+  }
+
+  getRelativeTime(iso: string): string {
+    const ts = Date.parse(iso);
+    if (Number.isNaN(ts)) return '';
+    const diffMin = Math.floor((Date.now() - ts) / 60000);
+    if (diffMin < 1) return "à l'instant";
+    if (diffMin < 60) return `il y a ${diffMin} min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `il y a ${diffH} h`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD === 1) return 'hier';
+    if (diffD < 30) return `il y a ${diffD} j`;
+    return `il y a ${Math.floor(diffD / 30)} mois`;
   }
 }

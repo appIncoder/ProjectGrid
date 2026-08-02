@@ -59,6 +59,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
     frequency: 'medium',
   };
   private readonly subs = new Subscription();
+  private destroyed = false;
 
   constructor(
     private data: ProjectDataService,
@@ -82,6 +83,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.subs.unsubscribe();
   }
 
@@ -136,6 +138,29 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
     if (score <= 8) return 'medium';
     if (score <= 15) return 'high';
     return 'critical';
+  }
+
+  getMatrixHeatClass(impact: string, probability: string): string {
+    return `risk-heat-${this.getMatrixComputedLevel(impact, probability)}`;
+  }
+
+  get openRisksCount(): number {
+    return this.topRisks.filter((r) => r.status !== 'RESOLVED' && r.status !== 'CLOSED').length;
+  }
+
+  get highRisksCount(): number {
+    return this.topRisks.filter((r) => r.level === 'high' || r.level === 'critical').length;
+  }
+
+  get mitigatedThisMonthCount(): number {
+    const now = new Date();
+    return this.topRisks.filter((r) => {
+      if (r.status !== 'RESOLVED' && r.status !== 'CLOSED') return false;
+      const ts = Date.parse(r.dueDate);
+      if (Number.isNaN(ts)) return false;
+      const d = new Date(ts);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
   }
 
   // ====== Classes ======
@@ -462,6 +487,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
       };
       this.removeItemEverywhere(risk.id);
       this.upsertItemInCell(item, risk.impact, risk.probability);
+      if (!this.destroyed) this.cdr.detectChanges();
     } catch {
       await this.loadRisksFromDb();
     } finally {
@@ -474,6 +500,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
     if (!projectId) {
       this.topRisks = [];
       this.riskMatrix = {};
+      if (!this.destroyed) this.cdr.detectChanges();
       return;
     }
 
@@ -506,6 +533,7 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
         risk.probability
       );
     }
+    if (!this.destroyed) this.cdr.detectChanges();
   }
 
   onCancelAddRisk(event?: Event): void {

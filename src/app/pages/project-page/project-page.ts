@@ -96,7 +96,18 @@ export class ProjectPage implements OnInit, OnDestroy {
     private cdr: ChangeDetectorRef
   ) {}
 
+  private readonly validTabs: ProjectTab[] = [
+    'scorecard', 'risks', 'change', 'detail_project', 'detail_business',
+    'detail_technology', 'budget', 'roadmap', 'board', 'ressources',
+  ];
+
   ngOnInit(): void {
+    // Permet d'ouvrir directement un onglet donné via ?tab=... (ex: depuis le tableau de bord).
+    const requestedTab = this.route.snapshot.queryParamMap.get('tab') as ProjectTab | null;
+    if (requestedTab && this.validTabs.includes(requestedTab)) {
+      this.activeTab = requestedTab;
+    }
+
     // ✅ recharge si l'ID change (important quand on navigue entre projets)
     this.subs.add(this.route.paramMap.subscribe((pm) => {
       const projectId = pm.get('id');

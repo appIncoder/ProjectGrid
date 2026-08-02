@@ -268,6 +268,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
       if (pop.roleField === 'reporter') ref.task.reporterId = value;
       if (pop.roleField === 'accountant') ref.task.accountantId = value;
       if (pop.roleField === 'responsible') ref.task.responsibleId = value;
+      this.stampTask(ref.task);
       this.rebuild();
     });
 
@@ -319,6 +320,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
       if (!taskRef) return;
       if (!this.canMoveTask(taskRef.task)) return;
       taskRef.task.status = targetStatus;
+      this.stampTask(taskRef.task);
       this.rebuild();
     });
   }
@@ -435,10 +437,12 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
         if (comment) {
           created.comments!.push({
             text: comment,
-            authorName: 'Utilisateur',
+            authorId: this.authService.user?.id,
+            authorName: this.currentUserLabel(),
             createdAt: new Date().toISOString(),
           });
         }
+        this.stampTask(created);
         matrix.technologie[phase][nextParentId].push(created);
         this.rebuild();
         return;
@@ -457,9 +461,11 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
           if (!Array.isArray(ref.task.comments)) ref.task.comments = [];
           ref.task.comments.push({
             text: comment,
-            authorName: 'Utilisateur',
+            authorId: this.authService.user?.id,
+            authorName: this.currentUserLabel(),
             createdAt: new Date().toISOString(),
           });
+          this.stampTask(ref.task);
         }
         this.rebuild();
         return;
@@ -471,7 +477,8 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
         if (!Array.isArray(ref.task.comments)) ref.task.comments = [];
         ref.task.comments.push({
           text: comment,
-          authorName: 'Utilisateur',
+          authorId: this.authService.user?.id,
+          authorName: this.currentUserLabel(),
           createdAt: new Date().toISOString(),
         });
       }
@@ -485,6 +492,7 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
         matrix.technologie[phase][nextParentId].push(moved);
       }
 
+      this.stampTask(ref.task);
       this.rebuild();
     }, true);
   }
@@ -608,6 +616,19 @@ export class ProjectTechnologyManagement implements OnChanges, OnDestroy {
   private isDone(status: string): boolean {
     const s = String(status ?? '').toLowerCase();
     return s === 'done' || s === 'notapplicable';
+  }
+
+  /** Stampe la tâche avec l'horodatage et l'identité de l'utilisateur courant (audit CRUD). */
+  private stampTask(task: Task): void {
+    const user = this.authService.user;
+    task.updatedAt = new Date().toISOString();
+    task.updatedByUserId = user?.id;
+    task.updatedByLabel = user?.label || user?.username;
+  }
+
+  private currentUserLabel(): string {
+    const user = this.authService.user;
+    return user?.label || user?.username || 'Utilisateur';
   }
 
   private async mutateAndPersist(mutator: () => void | Promise<void>, closeModalOnSuccess = false): Promise<void> {

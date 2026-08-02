@@ -468,6 +468,8 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
         dateCreated: this.asDateString(row['dateCreated'] ?? row['createdAt']),
         dateLastUpdated: this.asDateString(row['dateLastUpdated'] ?? row['updatedAt']),
         remainingRiskId: this.asString(row['remainingRiskId']),
+        updatedByUserId: this.asString(row['updatedByUserId']) || undefined,
+        updatedByLabel: this.asString(row['updatedByLabel']) || undefined,
       };
     });
   }
@@ -1114,6 +1116,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     if (!criticity) throw new Error('Missing risk criticity');
 
     const now = this.nowIso();
+    const currentUser = this.auth.user;
     const created: ProjectRiskRef = {
       projectId: project.id,
       riskId: this.createUuid(),
@@ -1127,6 +1130,8 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
       dateCreated: now,
       dateLastUpdated: now,
       remainingRiskId: this.asString(payload?.remainingRiskId),
+      updatedByUserId: currentUser?.id,
+      updatedByLabel: currentUser?.label || currentUser?.username,
     };
 
     await this.saveProject({
@@ -1174,6 +1179,8 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
         ? this.asString(payload.remainingRiskId)
         : current.remainingRiskId,
       dateLastUpdated: this.nowIso(),
+      updatedByUserId: this.auth.user?.id,
+      updatedByLabel: this.auth.user?.label || this.auth.user?.username,
     };
 
     currentRisks[currentIndex] = updated;

@@ -16,6 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
 import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
+import { AppButton } from '../design-system/button/button';
 
 import {
   ActivityId,
@@ -76,7 +77,7 @@ type GanttMilestoneView = ProjectMilestone & {
 @Component({
   selector: 'app-project-roadmap',
   standalone: true,
-  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip],
+  imports: [CommonModule, FormsModule, NgbModalModule, ProjectTaskEditModal, TaskHoverTooltip, AppButton],
   templateUrl: './project-roadmap.html',
   styleUrls: ['./project-roadmap.scss'],
 })

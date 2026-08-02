@@ -1,131 +1,116 @@
-<!-- HEADER / TOOLBAR -->
-<header>
-  <nav class="navbar navbar-expand-lg navbar-dark pg-navbar">
-    <div class="container-fluid">
-      <!-- Branding -->
-      <a class="navbar-brand" routerLink="/">
-        {{ title }}
-      </a>
+<div class="pg-shell" [class.pg-shell--rail]="isProjectWorkspaceRoute">
 
-      <!-- Bouton burger mobile -->
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-              data-bs-target="#mainNavbar" aria-controls="mainNavbar"
-              aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+  <!-- SIDEBAR -->
+  <aside class="pg-sidebar">
+    <a class="pg-sidebar-brand" routerLink="/">
+      <span class="pg-sidebar-logo">P</span>
+      <span class="pg-sidebar-wordmark">{{ title }}</span>
+    </a>
 
-      <div class="collapse navbar-collapse" id="mainNavbar">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+    <nav class="pg-sidebar-nav">
+      <!-- MENU UTILISATEURS NON IDENTIFIÉS -->
+      <ng-container *ngIf="!auth.isAuthenticated">
+        <a class="pg-sidebar-link"
+           routerLink="/"
+           routerLinkActive="pg-sidebar-link--active"
+           [routerLinkActiveOptions]="{ exact: true }">
+          <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+          <span class="pg-sidebar-link-label">Accueil</span>
+        </a>
+      </ng-container>
 
-          <!-- MENU UTILISATEURS NON IDENTIFIÉS -->
-          <ng-container *ngIf="!auth.isAuthenticated">
-            <li class="nav-item">
-              <a class="nav-link"
-                 routerLink="/"
-                 routerLinkActive="active"
-                 [routerLinkActiveOptions]="{ exact: true }">
-                Accueil
-              </a>
-            </li>
-          </ng-container>
+      <!-- MENU UTILISATEURS IDENTIFIÉS -->
+      <ng-container *ngIf="auth.isAuthenticated">
+        <a class="pg-sidebar-link"
+           routerLink="/"
+           routerLinkActive="pg-sidebar-link--active"
+           [routerLinkActiveOptions]="{ exact: true }">
+          <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+          <span class="pg-sidebar-link-label">Accueil</span>
+        </a>
+        <a class="pg-sidebar-link"
+           routerLink="/projects"
+           routerLinkActive="pg-sidebar-link--active">
+          <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="7" height="7" rx="1.6"/><rect x="14" y="4" width="7" height="7" rx="1.6"/><rect x="3" y="15" width="7" height="5" rx="1.6"/><rect x="14" y="15" width="7" height="5" rx="1.6"/></svg>
+          <span class="pg-sidebar-link-label">Mes projets</span>
+        </a>
+        <a class="pg-sidebar-link"
+           routerLink="/settings"
+           [queryParams]="projectService.currentProjectId ? { projectId: projectService.currentProjectId } : {}"
+           routerLinkActive="pg-sidebar-link--active">
+          <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>
+          <span class="pg-sidebar-link-label">Paramètres</span>
+        </a>
+        <a class="pg-sidebar-link"
+           routerLink="/account"
+           routerLinkActive="pg-sidebar-link--active">
+          <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/></svg>
+          <span class="pg-sidebar-link-label">Mon compte</span>
+        </a>
+        <a class="pg-sidebar-link" *ngIf="isSuperUser"
+           routerLink="/admin"
+           routerLinkActive="pg-sidebar-link--active">
+          <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3 4 6v6c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V6z"/></svg>
+          <span class="pg-sidebar-link-label">Admin</span>
+          <span class="pg-sidebar-link-tag">super</span>
+        </a>
+      </ng-container>
+    </nav>
 
-          <!-- MENU UTILISATEURS IDENTIFIÉS -->
-          <ng-container *ngIf="auth.isAuthenticated">
-            <li class="nav-item">
-              <a class="nav-link"
-                 routerLink="/"
-                 routerLinkActive="active"
-                 [routerLinkActiveOptions]="{ exact: true }">
-                Accueil
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link"
-                 routerLink="/projects"
-                 routerLinkActive="active">
-                Mes projets
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link"
-                 routerLink="/settings"
-                 [queryParams]="projectService.currentProjectId ? { projectId: projectService.currentProjectId } : {}"
-                 routerLinkActive="active">
-                Paramètres
-              </a>
-            </li>
-            <li class="nav-item" *ngIf="isSuperUser">
-              <a class="nav-link"
-                 routerLink="/admin"
-                 routerLinkActive="active">
-                Admin page
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link"
-                 routerLink="/account"
-                 routerLinkActive="active">
-                Mon compte
-              </a>
-            </li>
-          </ng-container>
-        </ul>
+    <div class="pg-sidebar-bottom">
+      <div *ngIf="auth.isRealSysAdmin && auth.isAuthenticated" class="access-check-control">
+        <label class="access-check-label" for="accessCheckRole">Check access as</label>
+        <select
+          id="accessCheckRole"
+          class="access-check-select"
+          [value]="auth.accessCheckMode?.role ?? ''"
+          (change)="onAccessCheckRoleChange($event)">
+          <option value="">Sysadmin réel</option>
+          <option *ngFor="let role of accessCheckRoleOptions" [value]="role.value">
+            {{ role.label }}
+          </option>
+        </select>
+        <button
+          *ngIf="auth.isAccessCheckActive"
+          type="button"
+          class="access-check-exit"
+          (click)="stopAccessCheck()">
+          Quitter
+        </button>
+      </div>
 
-        <div class="d-flex align-items-center gap-2">
-          <div *ngIf="auth.isRealSysAdmin && auth.isAuthenticated" class="access-check-control">
-            <label class="access-check-label" for="accessCheckRole">Check access as</label>
-            <select
-              id="accessCheckRole"
-              class="access-check-select"
-              [value]="auth.accessCheckMode?.role ?? ''"
-              (change)="onAccessCheckRoleChange($event)">
-              <option value="">Sysadmin réel</option>
-              <option *ngFor="let role of accessCheckRoleOptions" [value]="role.value">
-                {{ role.label }}
-              </option>
-            </select>
-            <button
-              *ngIf="auth.isAccessCheckActive"
-              type="button"
-              class="access-check-exit"
-              (click)="stopAccessCheck()">
-              Quitter
-            </button>
-          </div>
-
-          <button *ngIf="auth.isAuthenticated"
-                  class="avatar-logout-btn"
-                  (click)="logout()">
-            <span class="avatar-circle" aria-hidden="true">
-              {{ (auth.user?.label || auth.user?.username || 'U').charAt(0).toUpperCase() }}
-            </span>
-          </button>
-        </div>
+      <div *ngIf="auth.isAuthenticated" class="pg-sidebar-user">
+        <span class="pg-sidebar-user-avatar" aria-hidden="true">{{ currentUserInitial }}</span>
+        <span class="pg-sidebar-user-name">{{ currentUserLabel }}</span>
+        <button type="button" class="pg-sidebar-logout" aria-label="Se déconnecter" (click)="logout()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
       </div>
     </div>
-  </nav>
-</header>
+  </aside>
 
-<!-- CONTENU PRINCIPAL ROUTÉ -->
-<main class="flex-fill">
-  <div class="app-main-container container-fluid py-2 px-2 px-md-3">
-    <router-outlet></router-outlet>
-  </div>
-</main>
+  <!-- CONTENU PRINCIPAL -->
+  <div class="pg-shell-main">
+    <main class="flex-fill">
+      <div class="app-main-container container-fluid py-2 px-2 px-md-3">
+        <router-outlet></router-outlet>
+      </div>
+    </main>
 
-<!-- FOOTER / STATUS BAR -->
-<footer class="bg-light border-top py-2">
-  <div class="container d-flex justify-content-between align-items-center small">
-    <div>
-      Status :
-      <span *ngIf="auth.isAuthenticated" class="text-success">Connecté</span>
-      <span *ngIf="!auth.isAuthenticated" class="text-danger">Non connecté</span>
-      <span *ngIf="auth.isAccessCheckActive" class="access-check-status">
-        Mode vérification : {{ auth.accessCheckMode?.label }}
-      </span>
-    </div>
-    <div>
-      © {{ title }}
-    </div>
+    <footer class="bg-light border-top py-2">
+      <div class="container d-flex justify-content-between align-items-center small">
+        <div>
+          Status :
+          <span *ngIf="auth.isAuthenticated" class="text-success">Connecté</span>
+          <span *ngIf="!auth.isAuthenticated" class="text-danger">Non connecté</span>
+          <span *ngIf="auth.isAccessCheckActive" class="access-check-status">
+            Mode vérification : {{ auth.accessCheckMode?.label }}
+          </span>
+        </div>
+        <div>
+          © {{ title }}
+        </div>
+      </div>
+    </footer>
   </div>
-</footer>
+</div>

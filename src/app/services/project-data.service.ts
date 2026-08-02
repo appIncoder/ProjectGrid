@@ -84,6 +84,9 @@ export interface ProjectRiskRef {
   dateCreated: string;
   dateLastUpdated: string;
   remainingRiskId: string;
+  // ✅ audit — identité de l'auteur de la dernière modification (dateLastUpdated fait déjà l'horodatage)
+  updatedByUserId?: string;
+  updatedByLabel?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -492,6 +495,8 @@ export class ProjectDataService {
             dateCreated: String(r?.dateCreated ?? '').trim(),
             dateLastUpdated: String(r?.dateLastUpdated ?? '').trim(),
             remainingRiskId: String(r?.remainingRiskId ?? '').trim(),
+            updatedByUserId: String(r?.updatedByUserId ?? '').trim() || undefined,
+            updatedByLabel: String(r?.updatedByLabel ?? '').trim() || undefined,
           }))
         : [],
       phaseActivityReports: Array.isArray(raw?.phaseActivityReports)

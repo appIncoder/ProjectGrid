@@ -47,7 +47,7 @@
 }
 
 .pg-button--sm {
-  min-height: 30px;
+  min-height: 34px;
   padding: 0.34rem 0.62rem;
   font-size: 0.78rem;
 }
@@ -68,26 +68,22 @@
   width: 100%;
 }
 
-.pg-button--primary,
-.pg-button--secondary {
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
 .pg-button--primary {
-  --pg-button-bg: var(--pg-color-navy, #1a2332);
-  --pg-button-border: var(--pg-color-navy, #1a2332);
+  --pg-button-bg: var(--pg-color-accent);
+  --pg-button-border: var(--pg-color-accent);
   --pg-button-color: #ffffff;
-  --pg-button-hover-bg: #262f40;
-  --pg-button-hover-border: #262f40;
+  --pg-button-hover-bg: var(--pg-color-accent-hover);
+  --pg-button-hover-border: var(--pg-color-accent-hover);
+  font-weight: 700;
 }
 
 .pg-button--secondary {
   --pg-button-bg: #ffffff;
   --pg-button-border: var(--pg-color-border, #cbd5e1);
-  --pg-button-color: var(--pg-color-text, #334155);
+  --pg-button-color: oklch(0.3 0.02 200);
   --pg-button-hover-bg: var(--pg-color-bg-head, #f8fafc);
-  --pg-button-hover-border: #94a3b8;
+  --pg-button-hover-border: var(--pg-color-border);
+  font-weight: 600;
 }
 
 .pg-button--ghost {
@@ -115,7 +111,7 @@
 }
 
 .pg-button.is-active {
-  box-shadow: 0 0 0 2px rgba(201, 138, 46, 0.35);
+  box-shadow: 0 0 0 2px oklch(0.45 0.13 195 / 0.35);
 }
 
 .pg-button__content {

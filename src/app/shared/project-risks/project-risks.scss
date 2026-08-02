@@ -23,6 +23,45 @@
   overflow: auto;
 }
 
+// ── Risques : KPI (même look que la private page) ──────────────────────────
+.risk-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 0.75rem;
+  flex: 0 0 auto;
+}
+
+.risk-kpi {
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-lg);
+  padding: 10px 12px;
+}
+
+.risk-kpi-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--pg-color-text-tertiary);
+}
+
+.risk-kpi-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--pg-color-text-heading);
+  margin-top: 2px;
+}
+
+.risk-kpi-value--alert {
+  color: var(--pg-status-alert-fg);
+}
+
+.risk-kpi-value--done {
+  color: var(--pg-status-done-fg);
+}
+
 .risk-matrix-shell {
   display: grid;
   grid-template-columns: 42px 1fr;
@@ -37,7 +76,7 @@
   text-align: center;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #4f5f76;
+  color: var(--pg-color-text-secondary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   display: flex;
@@ -53,7 +92,7 @@
   text-align: center;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #4f5f76;
+  color: var(--pg-color-text-secondary);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin-bottom: 0.35rem;
@@ -70,15 +109,27 @@
 }
 
 .risk-matrix {
-  --bs-table-border-color: var(--pg-color-border-light, #e7e9eb);
+  border-collapse: separate;
+  border-spacing: 4px;
 
   th,
   td {
+    border: none;
     vertical-align: middle;
   }
 
   thead th {
     text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--pg-color-text-tertiary);
+  }
+
+  tbody td {
+    min-width: 84px;
+    border-radius: var(--pg-radius);
   }
 
   tbody td.text-start strong {
@@ -88,14 +139,47 @@
   }
 }
 
-.risk-cell {
+.risk-heat-low {
+  background-color: var(--pg-status-neutral-bg);
+}
+
+.risk-heat-medium {
+  background-color: var(--pg-status-review-bg);
+}
+
+.risk-heat-high,
+.risk-heat-critical {
+  background-color: var(--pg-status-alert-bg);
+}
+
+.risk-cell-dots {
   min-height: 2.25rem;
   display: flex;
-  flex-wrap: wrap;
-  align-content: center;
+  align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  padding: 0.1rem;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.risk-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  cursor: grab;
+}
+
+.risk-dot-low {
+  background-color: var(--pg-status-neutral-fg);
+}
+
+.risk-dot-medium {
+  background-color: var(--pg-status-review-fg);
+}
+
+.risk-dot-high,
+.risk-dot-critical {
+  background-color: var(--pg-status-alert-fg);
 }
 
 .risk-context-menu {
@@ -118,8 +202,8 @@
 .risk-modal {
   width: min(560px, 100%);
   border: 1px solid var(--pg-color-border, #dcdfe3);
-  border-radius: var(--pg-radius, 2px);
-  box-shadow: none;
+  border-radius: var(--pg-radius-lg);
+  box-shadow: 0 24px 70px rgba(10, 30, 66, 0.15);
 }
 
 .top-risks-table {
@@ -135,5 +219,26 @@
     border: 0;
     box-shadow: none;
     background-color: transparent;
+  }
+}
+
+.risk-level-select {
+  border-radius: var(--pg-radius-sm);
+  font-weight: 600;
+
+  &.risk-low {
+    background-color: var(--pg-status-neutral-bg) !important;
+    color: var(--pg-status-neutral-fg);
+  }
+
+  &.risk-medium {
+    background-color: var(--pg-status-review-bg) !important;
+    color: var(--pg-status-review-fg);
+  }
+
+  &.risk-high,
+  &.risk-critical {
+    background-color: var(--pg-status-alert-bg) !important;
+    color: var(--pg-status-alert-fg);
   }
 }

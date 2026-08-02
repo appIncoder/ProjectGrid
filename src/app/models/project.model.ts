@@ -76,6 +76,11 @@ export interface Item {
 
   // IMPORTANT : un item "vit" dans une phase de la matrice
   phase?: PhaseId;
+
+  // ✅ audit — horodatage + identité de l'auteur de la dernière modification (CRUD)
+  updatedAt?: string; // ISO 8601
+  updatedByUserId?: string;
+  updatedByLabel?: string;
 }
 
 /** @deprecated Use Item instead */
@@ -111,6 +116,9 @@ export interface ProjectRiskItem {
   dateCreated: string;
   dateLastUpdated: string;
   remainingRiskId: string;
+  // ✅ audit — identité de l'auteur de la dernière modification (dateLastUpdated fait déjà l'horodatage)
+  updatedByUserId?: string;
+  updatedByLabel?: string;
 }
 
 export interface ProjectMilestone {
@@ -212,6 +220,12 @@ export interface ProjectListItem {
   health: Health;
   healthName?: string;
   currentPhase: string;
+  /** % de tâches terminées (done/notapplicable) sur le total du taskMatrix. */
+  progressPct?: number;
+  /** Tâches todo/inprogress/onhold restantes. */
+  activeCount?: number;
+  /** Nombre de risques enregistrés sur le projet. */
+  riskCount?: number;
 }
 
 export interface Project {

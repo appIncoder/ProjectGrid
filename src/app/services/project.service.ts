@@ -14,6 +14,7 @@ import type {
 type Task = Item;
 type TaskCategory = ItemCategory;
 import { ProjectDataService } from './project-data.service';
+import { AuthService } from './auth.service';
 
 export interface ProjectActionPayload {
   projectId: string;
@@ -75,7 +76,15 @@ export class ProjectService {
   // Règles planning
   readonly daysPerMonth = 30;
 
-  constructor(private projectData: ProjectDataService) {}
+  constructor(private projectData: ProjectDataService, private auth: AuthService) {}
+
+  /** Stampe l'item avec l'horodatage et l'identité de l'utilisateur courant (audit CRUD). */
+  private stampItem(item: Item): void {
+    const user = this.auth.user;
+    item.updatedAt = new Date().toISOString();
+    item.updatedByUserId = user?.id;
+    item.updatedByLabel = user?.label || user?.username;
+  }
 
   get mutations$(): Observable<ProjectMutationEvent> {
     return this.mutationsSubject.asObservable();
@@ -283,6 +292,7 @@ export class ProjectService {
       accountantId: payload.accountantId || undefined,
       responsibleId: payload.responsibleId || undefined,
     };
+    this.stampItem(item);
 
     matrix[payload.activityId][payload.phase].push(item);
     this.markProjectMutated(payload.projectId, 'item_updated');
@@ -342,6 +352,7 @@ export class ProjectService {
       (task as any).phase = (task as any).phase ?? payload.fromPhase;
     }
 
+    this.stampItem(task);
     this.mutationsSubject.next({ type: 'item_updated', projectId: payload.projectId });
   }
 
@@ -376,6 +387,7 @@ export class ProjectService {
     located.task.endDate = endIso;
 
     (located.task as any).phase = (located.task as any).phase ?? located.phase;
+    this.stampItem(located.task);
     this.mutationsSubject.next({ type: 'schedule_updated', projectId: params.projectId });
   }
 
