@@ -1,16 +1,20 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgFor, NgIf } from '@angular/common';
+import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import type { ProjectRole } from './models';
 import { AuthService } from './services/auth.service';
 import { ProjectService } from './services/project.service';
 
+/** Clé de persistance du choix utilisateur (réduit / étendu) pour la sidebar. */
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'pg.sidebar.collapsed';
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgFor],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgFor, NgbTooltipModule],
   templateUrl: './app.html',
   styleUrls: ['./app.scss']
 })
@@ -27,8 +31,15 @@ export class App implements OnInit, OnDestroy {
     { value: 'technologyMember', label: 'Technology Member' },
   ];
 
-  /** Variante rail (76px) de la sidebar sur les écrans denses de l'espace projet. */
-  isProjectWorkspaceRoute = false;
+  /** Écran de l'espace projet : suggère un repli automatique de la sidebar tant que l'utilisateur n'a rien choisi. */
+  readonly isProjectWorkspaceRoute = signal(false);
+
+  /** Choix explicite de l'utilisateur (réduit/étendu), `null` tant qu'il n'a pas encore utilisé le bouton. */
+  private readonly sidebarCollapsedOverride = signal<boolean | null>(this.readStoredSidebarPreference());
+
+  /** État effectif de la sidebar : le choix utilisateur prime, sinon on retombe sur le comportement automatique. */
+  readonly sidebarCollapsed = computed(() => this.sidebarCollapsedOverride() ?? this.isProjectWorkspaceRoute());
+
   private routerEventsSub: Subscription | null = null;
 
   constructor(
@@ -38,11 +49,11 @@ export class App implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
-    this.isProjectWorkspaceRoute = this.router.url.startsWith('/project/');
+    this.isProjectWorkspaceRoute.set(this.router.url.startsWith('/project/'));
     this.routerEventsSub = this.router.events
       .pipe(filter((evt): evt is NavigationEnd => evt instanceof NavigationEnd))
       .subscribe((evt) => {
-        this.isProjectWorkspaceRoute = evt.urlAfterRedirects.startsWith('/project/');
+        this.isProjectWorkspaceRoute.set(evt.urlAfterRedirects.startsWith('/project/'));
       });
   }
 
@@ -80,6 +91,28 @@ export class App implements OnInit, OnDestroy {
 
   stopAccessCheck(): void {
     this.auth.stopAccessCheck();
+  }
+
+  /** Bascule la sidebar entre mode réduit (icônes seules) et mode étendu, et mémorise le choix. */
+  toggleSidebar(): void {
+    const next = !this.sidebarCollapsed();
+    this.sidebarCollapsedOverride.set(next);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, next ? '1' : '0');
+    } catch {
+      // stockage indisponible (navigation privée, quota…) : le choix reste actif pour la session en cours.
+    }
+  }
+
+  private readStoredSidebarPreference(): boolean | null {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+      if (raw === '1') return true;
+      if (raw === '0') return false;
+    } catch {
+      // stockage indisponible : pas de préférence mémorisée.
+    }
+    return null;
   }
 
   logout() {

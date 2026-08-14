@@ -296,6 +296,8 @@ export class SettingsPage implements OnInit, OnDestroy {
       this.projectList = await this.dataService.listProjects();
     } catch {
       this.projectList = [];
+    } finally {
+      this.cdr.detectChanges();
     }
   }
 

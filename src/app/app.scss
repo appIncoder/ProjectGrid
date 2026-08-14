@@ -43,12 +43,43 @@ footer {
   transition: width 150ms ease;
 }
 
+.pg-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .pg-sidebar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0 6px;
   text-decoration: none;
+}
+
+.pg-sidebar-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-sm);
+  background: #ffffff;
+  color: var(--pg-color-text-secondary);
+  cursor: pointer;
+}
+
+.pg-sidebar-toggle:hover {
+  background: var(--pg-color-bg-head);
+  color: var(--pg-color-text-heading);
+}
+
+.pg-sidebar-toggle-icon {
+  transition: transform 150ms ease;
 }
 
 .pg-sidebar-logo {
@@ -192,9 +223,19 @@ footer {
   align-items: center;
 }
 
+.pg-shell--rail .pg-sidebar-header {
+  flex-direction: column;
+  gap: 8px;
+}
+
 .pg-shell--rail .pg-sidebar-brand {
   justify-content: center;
+  flex: 0 0 auto;
   padding: 0;
+}
+
+.pg-shell--rail .pg-sidebar-toggle-icon {
+  transform: rotate(180deg);
 }
 
 .pg-shell--rail .pg-sidebar-wordmark,

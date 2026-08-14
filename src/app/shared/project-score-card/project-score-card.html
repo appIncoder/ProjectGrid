@@ -25,7 +25,7 @@
         <thead>
           <tr>
             <th class="text-start activity-header-col">Activités</th>
-            <th *ngFor="let phase of getPhases()">
+            <th *ngFor="let phase of getPhases()" class="phase-header-col">
               <span [attr.title]="getPhaseLongName(phase)">
                 {{ getPhaseLabel(phase) }}
               </span>
@@ -63,7 +63,12 @@
                   (mouseleave)="hideTaskHoverCard()"
                   (contextmenu)="onTaskContextMenu($event, activity.id, phase, task)"
                   (click)="openTaskEditModal(taskEditModal, activity.id, phase, task)">
-                  {{ task.label }}
+                  <div class="tp-body">
+                    <p class="tp-title">{{ task.label }}</p>
+                  </div>
+                  <div class="tp-footer">
+                    <span class="tp-status-tag">{{ getTaskStatusText(task.status) }}</span>
+                  </div>
                 </div>
 
                 <div *ngIf="getTasks(activity.id, phase).length === 0" class="no-task text-muted small">

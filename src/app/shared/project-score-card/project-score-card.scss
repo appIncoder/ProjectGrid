@@ -1,7 +1,7 @@
 :host {
   display: block;
-  --scorecard-row-height-max: 9rem;
-  --scorecard-row-height-min: 4.25rem;
+  --scorecard-row-height-max: 11rem;
+  --scorecard-row-height-min: 5.5rem;
   --scorecard-head-height: 2.25rem;
   --scorecard-cell-pad-y: 0.3rem;
   --scorecard-cell-pad-x: 0.4rem;
@@ -11,8 +11,18 @@
     560px,
     max(300px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
   );
-  --task-pill-max-width: 210px;
-  --scorecard-task-radius: 5px;
+  // Cartouches agrandies : la colonne de phase suit désormais la taille de la
+  // cartouche (cf. .phase-header-col/.phase-cell ci-dessous) plutôt que
+  // l'inverse — le tableau peut donc déborder à droite de la zone visible
+  // (scroll horizontal sur .scorecard-table-wrap) au lieu de compresser les cartouches.
+  --task-pill-max-width: 320px;
+  // Largeur de colonne = exactement la largeur de cartouche + le padding
+  // horizontal de la cellule (cf. .phase-header-col/.phase-cell), pour que la
+  // colonne épouse la carte au pixel près (ni marge superflue, ni compression).
+  --scorecard-phase-col-width: calc(var(--task-pill-max-width) + (var(--scorecard-cell-pad-x) * 2));
+  // Rayon calqué sur --card-radius du kanban (project-board.scss) pour que les
+  // cartouches ressemblent aux tickets du board.
+  --scorecard-task-radius: 14px;
 }
 
 .scorecard-toolbar {
@@ -119,8 +129,14 @@
 }
 
 .scorecard-table {
-  width: 100%;
-  table-layout: fixed;
+  // table-layout: auto + width: max-content laisse chaque colonne de phase
+  // atteindre sa largeur figée --scorecard-phase-col-width (au lieu de se
+  // partager 100% de la largeur du panneau) : le tableau peut donc dépasser
+  // la largeur visible, avec défilement horizontal pris en charge par
+  // .scorecard-table-wrap.
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
   margin-bottom: 0;
 }
 
@@ -131,8 +147,24 @@
 }
 
 .activity-header-col {
-  width: 20%;
+  // Largeur fixe : avec table-layout: auto, un simple min-width ne suffit pas
+  // à contenir la colonne — elle grandit pour éviter tout retour à la ligne
+  // du libellé d'activité. width (sur le <th>, 1ère ligne) fige la colonne ;
+  // le libellé passe alors à la ligne (cf. .activity-name overflow-wrap ci-dessous).
+  width: 180px;
   min-width: 180px;
+  max-width: 180px;
+}
+
+.phase-header-col,
+.phase-cell {
+  // Largeur fixe (comme .activity-header-col) : sans elle, table-layout: auto
+  // dimensionne chaque colonne d'après son propre contenu (cellules avec des
+  // libellés courts ou vides deviennent plus étroites que --task-pill-max-width),
+  // ce qui désaligne la largeur des cartouches d'une colonne à l'autre.
+  width: var(--scorecard-phase-col-width);
+  min-width: var(--scorecard-phase-col-width);
+  max-width: var(--scorecard-phase-col-width);
 }
 
 .activity-row {
@@ -158,6 +190,9 @@
   font-weight: 600;
   line-height: 1.2;
   margin-bottom: 0.12rem;
+  // La colonne activité est maintenant à largeur fixe (.activity-header-col) :
+  // un libellé long doit passer à la ligne plutôt que d'élargir la colonne.
+  overflow-wrap: anywhere;
 }
 
 .activity-manager {
@@ -199,95 +234,110 @@
   overflow-y: auto;
 }
 
+// Cartouches calquées sur .kanban-card / .kc-* (project-board.scss) : fond
+// blanc constant, accent de statut porté par la bordure gauche + le badge de
+// pied de carte (au lieu de teinter toute la cartouche comme précédemment).
 .task-pill {
   display: block;
   position: relative;
   width: min(100%, var(--task-pill-max-width));
   min-width: 0;
   max-width: 100%;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
   border-radius: var(--scorecard-task-radius);
-  border: 1px solid #dfe4ec;
-  border-left: 4px solid var(--task-status-accent, #c1c7d0);
-  padding: 0.34rem 1.35rem 0.34rem 0.52rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.25;
+  border: 1px solid var(--pg-color-border, #dcdfe3);
+  border-left: 3px solid var(--task-status-accent, #c1c7d0);
   text-align: left;
   cursor: pointer;
-  color: var(--task-status-accent, #1a2332);
   background: #ffffff;
   box-shadow: none;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0.32rem;
-    right: 0.36rem;
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 999px;
-    background: var(--task-status-accent, #c1c7d0);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.95);
-  }
+  transition: border-color 120ms ease;
 
   &:hover {
-    border-color: var(--task-status-accent, #c8d2e1);
+    border-color: var(--pg-color-navy, #1a2332);
+    border-left-color: var(--task-status-accent, var(--pg-color-navy, #1a2332));
   }
 
   &.status-done {
     --task-status-accent: var(--pg-status-done-fg, #2f8a52);
-    background: var(--pg-status-done-bg, #e5f5ea);
+    --task-status-accent-bg: var(--pg-status-done-bg, #e5f5ea);
   }
 
   &.status-todo {
     --task-status-accent: var(--pg-status-neutral-fg, #7c8288);
-    background: #ffffff;
+    --task-status-accent-bg: var(--pg-status-neutral-bg, #e7e9eb);
   }
 
   &.status-inprogress {
     --task-status-accent: var(--pg-status-inprogress-fg, #2f5fa8);
-    background: var(--pg-status-inprogress-bg, #e9f0fb);
+    --task-status-accent-bg: var(--pg-status-inprogress-bg, #e9f0fb);
   }
 
   &.status-onhold {
     --task-status-accent: var(--pg-status-review-fg, #a8752f);
-    background: var(--pg-status-review-bg, #faf1e0);
+    --task-status-accent-bg: var(--pg-status-review-bg, #faf1e0);
   }
 
   &.status-notdone {
     --task-status-accent: var(--pg-status-alert-fg, #b8452f);
-    background: var(--pg-status-alert-bg, #fbe8e2);
+    --task-status-accent-bg: var(--pg-status-alert-bg, #fbe8e2);
   }
 
   &.status-notapplicable {
     --task-status-accent: var(--pg-status-neutral-fg, #7c8288);
-    background: var(--pg-status-neutral-bg, #e7e9eb);
+    --task-status-accent-bg: var(--pg-status-neutral-bg, #e7e9eb);
   }
+}
+
+// Corps (≈ .kc-body / .kc-title)
+.tp-body {
+  padding: 0.65rem 1.6rem 0.3rem 0.75rem;
+}
+
+.tp-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--pg-color-text, #1a2332);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+// Pied de carte (≈ .kc-footer / .kc-status-tag)
+.tp-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0.75rem 0.6rem;
+}
+
+.tp-status-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--pg-radius, 2px);
+  padding: 0.14rem 0.5rem;
+  white-space: nowrap;
+  background: var(--task-status-accent-bg, #e7e9eb);
+  color: var(--task-status-accent, #7c8288);
 }
 
 .task-pill::after {
   content: '\270E';
   position: absolute;
-  right: 0.34rem;
-  top: 50%;
-  transform: translateY(-40%) scale(0.9);
+  top: 0.55rem;
+  right: 0.55rem;
   font-size: 0.68rem;
   opacity: 0;
   color: #42526e;
+  transform: scale(0.9);
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
 .task-pill:hover::after {
   opacity: 0.92;
-  transform: translateY(-50%) scale(1);
+  transform: scale(1);
 }
 
 .task-pill:active {
@@ -314,7 +364,9 @@
   }
 
   .activity-header-col {
+    width: 150px;
     min-width: 150px;
+    max-width: 150px;
   }
 }
 

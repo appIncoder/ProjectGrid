@@ -1,4 +1,9 @@
-<div class="roadmap-root" [class.roadmap-root--readonly]="!canEditRoadmap">
+<div
+  class="roadmap-root"
+  [class.roadmap-root--readonly]="!canEditRoadmap"
+  [class.roadmap-root--rows-large]="ganttRowSize === 'large'"
+  [style.--roadmap-row-height.px]="bodyRowHeight"
+>
   <!-- Side-effect import (ne pas supprimer) -->
   <app-project-task-edit-modal *ngIf="false"></app-project-task-edit-modal>
 
@@ -33,6 +38,29 @@
       <div class="roadmap-toolbar-sep"></div>
 
       <button class="roadmap-btn" (click)="centerOnToday()">Aujourd'hui</button>
+
+      <div class="roadmap-toolbar-sep"></div>
+
+      <div class="roadmap-zoom-group" role="group" aria-label="Zoom de la roadmap">
+        <button type="button" class="roadmap-btn roadmap-zoom-btn" (click)="zoomOut()" [disabled]="!canZoomOut"
+          title="Réduire le zoom" aria-label="Réduire le zoom">−</button>
+        <button type="button" class="roadmap-zoom-value" (click)="resetZoom()"
+          title="Réinitialiser le zoom (100%) — astuce : Ctrl/Cmd + molette">{{ zoomPercent }}%</button>
+        <button type="button" class="roadmap-btn roadmap-zoom-btn" (click)="zoomIn()" [disabled]="!canZoomIn"
+          title="Augmenter le zoom" aria-label="Augmenter le zoom">+</button>
+      </div>
+
+      <div class="roadmap-toolbar-sep"></div>
+
+      <div class="roadmap-size-group" role="group" aria-label="Taille des cartouches du Gantt">
+        <button type="button" class="roadmap-btn roadmap-size-btn" [class.roadmap-btn--active]="ganttRowSize === 'compact'"
+          (click)="setGanttRowSize('compact')" title="Cartouches compactes" aria-label="Cartouches compactes">Compact</button>
+        <button type="button" class="roadmap-btn roadmap-size-btn" [class.roadmap-btn--active]="ganttRowSize === 'large'"
+          (click)="setGanttRowSize('large')" title="Cartouches larges" aria-label="Cartouches larges">Large</button>
+      </div>
+
+      <div class="roadmap-toolbar-sep"></div>
+
       <button class="roadmap-btn roadmap-btn--success" [disabled]="!canEditRoadmap" (click)="recalculateSchedule()">↻ Recalculer</button>
       <button class="roadmap-btn roadmap-btn--accent" [disabled]="!canEditRoadmap" (click)="openCreateMilestoneModal()">
         + Ajouter un jalon
@@ -57,7 +85,8 @@
         display: grid;
         grid-template-columns: {{tablePanelWidthPx}}px {{dividerW}}px 1fr;
         width: 100%;
-        align-items: start;
+        height: 100%;
+        align-items: stretch;
         font-size: 0.72rem;
         line-height: 1.12;
         flex: 1;
@@ -67,7 +96,7 @@
       <!-- ══════════════════════════════
            PANNEAU TABLEAU
            ══════════════════════════════ -->
-      <div class="roadmap-left-pane" [style.width.px]="tablePanelWidthPx">
+      <div #tableScroll class="roadmap-left-pane" [style.width.px]="tablePanelWidthPx">
         <div
           class="roadmap-table-grid"
           [style.gridTemplateColumns]="tableInnerGridTemplate"
@@ -261,7 +290,9 @@
       <!-- ══════════════════════════════
            PANNEAU GANTT
            ══════════════════════════════ -->
-      <div #ganttScroll class="roadmap-right-pane" style="flex: 1; overflow-x: auto; overflow-y: hidden; position: relative;">
+      <div #ganttScroll class="roadmap-right-pane" style="flex: 1; position: relative;"
+        (wheel)="onGanttWheel($event)"
+        (scroll)="onGanttPaneScroll()">
         <div class="roadmap-gantt-content" style="width: {{ganttWidth}}px; min-width: 0;">
 
           <!-- Ligne 1 : Jalons (milestones) -->
@@ -332,9 +363,9 @@
               <rect
                 [attr.class]="'gantt-row-stripe ' + (ri % 2 === 0 ? 'gantt-row-stripe--even' : 'gantt-row-stripe--odd')"
                 x="0"
-                [attr.y]="getRowCenterY(r.rowIndex) - 18"
+                [attr.y]="getRowCenterY(r.rowIndex) - bodyRowHeight / 2"
                 [attr.width]="ganttWidth"
-                height="36"
+                [attr.height]="bodyRowHeight"
               ></rect>
             </g>
 

@@ -382,6 +382,20 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
     this.isAddRiskModalOpen = true;
   }
 
+  /**
+   * Double-clic sur une cartouche de la matrice (croisement impact × probabilité) :
+   * ouvre la même popup de création, avec probabilité et impact pré-renseignés
+   * d'après la cellule cliquée.
+   */
+  onMatrixCellDblClick(impact: string, probability: string): void {
+    if (!this.canAddRisk) return;
+    this.openAddRiskModal();
+    if (this.riskProbabilityLevels.includes(probability)) {
+      this.newRiskForm.probability = probability;
+    }
+    this.newRiskForm.frequency = this.mapImpactLabelToCriticity(impact);
+  }
+
   closeAddRiskModal(refresh = true): void {
     const wasOpen = this.isAddRiskModalOpen;
     this.isAddRiskModalOpen = false;
@@ -436,6 +450,20 @@ export class ProjectRisks implements OnInit, OnChanges, OnDestroy {
     if (level === 'high') return 'Majeur';
     if (level === 'medium') return 'Modéré';
     return 'Faible';
+  }
+
+  // Inverse de mapCriticityToImpactLabel : le formulaire "Ajouter un risque"
+  // n'a qu'un sélecteur de criticité (4 valeurs) pour piloter l'impact affiché
+  // dans la matrice (5 niveaux) — 'Significatif' n'a pas de correspondance
+  // exacte, on retient 'high' (le plus proche par prudence).
+  private mapImpactLabelToCriticity(impact: string): string {
+    switch (impact) {
+      case 'Critique':      return 'critical';
+      case 'Majeur':        return 'high';
+      case 'Significatif':  return 'high';
+      case 'Modéré':        return 'medium';
+      default:               return 'low'; // 'Faible'
+    }
   }
 
   private normalizeProbabilityLabel(probability: string): string {

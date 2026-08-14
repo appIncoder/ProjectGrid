@@ -182,6 +182,83 @@ $accent-technologie: var(--pg-status-review-fg);
   gap: 8px;
 }
 
+// ── Zoom (zone d'encodage roadmap) ──────────────────────────────────────────
+.roadmap-zoom-group {
+  display: inline-flex;
+  align-items: stretch;
+
+  .roadmap-zoom-btn,
+  .roadmap-zoom-value {
+    border-radius: 0;
+    margin-left: -1px;
+  }
+
+  .roadmap-zoom-btn:first-child {
+    border-top-left-radius: var(--pg-radius);
+    border-bottom-left-radius: var(--pg-radius);
+    margin-left: 0;
+  }
+
+  .roadmap-zoom-btn:last-child {
+    border-top-right-radius: var(--pg-radius);
+    border-bottom-right-radius: var(--pg-radius);
+  }
+}
+
+.roadmap-zoom-btn {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  position: relative;
+
+  &:hover { z-index: 1; }
+}
+
+// ── Taille des cartouches (toggle 2 tailles, Gantt + panneau tableau) ────────
+.roadmap-size-group {
+  display: inline-flex;
+  align-items: stretch;
+
+  .roadmap-size-btn {
+    border-radius: 0;
+    margin-left: -1px;
+    position: relative;
+
+    &:hover { z-index: 1; }
+  }
+
+  .roadmap-size-btn:first-child {
+    border-top-left-radius: var(--pg-radius);
+    border-bottom-left-radius: var(--pg-radius);
+    margin-left: 0;
+  }
+
+  .roadmap-size-btn:last-child {
+    border-top-right-radius: var(--pg-radius);
+    border-bottom-right-radius: var(--pg-radius);
+  }
+}
+
+.roadmap-zoom-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 46px;
+  padding: 0 6px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: $ms-text-muted;
+  background: $ms-pane-bg;
+  border: 1px solid $ms-border;
+  cursor: pointer;
+
+  &:hover { background: $ms-header-bg; color: $ms-text; }
+}
+
 // ── Inputs / Selects ──────────────────────────────────────────────────────────
 .roadmap-select {
   padding: 3px 6px;
@@ -240,13 +317,16 @@ $accent-technologie: var(--pg-status-review-fg);
 }
 
 // ── Scroll frame ──────────────────────────────────────────────────────────────
+// Le défilement vertical se fait désormais à l'intérieur de chaque panneau
+// (et non plus sur ce cadre) afin que la scrollbar horizontale du Gantt,
+// portée par .roadmap-right-pane, reste ancrée en bas du cadre visible —
+// toujours visible, sans avoir à scroller jusqu'en bas du contenu.
 .roadmap-scroll-frame {
   display: flex;
   gap: 0;
   height: var(--roadmap-frame-height);
   max-height: var(--roadmap-frame-height);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   border: 1px solid $ms-border;
   border-radius: var(--pg-radius);
   background: $ms-pane-bg;
@@ -256,15 +336,21 @@ $accent-technologie: var(--pg-status-review-fg);
 .roadmap-left-pane {
   position: relative;
   z-index: 1;
+  height: 100%;
   background: $ms-pane-bg;
   overflow-x: auto;
+  // Défilement vertical synchronisé programmatiquement sur .roadmap-right-pane
+  // (cf. onGanttPaneScroll) : pas de scrollbar propre, pour n'en garder qu'une seule.
   overflow-y: hidden;
 }
 
 .roadmap-right-pane {
   position: relative;
   z-index: 1;
+  height: 100%;
   background: $ms-pane-bg;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .roadmap-right-pane {
@@ -355,8 +441,12 @@ $accent-technologie: var(--pg-status-review-fg);
 }
 
 // ── Table body cells ──────────────────────────────────────────────────────────
+// Hauteur pilotée par --roadmap-row-height (posée sur .roadmap-root, cf. HTML,
+// et dérivée de bodyRowHeight/ganttRowSize en TS) : doit rester égale à la
+// hauteur de ligne du Gantt pour que le scroll vertical synchronisé
+// (onGanttPaneScroll) reste aligné, quelle que soit la taille choisie.
 .roadmap-row-cell {
-  height: 36px;
+  height: var(--roadmap-row-height, 36px);
   padding: 0 8px;
   display: flex;
   align-items: center;
@@ -365,7 +455,7 @@ $accent-technologie: var(--pg-status-review-fg);
 }
 
 .roadmap-td {
-  height: 36px;
+  height: var(--roadmap-row-height, 36px);
   padding: 0 6px;
   display: flex;
   align-items: center;
@@ -597,6 +687,15 @@ $accent-technologie: var(--pg-status-review-fg);
   .gantt-bar-bullet-end {
     cursor: default;
   }
+}
+
+// ── Cartouches larges (toggle Compact/Large) ──────────────────────────────────
+// Les lignes sont déjà plus hautes via --roadmap-row-height ; on agrandit ici
+// un peu le texte pour rester proportionné à des cartouches plus grandes.
+.roadmap-root--rows-large {
+  .gantt-bar-label { font-size: 0.72rem; }
+  .roadmap-task-label-text { font-size: 0.8rem; }
+  .roadmap-row-title { font-size: 0.82rem; }
 }
 
 // ── Modal jalon (Bootstrap .btn-*) — recalées localement sur Executive Slate ──

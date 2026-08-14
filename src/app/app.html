@@ -1,11 +1,26 @@
-<div class="pg-shell" [class.pg-shell--rail]="isProjectWorkspaceRoute">
+<div class="pg-shell" [class.pg-shell--rail]="sidebarCollapsed()">
 
   <!-- SIDEBAR -->
   <aside class="pg-sidebar">
-    <a class="pg-sidebar-brand" routerLink="/">
-      <span class="pg-sidebar-logo">P</span>
-      <span class="pg-sidebar-wordmark">{{ title }}</span>
-    </a>
+    <div class="pg-sidebar-header">
+      <a class="pg-sidebar-brand" routerLink="/">
+        <span class="pg-sidebar-logo">P</span>
+        <span class="pg-sidebar-wordmark">{{ title }}</span>
+      </a>
+      <button type="button"
+              class="pg-sidebar-toggle"
+              (click)="toggleSidebar()"
+              [attr.aria-label]="sidebarCollapsed() ? 'Étendre le menu' : 'Réduire le menu'"
+              [attr.aria-expanded]="!sidebarCollapsed()"
+              ngbTooltip="{{ sidebarCollapsed() ? 'Étendre le menu' : 'Réduire le menu' }}"
+              placement="right"
+              container="body">
+        <svg class="pg-sidebar-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 17l-5-5 5-5"/>
+          <path d="M18 17l-5-5 5-5"/>
+        </svg>
+      </button>
+    </div>
 
     <nav class="pg-sidebar-nav">
       <!-- MENU UTILISATEURS NON IDENTIFIÉS -->
@@ -13,7 +28,11 @@
         <a class="pg-sidebar-link"
            routerLink="/"
            routerLinkActive="pg-sidebar-link--active"
-           [routerLinkActiveOptions]="{ exact: true }">
+           [routerLinkActiveOptions]="{ exact: true }"
+           ngbTooltip="Accueil"
+           placement="right"
+           container="body"
+           [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
           <span class="pg-sidebar-link-label">Accueil</span>
         </a>
@@ -24,32 +43,52 @@
         <a class="pg-sidebar-link"
            routerLink="/"
            routerLinkActive="pg-sidebar-link--active"
-           [routerLinkActiveOptions]="{ exact: true }">
+           [routerLinkActiveOptions]="{ exact: true }"
+           ngbTooltip="Accueil"
+           placement="right"
+           container="body"
+           [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
           <span class="pg-sidebar-link-label">Accueil</span>
         </a>
         <a class="pg-sidebar-link"
            routerLink="/projects"
-           routerLinkActive="pg-sidebar-link--active">
+           routerLinkActive="pg-sidebar-link--active"
+           ngbTooltip="Mes projets"
+           placement="right"
+           container="body"
+           [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="7" height="7" rx="1.6"/><rect x="14" y="4" width="7" height="7" rx="1.6"/><rect x="3" y="15" width="7" height="5" rx="1.6"/><rect x="14" y="15" width="7" height="5" rx="1.6"/></svg>
           <span class="pg-sidebar-link-label">Mes projets</span>
         </a>
         <a class="pg-sidebar-link"
            routerLink="/settings"
            [queryParams]="projectService.currentProjectId ? { projectId: projectService.currentProjectId } : {}"
-           routerLinkActive="pg-sidebar-link--active">
+           routerLinkActive="pg-sidebar-link--active"
+           ngbTooltip="Paramètres"
+           placement="right"
+           container="body"
+           [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>
           <span class="pg-sidebar-link-label">Paramètres</span>
         </a>
         <a class="pg-sidebar-link"
            routerLink="/account"
-           routerLinkActive="pg-sidebar-link--active">
+           routerLinkActive="pg-sidebar-link--active"
+           ngbTooltip="Mon compte"
+           placement="right"
+           container="body"
+           [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/></svg>
           <span class="pg-sidebar-link-label">Mon compte</span>
         </a>
         <a class="pg-sidebar-link" *ngIf="isSuperUser"
            routerLink="/admin"
-           routerLinkActive="pg-sidebar-link--active">
+           routerLinkActive="pg-sidebar-link--active"
+           ngbTooltip="Admin"
+           placement="right"
+           container="body"
+           [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3 4 6v6c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V6z"/></svg>
           <span class="pg-sidebar-link-label">Admin</span>
           <span class="pg-sidebar-link-tag">super</span>

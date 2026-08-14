@@ -51,8 +51,11 @@
                     <td
                       *ngFor="let prob of riskProbabilityLevels"
                       [ngClass]="getMatrixHeatClass(impact, prob)"
+                      [class.risk-cell--addable]="canAddRisk"
+                      [attr.title]="canAddRisk ? 'Double-cliquer pour ajouter un risque (Impact : ' + impact + ', Probabilité : ' + prob + ')' : null"
                       (dragover)="onRiskDragOver($event)"
-                      (drop)="onRiskDrop($event, impact, prob)">
+                      (drop)="onRiskDrop($event, impact, prob)"
+                      (dblclick)="onMatrixCellDblClick(impact, prob)">
                       <div class="risk-cell-dots">
                         <span
                           *ngFor="let item of getRiskCellItems(impact, prob)"
@@ -229,7 +232,10 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label small mb-1">Fréquence</label>
+            <!-- Champ "frequency" → sert de criticité, qui détermine l'impact affiché
+                 dans la matrice (cf. mapCriticityToImpactLabel) : libellé aligné en
+                 conséquence pour que le pré-remplissage par double-clic soit lisible. -->
+            <label class="form-label small mb-1">Impact</label>
             <select class="form-select form-select-sm" [(ngModel)]="newRiskForm.frequency">
               <option value="low">Faible</option>
               <option value="medium">Moyenne</option>

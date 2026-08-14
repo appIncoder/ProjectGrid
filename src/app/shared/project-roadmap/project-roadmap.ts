@@ -99,6 +99,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   @ViewChild('taskEditModal', { static: false }) taskEditModalTpl?: TemplateRef<any>;
   @ViewChild('milestoneEditModal', { static: false }) milestoneEditModalTpl?: TemplateRef<any>;
   @ViewChild('ganttScroll', { static: false }) ganttScrollRef?: ElementRef<HTMLElement>;
+  @ViewChild('tableScroll', { static: false }) tableScrollRef?: ElementRef<HTMLElement>;
 
   linkTooltip: LinkTooltip | null = null;
 
@@ -107,8 +108,32 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   // ===== Layout (lignes)
   readonly headerRow1Height = 44;
-  readonly headerRow2Height = 32;
-  readonly bodyRowHeight = 36;
+  // Doit rester égal à la hauteur réelle de .roadmap-th (panneau tableau) :
+  // ces deux lignes défilent ensemble et doivent avoir la même hauteur pour
+  // que le scroll vertical synchronisé (cf. onGanttPaneScroll) reste aligné.
+  readonly headerRow2Height = 28;
+
+  // ===== Taille des cartouches (lignes) du Gantt — toggle 2 tailles
+  readonly bodyRowHeightCompact = 36;
+  readonly bodyRowHeightLarge = 56;
+  ganttRowSize: 'compact' | 'large' = 'compact';
+
+  /**
+   * Hauteur de ligne effective (table + Gantt). C'est une valeur dérivée
+   * (getter) car .roadmap-row-cell/.roadmap-td (panneau tableau) sont
+   * synchronisées dessus via la CSS var --roadmap-row-height (cf. HTML racine)
+   * — les deux panneaux doivent toujours partager la même hauteur de ligne
+   * pour que le scroll vertical synchronisé (onGanttPaneScroll) reste aligné.
+   */
+  get bodyRowHeight(): number {
+    return this.ganttRowSize === 'large' ? this.bodyRowHeightLarge : this.bodyRowHeightCompact;
+  }
+
+  setGanttRowSize(size: 'compact' | 'large'): void {
+    if (this.ganttRowSize === size) return;
+    this.ganttRowSize = size;
+    this.rebuildGanttFromBase();
+  }
 
   // ===== Divider draggable
   readonly dividerW = 10;
@@ -189,7 +214,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   ganttMonthsCount = 12;
   private ganttStartDateOverride: Date | null = null;
 
-  readonly ganttColWidth = 140;
+  ganttColWidth = 140;
   readonly ganttLeftPadding = 10;
   readonly ganttTopPadding = 0;
 
@@ -202,6 +227,76 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   get dayWidth(): number {
     return this.ganttColWidth / this.projectService.daysPerMonth;
+  }
+
+  // ===== Zoom (zone d'encodage roadmap)
+  private readonly ganttColWidthDefault = 140;
+  private readonly ganttColWidthMin = 60;
+  private readonly ganttColWidthMax = 320;
+  private readonly ganttColWidthStep = 20;
+
+  get zoomPercent(): number {
+    return Math.round((this.ganttColWidth / this.ganttColWidthDefault) * 100);
+  }
+
+  get canZoomIn(): boolean { return this.ganttColWidth < this.ganttColWidthMax; }
+  get canZoomOut(): boolean { return this.ganttColWidth > this.ganttColWidthMin; }
+
+  zoomIn(): void { this.setGanttZoom(this.ganttColWidth + this.ganttColWidthStep); }
+  zoomOut(): void { this.setGanttZoom(this.ganttColWidth - this.ganttColWidthStep); }
+  resetZoom(): void { this.setGanttZoom(this.ganttColWidthDefault); }
+
+  /** Ctrl/Cmd + molette sur la timeline = zoom, centré sur la position du curseur. */
+  onGanttWheel(event: WheelEvent): void {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const step = event.deltaY < 0 ? this.ganttColWidthStep : -this.ganttColWidthStep;
+    this.setGanttZoom(this.ganttColWidth + step);
+  }
+
+  private setGanttZoom(width: number): void {
+    const next = this.clamp(Math.round(width), this.ganttColWidthMin, this.ganttColWidthMax);
+    if (next === this.ganttColWidth) return;
+
+    const centerDayIndex = this.getCenterDayIndex();
+
+    this.ganttColWidth = next;
+    this.buildGanttCalendar();
+    this.buildRoadmap();
+    this.updateGanttLinks();
+
+    if (centerDayIndex !== null) {
+      requestAnimationFrame(() => this.scrollToDayIndexCentered(centerDayIndex));
+    }
+  }
+
+  private getCenterDayIndex(): number | null {
+    const scroller = this.ganttScrollRef?.nativeElement;
+    if (!scroller || !this.dayWidth) return null;
+    const centerX = scroller.scrollLeft + scroller.clientWidth / 2;
+    return (centerX - this.ganttLeftPadding) / this.dayWidth;
+  }
+
+  private scrollToDayIndexCentered(dayIndex: number): void {
+    const scroller = this.ganttScrollRef?.nativeElement;
+    if (!scroller) return;
+    const x = this.ganttLeftPadding + dayIndex * this.dayWidth;
+    const desired = x - scroller.clientWidth / 2;
+    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    scroller.scrollLeft = Math.max(0, Math.min(maxScroll, desired));
+  }
+
+  /**
+   * Le panneau Gantt porte le seul défilement vertical visible (sa scrollbar
+   * horizontale reste ainsi ancrée en bas du cadre, toujours visible). On
+   * répercute sa position verticale sur le panneau tableau pour garder les
+   * lignes alignées entre les deux panneaux.
+   */
+  onGanttPaneScroll(): void {
+    const gantt = this.ganttScrollRef?.nativeElement;
+    const table = this.tableScrollRef?.nativeElement;
+    if (!gantt || !table) return;
+    if (table.scrollTop !== gantt.scrollTop) table.scrollTop = gantt.scrollTop;
   }
 
   ganttMonths: string[] = [];
@@ -1023,7 +1118,11 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.ganttActivityRows = rows;
     this.ganttTasksView = tasksView;
 
-    this.ganttBodyHeight = this.ganttActivityRows.length * this.bodyRowHeight + 40;
+    // Pas de padding supplémentaire ici : le panneau tableau (roadmap-left-pane)
+    // n'en a pas, et les deux panneaux doivent avoir la même hauteur de contenu
+    // scrollable pour que la synchronisation du scroll (onGanttPaneScroll) reste
+    // pixel-perfect jusqu'en bas (sinon décalage d'une ligne visible en fin de scroll).
+    this.ganttBodyHeight = this.ganttActivityRows.length * this.bodyRowHeight;
 
     this.rebuildTaskRowIndexMap();
     this.updateGanttLinks();
