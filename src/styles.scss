@@ -38,6 +38,14 @@
   --pg-font-body: 'Space Grotesk', sans-serif;
   --pg-font-heading: 'Space Grotesk', sans-serif;
 
+  /* Fond des cartes / surfaces élevées, et fond de page général : deux
+     variables distinctes pour que le mode sombre et les styles visuels
+     (Pulse/Agora/Mosaic) puissent les redéfinir indépendamment — sans ça,
+     une carte blanche sur une page sombre perdrait tout contraste. Avant
+     cette variable, ces endroits utilisaient un blanc fixe (#fff). */
+  --pg-color-surface: #ffffff;
+  --pg-color-page: var(--pg-color-bg-board);
+
   --pg-avatar-1: oklch(0.55 0.16 195);
   --pg-avatar-2: oklch(0.60 0.14 150);
   --pg-avatar-3: oklch(0.72 0.14 60);
@@ -62,9 +70,248 @@
   --pg-status-neutral-dot: oklch(0.72 0.01 200);
 }
 
+/* =========================================================
+   Thème — mode sombre, variantes d'accent, contraste élevé
+   Piloté par ThemeService (src/app/services/theme.service.ts) via les
+   attributs data-theme / data-accent et la classe pg-contrast-high sur
+   <html>, persistés en localStorage côté utilisateur.
+   ========================================================= */
+
+:root[data-theme='dark'] {
+  --pg-color-surface: oklch(0.2 0.015 240);
+  --pg-color-page: oklch(0.15 0.015 240);
+  --pg-color-border: oklch(0.34 0.015 240);
+  --pg-color-border-light: oklch(0.29 0.015 240);
+  --pg-color-bg-head: oklch(0.25 0.015 240);
+  --pg-color-bg-board: oklch(0.22 0.015 240);
+  --pg-color-bg-stripe: oklch(0.24 0.015 240);
+
+  --pg-color-text: oklch(0.92 0.01 240);
+  --pg-color-text-heading: oklch(0.97 0.008 240);
+  --pg-color-text-secondary: oklch(0.72 0.012 240);
+  --pg-color-text-tertiary: oklch(0.6 0.012 240);
+}
+
+:root[data-accent='violet'] {
+  --pg-color-accent: oklch(0.56 0.19 300);
+  --pg-color-accent-hover: oklch(0.49 0.19 300);
+  --pg-color-accent-soft: oklch(0.95 0.035 300);
+}
+
+:root[data-accent='coral'] {
+  --pg-color-accent: oklch(0.6 0.18 25);
+  --pg-color-accent-hover: oklch(0.53 0.18 25);
+  --pg-color-accent-soft: oklch(0.95 0.045 25);
+}
+
+:root[data-accent='amber'] {
+  --pg-color-accent: oklch(0.68 0.15 75);
+  --pg-color-accent-hover: oklch(0.6 0.15 75);
+  --pg-color-accent-soft: oklch(0.95 0.05 80);
+}
+
+:root[data-accent='green'] {
+  --pg-color-accent: oklch(0.55 0.14 150);
+  --pg-color-accent-hover: oklch(0.47 0.14 150);
+  --pg-color-accent-soft: oklch(0.95 0.045 150);
+}
+
+/* Contraste élevé : repose sur les mêmes tokens (texte secondaire/tertiaire
+   rapprochés du texte principal, bordures renforcées) + un focus visible
+   marqué — plutôt qu'un thème séparé, pour rester cohérent avec le mode
+   clair ou sombre actif. */
+:root.pg-contrast-high {
+  --pg-color-text-secondary: var(--pg-color-text);
+  --pg-color-text-tertiary: var(--pg-color-text);
+  --pg-color-border: oklch(0.5 0.03 200);
+  --pg-color-border-light: oklch(0.56 0.03 200);
+}
+
+:root[data-theme='dark'].pg-contrast-high {
+  --pg-color-border: oklch(0.55 0.02 240);
+  --pg-color-border-light: oklch(0.48 0.02 240);
+}
+
+:root.pg-contrast-high :focus-visible {
+  outline: 2px solid var(--pg-color-accent);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   Styles visuels — Lumen (défaut) / Pulse / Agora / Mosaic
+   Les 3 directions proposées lors de l'exploration design, portées au
+   niveau des tokens (couleurs, polices, rayons) plutôt que de la structure
+   de page : elles habillent la mise en page Lumen existante, elles ne la
+   remplacent pas (pas de rail/sidebar/topbar différents selon le style).
+   Déclarées après les blocs mode sombre / accent ci-dessus : à spécificité
+   égale, un style visuel actif (data-skin) l'emporte sur data-theme /
+   data-accent pour les propriétés qu'il redéfinit.
+   ========================================================= */
+
+:root[data-skin='pulse'] {
+  --pg-font-body: 'Sora', sans-serif;
+  --pg-font-heading: 'Sora', sans-serif;
+
+  --pg-color-page: oklch(0.13 0.015 260);
+  --pg-color-surface: oklch(0.19 0.016 260);
+  --pg-color-bg-head: oklch(0.23 0.016 260);
+  --pg-color-bg-board: oklch(0.16 0.015 260);
+  --pg-color-bg-stripe: oklch(0.22 0.016 260);
+  --pg-color-border: oklch(0.32 0.02 260);
+  --pg-color-border-light: oklch(0.27 0.02 260);
+
+  --pg-color-text: oklch(0.93 0.01 260);
+  --pg-color-text-heading: oklch(0.97 0.006 260);
+  --pg-color-text-secondary: oklch(0.7 0.015 260);
+  --pg-color-text-tertiary: oklch(0.58 0.015 260);
+
+  --pg-color-accent: oklch(0.6 0.19 295);
+  --pg-color-accent-hover: oklch(0.54 0.19 295);
+  --pg-color-accent-soft: oklch(0.3 0.08 295);
+
+  --pg-radius-sm: 10px;
+  --pg-radius: 13px;
+  --pg-radius-lg: 18px;
+}
+
+:root[data-skin='agora'] {
+  --pg-font-body: 'Plus Jakarta Sans', sans-serif;
+  --pg-font-heading: 'Plus Jakarta Sans', sans-serif;
+
+  --pg-color-page: oklch(0.97 0.004 265);
+  --pg-color-surface: #ffffff;
+  --pg-color-bg-head: oklch(0.965 0.005 265);
+  --pg-color-bg-board: oklch(0.975 0.004 265);
+  --pg-color-bg-stripe: oklch(0.97 0.006 265);
+  --pg-color-border: oklch(0.9 0.006 265);
+  --pg-color-border-light: oklch(0.94 0.006 265);
+
+  --pg-color-text: oklch(0.22 0.02 265);
+  --pg-color-text-heading: oklch(0.18 0.02 265);
+  --pg-color-text-secondary: oklch(0.55 0.015 265);
+  --pg-color-text-tertiary: oklch(0.62 0.015 265);
+
+  --pg-color-accent: oklch(0.47 0.19 275);
+  --pg-color-accent-hover: oklch(0.41 0.19 275);
+  --pg-color-accent-soft: oklch(0.95 0.03 275);
+
+  --pg-radius-sm: 9px;
+  --pg-radius: 11px;
+  --pg-radius-lg: 14px;
+}
+
+:root[data-skin='mosaic'] {
+  --pg-font-body: 'Work Sans', sans-serif;
+  --pg-font-heading: 'Fraunces', serif;
+
+  --pg-color-page: #fff6ed;
+  --pg-color-surface: #ffffff;
+  --pg-color-bg-head: #fffcf8;
+  --pg-color-bg-board: #fff6ed;
+  --pg-color-bg-stripe: #fffcf8;
+  --pg-color-border: #2c2640;
+  --pg-color-border-light: #e7dccb;
+
+  --pg-color-text: #2c2640;
+  --pg-color-text-heading: #2c2640;
+  --pg-color-text-secondary: #6b6478;
+  --pg-color-text-tertiary: #948b9e;
+
+  --pg-color-accent: #ff5d73;
+  --pg-color-accent-hover: #e04b61;
+  --pg-color-accent-soft: #ffe3e8;
+
+  --pg-radius-sm: 12px;
+  --pg-radius: 16px;
+  --pg-radius-lg: 22px;
+}
+
+/* Mosaic : carte "sticker" à bordure épaisse et ombre portée décalée,
+   plutôt que le fin liseré gris des autres styles. */
+:root[data-skin='mosaic'] .card,
+:root[data-skin='mosaic'] .settings-section.card {
+  border: 2.5px solid var(--pg-color-border);
+  box-shadow: 4px 4px 0 var(--pg-color-border);
+}
+
+:root[data-skin='graphite'] {
+  --pg-font-body: 'IBM Plex Sans', sans-serif;
+  --pg-font-heading: 'IBM Plex Sans', sans-serif;
+
+  --pg-color-page: oklch(0.97 0.002 260);
+  --pg-color-surface: #ffffff;
+  --pg-color-bg-head: oklch(0.95 0.002 260);
+  --pg-color-bg-board: oklch(0.965 0.002 260);
+  --pg-color-bg-stripe: oklch(0.955 0.002 260);
+  --pg-color-border: oklch(0.85 0.003 260);
+  --pg-color-border-light: oklch(0.9 0.003 260);
+
+  --pg-color-text: oklch(0.2 0.004 260);
+  --pg-color-text-heading: oklch(0.14 0.004 260);
+  --pg-color-text-secondary: oklch(0.48 0.004 260);
+  --pg-color-text-tertiary: oklch(0.58 0.004 260);
+
+  --pg-color-accent: oklch(0.42 0.05 250);
+  --pg-color-accent-hover: oklch(0.36 0.05 250);
+  --pg-color-accent-soft: oklch(0.94 0.012 250);
+
+  /* Esprit "tableur / outil pro" : angles nets plutôt qu'arrondis généreux. */
+  --pg-radius-sm: 4px;
+  --pg-radius: 6px;
+  --pg-radius-lg: 8px;
+}
+
+:root[data-skin='graphite'] .card,
+:root[data-skin='graphite'] .settings-section.card {
+  box-shadow: none;
+  border-width: 1px;
+}
+
+:root[data-skin='solstice'] {
+  --pg-font-body: 'Outfit', sans-serif;
+  --pg-font-heading: 'Outfit', sans-serif;
+
+  --pg-color-page: oklch(0.97 0.015 70);
+  --pg-color-surface: #fffaf2;
+  --pg-color-bg-head: oklch(0.95 0.018 70);
+  --pg-color-bg-board: oklch(0.965 0.015 70);
+  --pg-color-bg-stripe: oklch(0.955 0.018 70);
+  --pg-color-border: oklch(0.88 0.02 70);
+  --pg-color-border-light: oklch(0.92 0.018 70);
+
+  --pg-color-text: oklch(0.32 0.03 50);
+  --pg-color-text-heading: oklch(0.26 0.03 50);
+  --pg-color-text-secondary: oklch(0.55 0.025 55);
+  --pg-color-text-tertiary: oklch(0.62 0.02 60);
+
+  --pg-color-accent: oklch(0.62 0.15 45);
+  --pg-color-accent-hover: oklch(0.55 0.15 45);
+  --pg-color-accent-soft: oklch(0.93 0.05 55);
+
+  /* Esprit cocooning : formes arrondies et ombre douce plutôt que liseré sec. */
+  --pg-radius-sm: 12px;
+  --pg-radius: 16px;
+  --pg-radius-lg: 20px;
+}
+
+:root[data-skin='solstice'] .card,
+:root[data-skin='solstice'] .settings-section.card {
+  border-color: var(--pg-color-border-light);
+  box-shadow: 0 3px 14px oklch(0.4 0.08 50 / 0.1);
+}
+
+:root[data-skin='mosaic'] h1,
+:root[data-skin='mosaic'] h2,
+:root[data-skin='mosaic'] h3,
+:root[data-skin='mosaic'] h4 {
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
 body {
   font-family: var(--pg-font-body);
   color: var(--pg-color-text);
+  background: var(--pg-color-page);
 }
 
 h1, h2, h3, h4 {
@@ -81,6 +328,7 @@ h1, h2, h3, h4 {
   border-color: var(--pg-color-border);
   border-radius: var(--pg-radius-lg);
   box-shadow: none;
+  background: var(--pg-color-surface);
 }
 
 .card > .card-body > .card {

@@ -36,6 +36,91 @@
     }
   </header>
 
+  <!-- ══════════════════════════════════════════════════════════
+       Thème — préférence de compte, s'applique à toute l'app
+       (indépendante du projet sélectionné ci-dessus)
+       ══════════════════════════════════════════════════════════ -->
+  <section class="settings-section card theme-section" style="margin: 0 1rem 1rem">
+    <div class="section-header">
+      <h3>Thème</h3>
+      <span class="section-badge">Compte</span>
+    </div>
+    <p class="section-hint">
+      Personnalise l'apparence de ProjectGrid. Ce réglage est propre à ton compte : il s'applique à toute
+      l'application, pas seulement au projet sélectionné.
+    </p>
+
+    <div class="field-row align-start">
+      <label class="field-label pt-1">
+        Style visuel
+        <span class="field-label-hint">Issu de l'exploration design</span>
+      </label>
+      <div class="theme-seg theme-seg--wrap">
+        @for (opt of themeSkinOptions; track opt.value) {
+          <button
+            type="button"
+            class="theme-seg-btn"
+            [class.is-active]="themeService.skin() === opt.value"
+            [attr.title]="opt.description"
+            (click)="themeService.setSkin(opt.value)"
+          >{{ opt.label }}</button>
+        }
+      </div>
+    </div>
+
+    @if (themeService.skin() === 'lumen') {
+      <div class="field-row">
+        <label class="field-label">Apparence</label>
+        <div class="theme-seg">
+          @for (opt of themeModeOptions; track opt.value) {
+            <button
+              type="button"
+              class="theme-seg-btn"
+              [class.is-active]="themeService.mode() === opt.value"
+              (click)="themeService.setMode(opt.value)"
+            >{{ opt.label }}</button>
+          }
+        </div>
+      </div>
+
+      <div class="field-row align-start">
+        <label class="field-label pt-1">Couleur d'accent</label>
+        <div class="theme-accent-row">
+          @for (opt of themeAccentOptions; track opt.value) {
+            <button
+              type="button"
+              class="theme-accent-swatch theme-accent-swatch--{{ opt.value }}"
+              [class.is-selected]="themeService.accent() === opt.value"
+              [attr.aria-label]="opt.label"
+              [attr.title]="opt.label"
+              (click)="themeService.setAccent(opt.value)"
+            ></button>
+          }
+        </div>
+      </div>
+    } @else {
+      <p class="section-hint theme-skin-note">
+        {{ activeSkinLabel }} applique sa propre palette et typographie : l'apparence et la couleur d'accent de
+        Lumen ne s'y combinent pas. Reviens sur « Lumen » pour les retrouver.
+      </p>
+    }
+
+    <div class="field-row">
+      <label class="field-label">
+        Contraste élevé
+        <span class="field-label-hint">Renforce les contrastes (RGAA)</span>
+      </label>
+      <label class="toggle">
+        <input
+          type="checkbox"
+          [checked]="themeService.highContrast()"
+          (change)="themeService.setHighContrast(!themeService.highContrast())"
+        />
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+  </section>
+
   @if (project) {
 
     <!-- ══════════════════════════════════════════════════════════

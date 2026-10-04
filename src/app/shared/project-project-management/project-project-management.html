@@ -119,6 +119,11 @@
                         <div class="pm-task-title">{{ task.label }}</div>
                       </div>
                       <div class="pm-task-footer">
+                        <span
+                          class="item-type-tag"
+                          [class]="'item-type-tag item-type-tag--' + (task.itemType || 'story')"
+                          [title]="getItemTypeLabel(task)"
+                        >{{ getItemTypeAbbrev(task) }}</span>
                         <span class="pm-task-status-tag" [class]="'pm-task-status-tag pm-task-status-tag--' + col.id">{{ col.label }}</span>
                       </div>
                     </div>
@@ -142,6 +147,8 @@
     [title]="isCreateMode ? 'Ajouter une tâche' : 'Modifier la tâche'"
     [detailsReadonly]="!canManageThisActivityType"
     [taskName]="editedTaskName"
+    [itemType]="editedItemType"
+    [itemTypeOptions]="itemTypeOptions"
     [parentId]="editedTaskParentId"
     [parentOptions]="availableParentActivities"
     [comments]="getEditedTaskComments()"
@@ -149,6 +156,7 @@
     (close)="closeTaskModal()"
     (save)="saveTaskModal()"
     (taskNameChange)="editedTaskName = $event"
+    (itemTypeChange)="editedItemType = $event"
     (parentIdChange)="editedTaskParentId = $event"
     (newCommentTextChange)="newCommentText = $event"
   ></app-project-kanban-task-modal>

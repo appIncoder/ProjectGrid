@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import type { TaskComment } from '../../models';
+import { ITEM_TYPE_OPTIONS, type ItemType, type TaskComment } from '../../models';
 
 @Component({
   selector: 'app-project-kanban-task-modal',
@@ -19,6 +19,8 @@ export class ProjectKanbanTaskModal {
   @Input() detailsReadonly = false;
 
   @Input() taskName = '';
+  @Input() itemType: ItemType = 'story';
+  @Input() itemTypeOptions = ITEM_TYPE_OPTIONS;
   @Input() parentId = '';
   @Input() parentOptions: Array<{ id: string; label: string }> = [];
   @Input() comments: TaskComment[] = [];
@@ -27,6 +29,7 @@ export class ProjectKanbanTaskModal {
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<void>();
   @Output() taskNameChange = new EventEmitter<string>();
+  @Output() itemTypeChange = new EventEmitter<ItemType>();
   @Output() parentIdChange = new EventEmitter<string>();
   @Output() newCommentTextChange = new EventEmitter<string>();
 

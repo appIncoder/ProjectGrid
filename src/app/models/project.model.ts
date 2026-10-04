@@ -58,6 +58,14 @@ export type ItemCategory =
 /** @deprecated Use ItemCategory instead */
 export type TaskCategory = ItemCategory;
 
+export type ItemType = 'epic' | 'story' | 'subtask';
+
+export const ITEM_TYPE_OPTIONS: { value: ItemType; label: string }[] = [
+  { value: 'epic', label: 'Épopée' },
+  { value: 'story', label: 'Story' },
+  { value: 'subtask', label: 'Sous-tâche' },
+];
+
 /* ----- Scorecard / items ----- */
 export interface Item {
   id: string;
@@ -68,6 +76,7 @@ export interface Item {
   startDate?: string; // format "YYYY-MM-DD"
   endDate?: string;   // format "YYYY-MM-DD"
   category?: ItemCategory;
+  itemType?: ItemType;
   reporterId?: string;
   accountantId?: string;
   responsibleId?: string;

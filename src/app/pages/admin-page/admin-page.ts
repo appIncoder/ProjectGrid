@@ -54,14 +54,34 @@ export class AdminPage implements OnInit {
     void this.loadProjectTypes();
   }
 
+  /**
+   * Les appels Firestore sans timeout peuvent rester "pending" indéfiniment
+   * (ex: négociation long-polling qui échoue silencieusement) : si ça arrive
+   * en plein milieu de loadProjectTypes(), le `finally` qui éteint le spinner
+   * n'est jamais atteint et "Chargement des projectTypes…" reste affiché pour
+   * toujours, même quand la liste elle-même a bien été récupérée. On bascule
+   * donc chaque appel réseau à risque sur un timeout explicite.
+   */
+  private withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`Timeout (${label})`)), ms);
+      promise.then(
+        (value) => { clearTimeout(timer); resolve(value); },
+        (error) => { clearTimeout(timer); reject(error); },
+      );
+    });
+  }
+
   async loadProjectTypes(selectProjectTypeId?: string): Promise<void> {
     this.isLoadingProjectTypes = true;
     this.projectTypesError = null;
 
     try {
-      const refs = await this.projectData.listProjectTypes();
+      const refs = await this.withTimeout(this.projectData.listProjectTypes(), 15000, 'listProjectTypes');
       const defaultsRows = await Promise.allSettled(
-        refs.map(async (projectType) => this.projectData.getProjectTypeDefaults(projectType.id))
+        refs.map((projectType) =>
+          this.withTimeout(this.projectData.getProjectTypeDefaults(projectType.id), 15000, 'getProjectTypeDefaults')
+        )
       );
 
       this.projectTypes = refs
@@ -93,6 +113,11 @@ export class AdminPage implements OnInit {
         || this.selectedProjectTypeId
         || this.projectTypes[0]?.id
         || '';
+
+      // La liste est prête : on arrête le spinner ici plutôt qu'après la
+      // sélection du détail ci-dessous, pour que la liste reste utilisable
+      // même si ce second appel (lui aussi protégé par timeout) est lent.
+      this.isLoadingProjectTypes = false;
 
       if (nextSelectedId) {
         await this.selectProjectType(nextSelectedId);
@@ -126,7 +151,9 @@ export class AdminPage implements OnInit {
     }
 
     try {
-      this.selectedProjectType = await this.projectData.getProjectTypeDefaults(id);
+      this.selectedProjectType = await this.withTimeout(
+        this.projectData.getProjectTypeDefaults(id), 15000, 'getProjectTypeDefaults'
+      );
       this.patchEditFormFromSelection();
     } catch (error) {
       console.error('[AdminPage] selectProjectType error', error);

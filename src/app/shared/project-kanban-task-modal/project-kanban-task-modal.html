@@ -17,6 +17,17 @@
       </label>
 
       <label class="pkm-field">
+        <span>Type d'item</span>
+        <select
+          [ngModel]="itemType"
+          (ngModelChange)="itemTypeChange.emit($event)"
+          [disabled]="isSaving || detailsReadonly"
+        >
+          <option *ngFor="let opt of itemTypeOptions" [ngValue]="opt.value">{{ opt.label }}</option>
+        </select>
+      </label>
+
+      <label class="pkm-field">
         <span>Activite mere</span>
         <select
           [ngModel]="parentId"

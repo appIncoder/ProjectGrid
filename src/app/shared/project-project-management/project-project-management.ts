@@ -4,7 +4,7 @@ import { Component, HostListener, Input, NgZone, OnChanges, OnDestroy } from '@a
 
 import { ProjectDataService } from '../../services/project-data.service';
 import { AuthService } from '../../services/auth.service';
-import type { ActivityStatus, PhaseId, ProjectDetail, ProjectWorkflow, Task, TaskComment, UserRef } from '../../models';
+import { ITEM_TYPE_OPTIONS, type ActivityStatus, type ItemType, type PhaseId, type ProjectDetail, type ProjectWorkflow, type Task, type TaskComment, type UserRef } from '../../models';
 import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kanban-task-modal';
 import { ProjectAddTaskButton } from '../project-add-task-button/project-add-task-button';
 import { TaskAssignmentPopover } from '../task-assignment-popover/task-assignment-popover';
@@ -69,6 +69,8 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
   editedTaskPhase: PhaseId | null = null;
   editedTaskParentId = '';
   editedTaskName = '';
+  editedItemType: ItemType = 'story';
+  readonly itemTypeOptions = ITEM_TYPE_OPTIONS;
   newCommentText = '';
   availableParentActivities: Array<{ id: string; label: string }> = [];
   isCreateMode = false;
@@ -514,6 +516,7 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
     this.editedTaskPhase = lane.phase;
     this.editedTaskParentId = lane.id;
     this.editedTaskName = String(task.label ?? '').trim();
+    this.editedItemType = (task.itemType as ItemType) ?? 'story';
     this.newCommentText = '';
     this.availableParentActivities = this.getParentActivitiesForPhase(lane.phase);
     this.isCreateMode = false;
@@ -533,6 +536,7 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
     this.availableParentActivities = parents;
     this.editedTaskParentId = parents[0]?.id ?? '';
     this.editedTaskName = '';
+    this.editedItemType = 'story';
     this.newCommentText = '';
     this.isCreateMode = true;
   }
@@ -545,9 +549,22 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
     this.editedTaskPhase = null;
     this.editedTaskParentId = '';
     this.editedTaskName = '';
+    this.editedItemType = 'story';
     this.newCommentText = '';
     this.availableParentActivities = [];
     this.isCreateMode = false;
+  }
+
+  getItemTypeLabel(task: Task): string {
+    const type = (task.itemType ?? 'story') as ItemType;
+    return this.itemTypeOptions.find((o) => o.value === type)?.label ?? 'Story';
+  }
+
+  getItemTypeAbbrev(task: Task): string {
+    const type = (task.itemType ?? 'story') as ItemType;
+    if (type === 'epic') return 'É';
+    if (type === 'subtask') return 'T';
+    return 'S';
   }
 
   getEditedTaskComments(): TaskComment[] {
@@ -584,6 +601,7 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
           id: taskId,
           label: nextName,
           status: 'todo',
+          itemType: this.editedItemType,
           parentActivityId: nextParentId,
           comments: [],
         };
@@ -625,6 +643,7 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
         return;
       }
       ref.task.label = nextName;
+      ref.task.itemType = this.editedItemType;
 
       const comment = this.newCommentText.trim();
       if (comment) {

@@ -7,6 +7,7 @@ import { filter } from 'rxjs/operators';
 import type { ProjectRole } from './models';
 import { AuthService } from './services/auth.service';
 import { ProjectService } from './services/project.service';
+import { ThemeService } from './services/theme.service';
 
 /** Clé de persistance du choix utilisateur (réduit / étendu) pour la sidebar. */
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'pg.sidebar.collapsed';
@@ -45,6 +46,10 @@ export class App implements OnInit, OnDestroy {
   constructor(
     public auth: AuthService,
     public projectService: ProjectService,
+    // Injecté ici (même si non utilisé dans ce template) pour que la préférence
+    // de thème (clair/sombre/accent/contraste) soit appliquée dès le démarrage
+    // de l'app, quelle que soit la route — pas seulement depuis les Paramètres.
+    private themeService: ThemeService,
     private router: Router,
   ) { }
 

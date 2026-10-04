@@ -354,8 +354,17 @@ $c-notapplicable:  var(--pg-status-neutral-fg);
 .pm-task-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 6px 12px 10px;
+}
+
+.item-type-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  font-size: 0.64rem; font-weight: 700; flex-shrink: 0;
+  &.item-type-tag--epic    { background: #EDE4FF; color: #6B2FB3; }
+  &.item-type-tag--story   { background: #E0ECFF; color: #1D4ED8; }
+  &.item-type-tag--subtask { background: #E3F5F0; color: #0F766E; }
 }
 
 .pm-task-status-tag {

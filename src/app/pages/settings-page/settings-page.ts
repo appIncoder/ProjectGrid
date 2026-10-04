@@ -12,6 +12,7 @@ import { AuthService } from '../../services/auth.service';
 import { ProjectDataService } from '../../services/project-data.service';
 import { DEFAULT_WORKFLOW } from '../../services/project-type-fallbacks';
 import { ProjectService } from '../../services/project.service';
+import { THEME_ACCENT_OPTIONS, THEME_MODE_OPTIONS, THEME_SKIN_OPTIONS, ThemeService } from '../../services/theme.service';
 
 export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string; description: string }> = [
   { value: 'projectManager',    label: 'Project Manager',    description: 'Accès admin complet au projet' },
@@ -85,6 +86,15 @@ export class SettingsPage implements OnInit, OnDestroy {
 
   // ── Onglets ──────────────────────────────────────────────────────────────
   activeTab: 'project' | 'access' | 'roles' = 'project';
+
+  // ── Thème (préférence de compte, indépendante du projet) ──────────────────
+  readonly themeModeOptions = THEME_MODE_OPTIONS;
+  readonly themeAccentOptions = THEME_ACCENT_OPTIONS;
+  readonly themeSkinOptions = THEME_SKIN_OPTIONS;
+
+  get activeSkinLabel(): string {
+    return this.themeSkinOptions.find((opt) => opt.value === this.themeService.skin())?.label ?? '';
+  }
 
   // ── Membres & rôles (Firestore) ──────────────────────────────────────────
   readonly roleOptions = PROJECT_ROLE_OPTIONS;
@@ -249,6 +259,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     private dataService: ProjectDataService,
     private projectService: ProjectService,
     private cdr: ChangeDetectorRef,
+    public themeService: ThemeService,
   ) {}
 
   getAccessValueSymbol(value: AccessRuleValue): string {
