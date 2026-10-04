@@ -249,12 +249,13 @@
   text-align: left;
   cursor: pointer;
   background: #ffffff;
-  box-shadow: none;
-  transition: border-color 120ms ease;
+  box-shadow: 0 1px 3px rgba(20, 40, 50, 0.1);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 
   &:hover {
     border-color: var(--pg-color-navy, #1a2332);
     border-left-color: var(--task-status-accent, var(--pg-color-navy, #1a2332));
+    box-shadow: 0 4px 12px rgba(20, 40, 50, 0.16);
   }
 
   &.status-done {

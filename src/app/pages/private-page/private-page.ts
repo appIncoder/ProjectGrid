@@ -2,6 +2,7 @@ import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterModule } from '@angular/router';
 import { NgbDropdownModule } from '@ng-bootstrap/ng-bootstrap';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
@@ -67,10 +68,19 @@ type DashboardActivityEntry = {
   createdTs: number;
 };
 
+export type DashboardLayoutMode = 'mosaic' | 'list';
+export type DashboardWidgetKey = 'scorecard' | 'roadmap' | 'activity' | 'risks' | 'dueItems';
+
+type DashboardPrefs = {
+  layoutMode: DashboardLayoutMode;
+  widgets: Record<DashboardWidgetKey, boolean>;
+  order: DashboardWidgetKey[];
+};
+
 @Component({
   selector: 'app-private-page',
   standalone: true,
-  imports: [CommonModule, RouterModule, NgbDropdownModule],
+  imports: [CommonModule, RouterModule, NgbDropdownModule, DragDropModule],
   templateUrl: './private-page.html',
   styleUrls: ['./private-page.scss'],
 })
@@ -94,6 +104,35 @@ export class PrivatePage implements OnInit, OnDestroy {
   readonly riskImpactLevels: string[] = ['Faible', 'Modéré', 'Significatif', 'Majeur', 'Critique'];
   readonly riskProbabilityLevels: string[] = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
 
+  // ── Organisation du tableau de bord (préférence utilisateur, stockée en local) ─
+  private readonly dashboardPrefsStorageKey = 'pg.dashboard.prefs.v1';
+
+  readonly widgetOptions: { key: DashboardWidgetKey; label: string }[] = [
+    { key: 'scorecard', label: 'Scorecard des activités' },
+    { key: 'roadmap', label: 'Roadmap synthétique' },
+    { key: 'activity', label: "Fil d'activité" },
+    { key: 'risks', label: 'Risques' },
+    { key: 'dueItems', label: 'Échéances proches' },
+  ];
+
+  dashboardLayoutMode: DashboardLayoutMode = 'mosaic';
+  widgetVisibility: Record<DashboardWidgetKey, boolean> = {
+    scorecard: true,
+    roadmap: true,
+    activity: true,
+    risks: true,
+    dueItems: true,
+  };
+  widgetOrder: DashboardWidgetKey[] = ['scorecard', 'roadmap', 'activity', 'risks', 'dueItems'];
+
+  get orderedVisibleWidgets(): DashboardWidgetKey[] {
+    return this.widgetOrder.filter((key) => this.isWidgetVisible(key));
+  }
+
+  trackWidget(_index: number, key: DashboardWidgetKey): DashboardWidgetKey {
+    return key;
+  }
+
   isLoading = false;
   loadError: string | null = null;
   noProjectSelected = false;
@@ -109,6 +148,7 @@ export class PrivatePage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    this.loadDashboardPrefs();
     void this.loadCurrentProject();
     this.routerEventsSub = this.router.events
       .pipe(filter((evt): evt is NavigationEnd => evt instanceof NavigationEnd))
@@ -134,6 +174,81 @@ export class PrivatePage implements OnInit, OnDestroy {
 
   async refresh(): Promise<void> {
     await this.loadCurrentProject();
+  }
+
+  // ── Organisation du tableau de bord ─────────────────────────────────────────
+
+  private loadDashboardPrefs(): void {
+    try {
+      const raw = localStorage.getItem(this.dashboardPrefsStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<DashboardPrefs>;
+
+      if (parsed?.layoutMode === 'list' || parsed?.layoutMode === 'mosaic') {
+        this.dashboardLayoutMode = parsed.layoutMode;
+      }
+
+      if (parsed?.widgets && typeof parsed.widgets === 'object') {
+        for (const key of Object.keys(this.widgetVisibility) as DashboardWidgetKey[]) {
+          const value = (parsed.widgets as any)[key];
+          if (typeof value === 'boolean') this.widgetVisibility[key] = value;
+        }
+      }
+
+      if (Array.isArray(parsed?.order)) {
+        const known = this.widgetOrder;
+        const stored = (parsed.order as unknown[]).filter(
+          (k): k is DashboardWidgetKey => typeof k === 'string' && known.includes(k as DashboardWidgetKey)
+        );
+        const missing = known.filter((k) => !stored.includes(k));
+        this.widgetOrder = [...stored, ...missing];
+      }
+    } catch {
+      // stockage indisponible ou corrompu : on garde les valeurs par défaut
+    }
+  }
+
+  private saveDashboardPrefs(): void {
+    try {
+      const prefs: DashboardPrefs = {
+        layoutMode: this.dashboardLayoutMode,
+        widgets: this.widgetVisibility,
+        order: this.widgetOrder,
+      };
+      localStorage.setItem(this.dashboardPrefsStorageKey, JSON.stringify(prefs));
+    } catch {
+      // stockage indisponible (navigation privée, quota...) : préférence non persistée
+    }
+  }
+
+  /**
+   * Les widgets masqués ne sont pas rendus dans le cdkDropList (donc absents des
+   * index previousIndex/currentIndex de l'event) : on réordonne seulement les
+   * widgets visibles, puis on rajoute les masqués à la fin de l'ordre global.
+   */
+  onWidgetDrop(event: CdkDragDrop<DashboardWidgetKey[]>): void {
+    if (event.previousIndex === event.currentIndex) return;
+
+    const visible = this.orderedVisibleWidgets;
+    moveItemInArray(visible, event.previousIndex, event.currentIndex);
+    const hidden = this.widgetOrder.filter((key) => !this.isWidgetVisible(key));
+    this.widgetOrder = [...visible, ...hidden];
+    this.saveDashboardPrefs();
+  }
+
+  isWidgetVisible(key: DashboardWidgetKey): boolean {
+    return this.widgetVisibility[key] !== false;
+  }
+
+  toggleWidget(key: DashboardWidgetKey): void {
+    this.widgetVisibility = { ...this.widgetVisibility, [key]: !this.widgetVisibility[key] };
+    this.saveDashboardPrefs();
+  }
+
+  setDashboardLayoutMode(mode: DashboardLayoutMode): void {
+    if (this.dashboardLayoutMode === mode) return;
+    this.dashboardLayoutMode = mode;
+    this.saveDashboardPrefs();
   }
 
   private async loadCurrentProject(): Promise<void> {
@@ -341,6 +456,46 @@ export class PrivatePage implements OnInit, OnDestroy {
     const fromDefinitions = String(detail?.phaseDefinitions?.[phase]?.label ?? '').trim();
     if (fromDefinitions) return fromDefinitions;
     return this.defaultPhaseLongNames[phase] ?? String(phase);
+  }
+
+  // ── Date de début du projet (= startDate la plus ancienne des phaseDefinitions) ─
+
+  isSavingProjectStartDate = false;
+
+  getProjectStartDateIso(): string {
+    const defs = (this.selectedProjectDetail as any)?.phaseDefinitions as Record<string, { startDate?: string }> | undefined;
+    if (defs) {
+      const dates = Object.values(defs)
+        .map((def) => def?.startDate)
+        .filter((d): d is string => !!d)
+        .sort();
+      if (dates.length) return dates[0];
+    }
+    return this.projectService.toIsoDate(this.projectService.getDefaultGanttStartDate());
+  }
+
+  async onProjectStartDateChange(event: Event): Promise<void> {
+    const detail = this.selectedProjectDetail;
+    const iso = (event.target as HTMLInputElement).value.trim();
+    if (!detail || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+
+    const firstPhase = (detail.phases ?? [])[0];
+    if (!firstPhase) return;
+
+    const defs = { ...((detail as any).phaseDefinitions ?? {}) } as Record<string, any>;
+    defs[firstPhase] = { ...(defs[firstPhase] ?? {}), id: firstPhase, startDate: iso };
+    (detail as any).phaseDefinitions = defs;
+
+    this.isSavingProjectStartDate = true;
+    try {
+      await this.projectData.saveProject(detail);
+      this.projectService.markProjectMutated(detail.id, 'schedule_updated');
+    } catch (e) {
+      console.error('[PrivatePage] onProjectStartDateChange error', e);
+    } finally {
+      this.isSavingProjectStartDate = false;
+      if (!this.destroyed) this.cdr.detectChanges();
+    }
   }
 
   // ── Roadmap synthétique (même convention que project-roadmap : 1 phase = 1 mois) ─

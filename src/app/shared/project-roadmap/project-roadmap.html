@@ -41,7 +41,7 @@
 
       <div class="roadmap-toolbar-sep"></div>
 
-      <div class="roadmap-zoom-group" role="group" aria-label="Zoom de la roadmap">
+      <div class="roadmap-seg-group" role="group" aria-label="Zoom de la roadmap">
         <button type="button" class="roadmap-btn roadmap-zoom-btn" (click)="zoomOut()" [disabled]="!canZoomOut"
           title="Réduire le zoom" aria-label="Réduire le zoom">−</button>
         <button type="button" class="roadmap-zoom-value" (click)="resetZoom()"
@@ -52,7 +52,7 @@
 
       <div class="roadmap-toolbar-sep"></div>
 
-      <div class="roadmap-size-group" role="group" aria-label="Taille des cartouches du Gantt">
+      <div class="roadmap-seg-group" role="group" aria-label="Taille des cartouches du Gantt">
         <button type="button" class="roadmap-btn roadmap-size-btn" [class.roadmap-btn--active]="ganttRowSize === 'compact'"
           (click)="setGanttRowSize('compact')" title="Cartouches compactes" aria-label="Cartouches compactes">Compact</button>
         <button type="button" class="roadmap-btn roadmap-size-btn" [class.roadmap-btn--active]="ganttRowSize === 'large'"

@@ -9,6 +9,40 @@
     </div>
 
     <div class="d-flex gap-2">
+      <div ngbDropdown [autoClose]="false" class="d-inline-block" *ngIf="selectedProject">
+        <button class="btn dashboard-btn" ngbDropdownToggle>
+          ⚙️ Personnaliser
+        </button>
+        <div ngbDropdownMenu class="dropdown-menu dropdown-menu-end dashboard-prefs-menu">
+          <h6 class="dropdown-header">Affichage</h6>
+          <div class="dashboard-prefs-layout">
+            <button
+              type="button"
+              class="dashboard-layout-btn"
+              [class.active]="dashboardLayoutMode === 'mosaic'"
+              (click)="setDashboardLayoutMode('mosaic')">
+              ▦ Mosaïque
+            </button>
+            <button
+              type="button"
+              class="dashboard-layout-btn"
+              [class.active]="dashboardLayoutMode === 'list'"
+              (click)="setDashboardLayoutMode('list')">
+              ☰ Liste
+            </button>
+          </div>
+
+          <h6 class="dropdown-header">Zones affichées</h6>
+          <label class="dashboard-prefs-check" *ngFor="let widget of widgetOptions">
+            <input
+              type="checkbox"
+              [checked]="isWidgetVisible(widget.key)"
+              (change)="toggleWidget(widget.key)"
+            />
+            {{ widget.label }}
+          </label>
+        </div>
+      </div>
       <button class="btn dashboard-btn" (click)="goToProjects()">
         ⇄ Changer de projet
       </button>
@@ -82,6 +116,17 @@
       </section>
 
       <div class="project-info-bar mt-3">
+        <div class="info-item" (click)="$event.stopPropagation()">
+          <span class="info-label">Date de début</span>
+          <input
+            type="date"
+            class="info-date-input"
+            [value]="getProjectStartDateIso()"
+            [disabled]="isSavingProjectStartDate"
+            (click)="$event.stopPropagation()"
+            (change)="onProjectStartDateChange($event)"
+          />
+        </div>
         <div class="info-item">
           <span class="info-label">Sponsor</span>
           <span class="info-value">{{ p.sponsor }}</span>
@@ -117,256 +162,278 @@
       </div>
     </section>
 
-    <div class="dashboard-columns mb-3">
-      <div class="dashboard-column">
-        <section
-          class="dashboard-card dashboard-clickable"
-          role="button"
-          tabindex="0"
-          title="Ouvrir le Scorecard"
-          (click)="goToProjectTab('scorecard')"
-          (keydown.enter)="goToProjectTab('scorecard')"
-          (keydown.space)="$event.preventDefault(); goToProjectTab('scorecard')">
-          <h4 class="h6 mb-2">Scorecard des activités</h4>
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0 dashboard-table">
-              <thead>
-                <tr>
-                  <th class="text-start">Activité</th>
-                  <th *ngFor="let phase of getSelectedPhases()">
-                    <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let row of progressRows">
-                  <td class="text-start fw-semibold">{{ row.activityLabel }}</td>
-                  <td *ngFor="let cell of row.cells">
-                    <div class="progress-track">
-                      <div
-                        class="progress-fill"
-                        [ngClass]="getProgressBarClass(cell.percent)"
-                        [style.width.%]="cell.percent"
-                      ></div>
-                    </div>
-                    <small class="text-muted">{{ cell.percent }}% ({{ cell.done }}/{{ cell.total }})</small>
-                  </td>
-                </tr>
-                <tr *ngIf="progressRows.length === 0">
-                  <td [attr.colspan]="1 + getSelectedPhases().length" class="text-muted text-center py-3">
-                    Aucune donnée d'avancement.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+    <div
+      class="dashboard-columns mb-3"
+      [class.dashboard-columns--list]="dashboardLayoutMode === 'list'"
+      cdkDropList
+      (cdkDropListDropped)="onWidgetDrop($event)">
 
-        <section
-          class="dashboard-card dashboard-clickable"
-          role="button"
-          tabindex="0"
-          title="Ouvrir la Roadmap"
-          (click)="goToProjectTab('roadmap')"
-          (keydown.enter)="goToProjectTab('roadmap')"
-          (keydown.space)="$event.preventDefault(); goToProjectTab('roadmap')">
-          <h4 class="h6 mb-2">Roadmap synthétique</h4>
+      <ng-container *ngFor="let widget of orderedVisibleWidgets; trackBy: trackWidget">
+        <ng-container [ngSwitch]="widget">
 
-          <div class="mini-gantt" *ngIf="progressRows.length; else noRoadmap">
-            <div class="mini-gantt-header">
-              <span class="mini-gantt-header-label">Activité</span>
-              <div class="mini-gantt-header-track">
-                <span
-                  class="mini-gantt-header-phase"
-                  *ngFor="let phase of getSelectedPhases(); let i = index"
-                  [class.mini-gantt-header-phase--current]="i === 0"
-                  [title]="getPhaseLongName(phase)">
-                  {{ getGanttMonthLabel(i) }}
-                </span>
-              </div>
+          <section
+            *ngSwitchCase="'scorecard'"
+            cdkDrag
+            class="dashboard-card dashboard-widget dashboard-clickable"
+            role="button"
+            tabindex="0"
+            title="Ouvrir le Scorecard"
+            (click)="goToProjectTab('scorecard')"
+            (keydown.enter)="goToProjectTab('scorecard')"
+            (keydown.space)="$event.preventDefault(); goToProjectTab('scorecard')">
+            <span class="dashboard-widget-handle" cdkDragHandle title="Déplacer le widget" (click)="$event.stopPropagation()">⠿</span>
+            <h4 class="h6 mb-2">Scorecard des activités</h4>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0 dashboard-table">
+                <thead>
+                  <tr>
+                    <th class="text-start">Activité</th>
+                    <th *ngFor="let phase of getSelectedPhases()">
+                      <span [attr.title]="getPhaseLongName(phase)">{{ phase }}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of progressRows">
+                    <td class="text-start fw-semibold">{{ row.activityLabel }}</td>
+                    <td *ngFor="let cell of row.cells">
+                      <div class="progress-track">
+                        <div
+                          class="progress-fill"
+                          [ngClass]="getProgressBarClass(cell.percent)"
+                          [style.width.%]="cell.percent"
+                        ></div>
+                      </div>
+                      <small class="text-muted">{{ cell.percent }}% ({{ cell.done }}/{{ cell.total }})</small>
+                    </td>
+                  </tr>
+                  <tr *ngIf="progressRows.length === 0">
+                    <td [attr.colspan]="1 + getSelectedPhases().length" class="text-muted text-center py-3">
+                      Aucune donnée d'avancement.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+          </section>
 
-            <div class="mini-gantt-row" *ngFor="let row of progressRows">
-              <span class="mini-gantt-row-label">
-                <span class="mini-gantt-dot" [ngClass]="'mini-gantt-dot--' + row.activityId"></span>
-                {{ row.activityLabel }}
-              </span>
-              <div class="mini-gantt-track">
-                <span
-                  class="mini-gantt-guide-col"
-                  *ngFor="let phase of getSelectedPhases(); let i = index"
-                  [class.mini-gantt-guide-col--current]="i === 0">
+          <section
+            *ngSwitchCase="'roadmap'"
+            cdkDrag
+            class="dashboard-card dashboard-widget dashboard-clickable"
+            role="button"
+            tabindex="0"
+            title="Ouvrir la Roadmap"
+            (click)="goToProjectTab('roadmap')"
+            (keydown.enter)="goToProjectTab('roadmap')"
+            (keydown.space)="$event.preventDefault(); goToProjectTab('roadmap')">
+            <span class="dashboard-widget-handle" cdkDragHandle title="Déplacer le widget" (click)="$event.stopPropagation()">⠿</span>
+            <h4 class="h6 mb-2">Roadmap synthétique</h4>
+
+            <div class="mini-gantt" *ngIf="progressRows.length; else noRoadmap">
+              <div class="mini-gantt-header">
+                <span class="mini-gantt-header-label">Activité</span>
+                <div class="mini-gantt-header-track">
+                  <span
+                    class="mini-gantt-header-phase"
+                    *ngFor="let phase of getSelectedPhases(); let i = index"
+                    [class.mini-gantt-header-phase--current]="i === 0"
+                    [title]="getPhaseLongName(phase)">
+                    {{ getGanttMonthLabel(i) }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="mini-gantt-row" *ngFor="let row of progressRows">
+                <span class="mini-gantt-row-label">
+                  <span class="mini-gantt-dot" [ngClass]="'mini-gantt-dot--' + row.activityId"></span>
+                  {{ row.activityLabel }}
                 </span>
-                <div
-                  class="mini-gantt-bar"
-                  *ngIf="getActivityBarRange(row) as bar"
-                  [ngClass]="'mini-gantt-bar--' + row.activityId"
-                  [style.left.%]="getBarLeftPercent(bar)"
-                  [style.width.%]="getBarWidthPercent(bar)">
-                  <span class="mini-gantt-bar-label" *ngIf="bar.percent > 0">{{ bar.percent }}%</span>
+                <div class="mini-gantt-track">
+                  <span
+                    class="mini-gantt-guide-col"
+                    *ngFor="let phase of getSelectedPhases(); let i = index"
+                    [class.mini-gantt-guide-col--current]="i === 0">
+                  </span>
+                  <div
+                    class="mini-gantt-bar"
+                    *ngIf="getActivityBarRange(row) as bar"
+                    [ngClass]="'mini-gantt-bar--' + row.activityId"
+                    [style.left.%]="getBarLeftPercent(bar)"
+                    [style.width.%]="getBarWidthPercent(bar)">
+                    <span class="mini-gantt-bar-label" *ngIf="bar.percent > 0">{{ bar.percent }}%</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <ng-template #noRoadmap>
-            <p class="text-muted small mb-0">Aucune donnée de roadmap.</p>
-          </ng-template>
+            <ng-template #noRoadmap>
+              <p class="text-muted small mb-0">Aucune donnée de roadmap.</p>
+            </ng-template>
 
-          <div class="mini-gantt-milestones" *ngIf="selectedProjectDetail?.milestones?.length">
-            <span class="mini-gantt-milestones-label">Jalons&nbsp;:</span>
-            <span class="mini-gantt-milestone" *ngFor="let m of selectedProjectDetail?.milestones">
-              <span class="mini-gantt-milestone-diamond"></span>{{ m.label }} — {{ m.date }}
-            </span>
-          </div>
-        </section>
-
-        <section
-          class="dashboard-card dashboard-clickable"
-          role="button"
-          tabindex="0"
-          title="Ouvrir le Board"
-          (click)="goToProjectTab('board')"
-          (keydown.enter)="goToProjectTab('board')"
-          (keydown.space)="$event.preventDefault(); goToProjectTab('board')">
-          <div class="d-flex align-items-center justify-content-between mb-3">
-            <h4 class="h6 mb-0">Fil d'activité</h4>
-            <a
-              href="javascript:void(0)"
-              class="dashboard-card-link"
-              *ngIf="selectedProject"
-              (click)="$event.stopPropagation(); goToProjectTab('board')">
-              Tout voir
-            </a>
-          </div>
-          <div class="activity-feed" *ngIf="activityFeed.length; else noActivity">
-            <div class="activity-feed-entry" *ngFor="let entry of activityFeed">
-              <span
-                class="activity-feed-avatar"
-                [class]="'activity-feed-avatar--' + getAvatarColorIndex(entry.authorName)">
-                {{ getInitials(entry.authorName) }}
+            <div class="mini-gantt-milestones" *ngIf="selectedProjectDetail?.milestones?.length">
+              <span class="mini-gantt-milestones-label">Jalons&nbsp;:</span>
+              <span class="mini-gantt-milestone" *ngFor="let m of selectedProjectDetail?.milestones">
+                <span class="mini-gantt-milestone-diamond"></span>{{ m.label }} — {{ m.date }}
               </span>
-              <div class="activity-feed-body">
-                <p class="activity-feed-text">
-                  <strong>{{ entry.authorName }}</strong> {{ getActivityVerb(entry) }} <strong>{{ entry.taskLabel }}</strong>
-                </p>
-                <span class="activity-feed-time">{{ getRelativeTime(entry.createdAt) }}</span>
+            </div>
+          </section>
+
+          <section
+            *ngSwitchCase="'activity'"
+            cdkDrag
+            class="dashboard-card dashboard-widget dashboard-clickable"
+            role="button"
+            tabindex="0"
+            title="Ouvrir le Board"
+            (click)="goToProjectTab('board')"
+            (keydown.enter)="goToProjectTab('board')"
+            (keydown.space)="$event.preventDefault(); goToProjectTab('board')">
+            <span class="dashboard-widget-handle" cdkDragHandle title="Déplacer le widget" (click)="$event.stopPropagation()">⠿</span>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h4 class="h6 mb-0">Fil d'activité</h4>
+              <a
+                href="javascript:void(0)"
+                class="dashboard-card-link"
+                *ngIf="selectedProject"
+                (click)="$event.stopPropagation(); goToProjectTab('board')">
+                Tout voir
+              </a>
+            </div>
+            <div class="activity-feed" *ngIf="activityFeed.length; else noActivity">
+              <div class="activity-feed-entry" *ngFor="let entry of activityFeed">
+                <span
+                  class="activity-feed-avatar"
+                  [class]="'activity-feed-avatar--' + getAvatarColorIndex(entry.authorName)">
+                  {{ getInitials(entry.authorName) }}
+                </span>
+                <div class="activity-feed-body">
+                  <p class="activity-feed-text">
+                    <strong>{{ entry.authorName }}</strong> {{ getActivityVerb(entry) }} <strong>{{ entry.taskLabel }}</strong>
+                  </p>
+                  <span class="activity-feed-time">{{ getRelativeTime(entry.createdAt) }}</span>
+                </div>
               </div>
             </div>
-          </div>
-          <ng-template #noActivity>
-            <p class="text-muted small mb-0">Aucune activité récente.</p>
-          </ng-template>
-        </section>
-      </div>
+            <ng-template #noActivity>
+              <p class="text-muted small mb-0">Aucune activité récente.</p>
+            </ng-template>
+          </section>
 
-      <div class="dashboard-column">
-        <section
-          class="dashboard-card dashboard-clickable"
-          role="button"
-          tabindex="0"
-          title="Ouvrir la Gestion des risques"
-          (click)="goToProjectTab('risks')"
-          (keydown.enter)="goToProjectTab('risks')"
-          (keydown.space)="$event.preventDefault(); goToProjectTab('risks')">
-          <h4 class="h6 mb-3">Risques</h4>
+          <section
+            *ngSwitchCase="'risks'"
+            cdkDrag
+            class="dashboard-card dashboard-widget dashboard-clickable"
+            role="button"
+            tabindex="0"
+            title="Ouvrir la Gestion des risques"
+            (click)="goToProjectTab('risks')"
+            (keydown.enter)="goToProjectTab('risks')"
+            (keydown.space)="$event.preventDefault(); goToProjectTab('risks')">
+            <span class="dashboard-widget-handle" cdkDragHandle title="Déplacer le widget" (click)="$event.stopPropagation()">⠿</span>
+            <h4 class="h6 mb-3">Risques</h4>
 
-          <div class="risk-kpis">
-            <div class="risk-kpi">
-              <div class="risk-kpi-label">Risques ouverts</div>
-              <div class="risk-kpi-value">{{ openRisksCount }}</div>
-            </div>
-            <div class="risk-kpi">
-              <div class="risk-kpi-label">Niveau élevé</div>
-              <div class="risk-kpi-value risk-kpi-value--alert">{{ highRisksCount }}</div>
-            </div>
-            <div class="risk-kpi">
-              <div class="risk-kpi-label">Mitigés ce mois</div>
-              <div class="risk-kpi-value risk-kpi-value--done">{{ mitigatedThisMonthCount }}</div>
-            </div>
-          </div>
-
-          <div class="risk-matrix-shell">
-            <div class="impact-axis-label">Impact</div>
-            <div class="risk-matrix-main">
-              <div class="prob-axis-label">Probabilité</div>
-              <div class="table-responsive">
-                <table class="table table-sm text-center align-middle mb-0 risk-matrix-table">
-                  <thead>
-                    <tr>
-                      <th class="text-start"></th>
-                      <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let impact of riskImpactLevels">
-                      <td class="text-start fw-semibold">{{ impact }}</td>
-                      <td
-                        *ngFor="let prob of riskProbabilityLevels"
-                        [ngClass]="getMatrixHeatClass(impact, prob)">
-                        <div class="risk-cell-dots">
-                          <span
-                            *ngFor="let risk of getRiskMatrixDots(impact, prob)"
-                            class="risk-dot"
-                            [ngClass]="'risk-dot-' + risk.level"
-                            [title]="risk.longName || risk.title">
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div class="risk-kpis">
+              <div class="risk-kpi">
+                <div class="risk-kpi-label">Risques ouverts</div>
+                <div class="risk-kpi-value">{{ openRisksCount }}</div>
+              </div>
+              <div class="risk-kpi">
+                <div class="risk-kpi-label">Niveau élevé</div>
+                <div class="risk-kpi-value risk-kpi-value--alert">{{ highRisksCount }}</div>
+              </div>
+              <div class="risk-kpi">
+                <div class="risk-kpi-label">Mitigés ce mois</div>
+                <div class="risk-kpi-value risk-kpi-value--done">{{ mitigatedThisMonthCount }}</div>
               </div>
             </div>
-          </div>
 
-          <div class="risk-priority-list" *ngIf="topRiskRows.length; else noRisks">
-            <div
-              class="risk-priority-card"
-              *ngFor="let risk of topRiskRows"
-              [ngClass]="'risk-priority-card--' + risk.level">
-              <div class="risk-priority-title">
-                {{ risk.longName || risk.title }}
-                <span class="badge" [ngClass]="getRiskLevelClass(risk.level)">
-                  {{ getRiskLevelLabel(risk.level) }}
+            <div class="risk-matrix-shell">
+              <div class="impact-axis-label">Impact</div>
+              <div class="risk-matrix-main">
+                <div class="prob-axis-label">Probabilité</div>
+                <div class="table-responsive">
+                  <table class="table table-sm text-center align-middle mb-0 risk-matrix-table">
+                    <thead>
+                      <tr>
+                        <th class="text-start"></th>
+                        <th *ngFor="let prob of riskProbabilityLevels">{{ prob }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let impact of riskImpactLevels">
+                        <td class="text-start fw-semibold">{{ impact }}</td>
+                        <td
+                          *ngFor="let prob of riskProbabilityLevels"
+                          [ngClass]="getMatrixHeatClass(impact, prob)">
+                          <div class="risk-cell-dots">
+                            <span
+                              *ngFor="let risk of getRiskMatrixDots(impact, prob)"
+                              class="risk-dot"
+                              [ngClass]="'risk-dot-' + risk.level"
+                              [title]="risk.longName || risk.title">
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="risk-priority-list" *ngIf="topRiskRows.length; else noRisks">
+              <div
+                class="risk-priority-card"
+                *ngFor="let risk of topRiskRows"
+                [ngClass]="'risk-priority-card--' + risk.level">
+                <div class="risk-priority-title">
+                  {{ risk.longName || risk.title }}
+                  <span class="badge" [ngClass]="getRiskLevelClass(risk.level)">
+                    {{ getRiskLevelLabel(risk.level) }}
+                  </span>
+                </div>
+                <p class="risk-priority-meta">{{ risk.status }} · maj {{ risk.dueDate || '—' }}</p>
+              </div>
+            </div>
+            <ng-template #noRisks>
+              <p class="text-muted small mb-0">Aucun risque disponible.</p>
+            </ng-template>
+          </section>
+
+          <section
+            *ngSwitchCase="'dueItems'"
+            cdkDrag
+            class="dashboard-card dashboard-widget dashboard-clickable"
+            role="button"
+            tabindex="0"
+            title="Ouvrir la Roadmap"
+            (click)="goToProjectTab('roadmap')"
+            (keydown.enter)="goToProjectTab('roadmap')"
+            (keydown.space)="$event.preventDefault(); goToProjectTab('roadmap')">
+            <span class="dashboard-widget-handle" cdkDragHandle title="Déplacer le widget" (click)="$event.stopPropagation()">⠿</span>
+            <h4 class="h6 mb-2">Échéances proches</h4>
+            <div class="due-list" *ngIf="dueItemRows.length; else noDueItems">
+              <div
+                class="due-row"
+                *ngFor="let task of dueItemRows"
+                [ngClass]="'due-row--' + getItemDueClass(task.daysRemaining)"
+                [title]="task.activityLabel + ' · ' + task.phaseLabel">
+                <span class="due-row-dot"></span>
+                <span class="due-row-label">{{ task.taskLabel }}</span>
+                <span class="due-row-proximity">
+                  <ng-container *ngIf="task.daysRemaining < 0">retard {{ -task.daysRemaining }}j</ng-container>
+                  <ng-container *ngIf="task.daysRemaining === 0">Aujourd'hui</ng-container>
+                  <ng-container *ngIf="task.daysRemaining > 0">J-{{ task.daysRemaining }}</ng-container>
                 </span>
               </div>
-              <p class="risk-priority-meta">{{ risk.status }} · maj {{ risk.dueDate || '—' }}</p>
             </div>
-          </div>
-          <ng-template #noRisks>
-            <p class="text-muted small mb-0">Aucun risque disponible.</p>
-          </ng-template>
-        </section>
+            <ng-template #noDueItems>
+              <p class="text-muted small mb-0">Aucune échéance disponible.</p>
+            </ng-template>
+          </section>
 
-        <section
-          class="dashboard-card dashboard-clickable"
-          role="button"
-          tabindex="0"
-          title="Ouvrir la Roadmap"
-          (click)="goToProjectTab('roadmap')"
-          (keydown.enter)="goToProjectTab('roadmap')"
-          (keydown.space)="$event.preventDefault(); goToProjectTab('roadmap')">
-          <h4 class="h6 mb-2">Échéances proches</h4>
-          <div class="due-list" *ngIf="dueItemRows.length; else noDueItems">
-            <div
-              class="due-row"
-              *ngFor="let task of dueItemRows"
-              [ngClass]="'due-row--' + getItemDueClass(task.daysRemaining)"
-              [title]="task.activityLabel + ' · ' + task.phaseLabel">
-              <span class="due-row-dot"></span>
-              <span class="due-row-label">{{ task.taskLabel }}</span>
-              <span class="due-row-proximity">
-                <ng-container *ngIf="task.daysRemaining < 0">retard {{ -task.daysRemaining }}j</ng-container>
-                <ng-container *ngIf="task.daysRemaining === 0">Aujourd'hui</ng-container>
-                <ng-container *ngIf="task.daysRemaining > 0">J-{{ task.daysRemaining }}</ng-container>
-              </span>
-            </div>
-          </div>
-          <ng-template #noDueItems>
-            <p class="text-muted small mb-0">Aucune échéance disponible.</p>
-          </ng-template>
-        </section>
-      </div>
+        </ng-container>
+      </ng-container>
     </div>
 
   </ng-container>

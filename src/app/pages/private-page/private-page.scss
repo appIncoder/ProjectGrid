@@ -148,6 +148,21 @@
     font-weight: 700;
     color: var(--pg-color-navy);
   }
+
+  .info-date-input {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pg-color-navy);
+    border: 1px solid var(--pg-color-border-light);
+    border-radius: 4px;
+    padding: 2px 6px;
+    background-color: var(--pg-color-surface, #fff);
+    width: fit-content;
+
+    &:disabled {
+      opacity: 0.6;
+    }
+  }
 }
 
 .project-team {
@@ -220,13 +235,58 @@
   gap: 1rem;
 }
 
-.dashboard-column {
-  display: grid;
-  gap: 1rem;
-  align-content: start;
+.dashboard-columns--list {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-prefs-menu {
+  min-width: 240px;
+  padding: 8px 12px 12px;
+}
+
+.dashboard-prefs-layout {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.dashboard-layout-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+  background: #ffffff;
+  color: var(--pg-color-text-heading);
+  font-size: 12px;
+  font-weight: 600;
+
+  &.active {
+    border-color: var(--pg-color-accent);
+    background: var(--pg-color-accent);
+    color: #ffffff;
+  }
+}
+
+.dashboard-prefs-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pg-color-text);
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    cursor: pointer;
+  }
 }
 
 .dashboard-card {
+  position: relative;
   border: 1px solid var(--pg-color-border);
   border-radius: var(--pg-radius-lg);
   padding: 14px 16px;
@@ -238,6 +298,53 @@
     font-weight: 600;
     color: var(--pg-color-text);
   }
+}
+
+// Widgets du tableau de bord réorganisables par drag & drop (cf. onWidgetDrop).
+.dashboard-widget-handle {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--pg-radius);
+  color: var(--pg-color-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+
+  &:hover {
+    background: var(--pg-color-bg-head);
+    color: var(--pg-color-text);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.dashboard-widget.cdk-drag-preview {
+  background: #fff;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius-lg);
+  box-shadow: 0 6px 18px rgba(20, 40, 50, 0.18);
+}
+
+.dashboard-widget.cdk-drag-placeholder {
+  opacity: 0.3;
+  outline: 1px dashed var(--pg-color-accent);
+}
+
+.dashboard-widget.cdk-drag-animating {
+  transition: transform 180ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.dashboard-columns.cdk-drop-list-dragging .dashboard-widget:not(.cdk-drag-placeholder) {
+  transition: transform 180ms cubic-bezier(0, 0, 0.2, 1);
 }
 
 // Zones d'information cliquables : renvoient vers l'onglet d'encodage équivalent.

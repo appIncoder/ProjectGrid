@@ -182,26 +182,33 @@ $accent-technologie: var(--pg-status-review-fg);
   gap: 8px;
 }
 
-// ── Zoom (zone d'encodage roadmap) ──────────────────────────────────────────
-.roadmap-zoom-group {
+// ── Groupes de boutons segmentés (zoom, taille des cartouches) ───────────────
+// Structure partagée par tous les groupes de boutons accolés de la toolbar :
+// un seul jeu de règles pour tous les <button> enfants (au lieu d'un bloc
+// dupliqué par groupe) — ne porte que la mécanique de groupement (coins
+// arrondis aux extrémités, chevauchement des bordures), pas l'habillage propre
+// à chaque bouton (largeur, couleur…), défini séparément.
+.roadmap-seg-group {
   display: inline-flex;
   align-items: stretch;
 
-  .roadmap-zoom-btn,
-  .roadmap-zoom-value {
+  > button {
     border-radius: 0;
     margin-left: -1px;
-  }
+    position: relative;
 
-  .roadmap-zoom-btn:first-child {
-    border-top-left-radius: var(--pg-radius);
-    border-bottom-left-radius: var(--pg-radius);
-    margin-left: 0;
-  }
+    &:hover { z-index: 1; }
 
-  .roadmap-zoom-btn:last-child {
-    border-top-right-radius: var(--pg-radius);
-    border-bottom-right-radius: var(--pg-radius);
+    &:first-child {
+      border-top-left-radius: var(--pg-radius);
+      border-bottom-left-radius: var(--pg-radius);
+      margin-left: 0;
+    }
+
+    &:last-child {
+      border-top-right-radius: var(--pg-radius);
+      border-bottom-right-radius: var(--pg-radius);
+    }
   }
 }
 
@@ -211,34 +218,6 @@ $accent-technologie: var(--pg-status-review-fg);
   justify-content: center;
   font-size: 0.95rem;
   font-weight: 700;
-  position: relative;
-
-  &:hover { z-index: 1; }
-}
-
-// ── Taille des cartouches (toggle 2 tailles, Gantt + panneau tableau) ────────
-.roadmap-size-group {
-  display: inline-flex;
-  align-items: stretch;
-
-  .roadmap-size-btn {
-    border-radius: 0;
-    margin-left: -1px;
-    position: relative;
-
-    &:hover { z-index: 1; }
-  }
-
-  .roadmap-size-btn:first-child {
-    border-top-left-radius: var(--pg-radius);
-    border-bottom-left-radius: var(--pg-radius);
-    margin-left: 0;
-  }
-
-  .roadmap-size-btn:last-child {
-    border-top-right-radius: var(--pg-radius);
-    border-bottom-right-radius: var(--pg-radius);
-  }
 }
 
 .roadmap-zoom-value {
@@ -351,9 +330,6 @@ $accent-technologie: var(--pg-status-review-fg);
   background: $ms-pane-bg;
   overflow-x: auto;
   overflow-y: auto;
-}
-
-.roadmap-right-pane {
   border-left: 1px solid $ms-border-light;
 }
 

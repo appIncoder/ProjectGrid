@@ -379,6 +379,19 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     return this.projectService.getPhaseToMonthIndex(this.project?.phases ?? []);
   }
 
+  /** Date de démarrage du projet (plus ancienne startDate des phases), sert de seuil minimal à la roadmap. */
+  private getProjectStartDate(): Date {
+    const defs = this.project?.phaseDefinitions;
+    if (defs) {
+      const dates = Object.values(defs)
+        .map((def) => def?.startDate)
+        .filter((d): d is string => !!d)
+        .sort();
+      if (dates.length) return this.parseIsoToDate(dates[0]) ?? this.projectService.getDefaultGanttStartDate();
+    }
+    return this.projectService.getDefaultGanttStartDate();
+  }
+
   private columnResizing = false;
   private resizingCol: RoadmapColKey | null = null;
   private colResizeStartX = 0;
@@ -498,7 +511,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.tablePanelWidthPx = 400;
     this.recomputeTableContentWidth();
 
-    const d = this.projectService.getDefaultGanttStartDate();
+    const d = this.getProjectStartDate();
     this.customStartIso = this.projectService.toIsoDate(d);
     this.ganttStartDateOverride = d;
 
@@ -632,7 +645,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   private applyPeriod(monthsCount: number, startIso: string): void {
-    const start = this.parseIsoToDate(startIso) ?? this.projectService.getDefaultGanttStartDate();
+    const start = this.parseIsoToDate(startIso) ?? this.getProjectStartDate();
     const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
 
     this.ganttMonthsCount = monthsCount;
@@ -690,7 +703,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   // Calendrier Gantt
   // =======================
   private buildGanttCalendar(): void {
-    const base = this.ganttStartDateOverride ?? this.projectService.getDefaultGanttStartDate();
+    const base = this.ganttStartDateOverride ?? this.getProjectStartDate();
     this.ganttStartDate = new Date(base.getFullYear(), base.getMonth(), 1);
 
     this.ganttMonths = [];
