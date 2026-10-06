@@ -380,14 +380,40 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   }
 
   /** Date de démarrage du projet (plus ancienne startDate des phases), sert de seuil minimal à la roadmap. */
+  /**
+   * Date de démarrage la plus ancienne du projet : la plus petite startDate
+   * trouvée parmi les phases ET parmi les tâches elles-mêmes. Une tâche peut
+   * avoir une date antérieure à celle de sa phase (saisie manuelle, import...)
+   * — si on ne regardait que les phases, cette tâche serait tronquée au jour 0
+   * du calendrier Gantt (cf. clamp dans seedOverridesFromTaskDates) et
+   * resterait inaccessible même en scrollant tout à gauche.
+   */
   private getProjectStartDate(): Date {
+    const candidates: string[] = [];
+
     const defs = this.project?.phaseDefinitions;
     if (defs) {
-      const dates = Object.values(defs)
-        .map((def) => def?.startDate)
-        .filter((d): d is string => !!d)
-        .sort();
-      if (dates.length) return this.parseIsoToDate(dates[0]) ?? this.projectService.getDefaultGanttStartDate();
+      for (const def of Object.values(defs)) {
+        if (def?.startDate) candidates.push(def.startDate);
+      }
+    }
+
+    const taskMatrix = this.project?.taskMatrix as Record<string, Record<string, Task[]>> | undefined;
+    if (taskMatrix) {
+      for (const byPhase of Object.values(taskMatrix)) {
+        for (const tasks of Object.values(byPhase ?? {})) {
+          for (const task of tasks ?? []) {
+            const start = (task as any)?.startDate;
+            if (start) candidates.push(start);
+          }
+        }
+      }
+    }
+
+    candidates.sort();
+    if (candidates.length) {
+      const parsed = this.parseIsoToDate(candidates[0]);
+      if (parsed) return parsed;
     }
     return this.projectService.getDefaultGanttStartDate();
   }
@@ -697,6 +723,17 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     scroller.scrollLeft = Math.max(0, Math.min(maxScroll, desired));
+  }
+
+  /**
+   * Ramène le Gantt au tout début du calendrier (jour 0 = seuil minimal du
+   * projet, cf. getProjectStartDate) — permet de scroller jusqu'à la date de
+   * démarrage la plus ancienne, y compris dans le passé par rapport à aujourd'hui.
+   */
+  scrollToProjectStart(): void {
+    const scroller = this.ganttScrollRef?.nativeElement;
+    if (!scroller) return;
+    scroller.scrollLeft = 0;
   }
 
   // =======================
