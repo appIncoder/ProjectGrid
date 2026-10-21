@@ -7,7 +7,7 @@ import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 import { ProjectDataService } from '../../services/project-data.service';
-import { type ActivityStatus, type Health, type PhaseId, type ProjectDetail, type ProjectListItem, type ProjectStatus } from '../../models';
+import { localizeStoredLabel, type ActivityStatus, type Health, type PhaseId, type ProjectDetail, type ProjectListItem, type ProjectStatus } from '../../models';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { ProjectCreateWizard } from '../../shared/project-create-wizard/project-create-wizard';
 import { AppButton } from '../../shared/design-system/button/button';
@@ -20,6 +20,8 @@ import { AppButton } from '../../shared/design-system/button/button';
   styleUrls: ['./projects-page.scss'],
 })
 export class ProjectsPage implements OnInit, OnDestroy {
+  readonly localizeStoredLabel = localizeStoredLabel;
+
   searchTerm = '';
   statusFilter: ProjectStatus | 'Tous' = 'Tous';
   healthFilter: Health | 'Tous' = 'Tous';

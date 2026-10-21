@@ -4,14 +4,9 @@
 
 .settings-page {
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  height: calc(100dvh - 9rem); // navbar (~56px) + footer (~46px) + container py-4 (3rem)
-  gap: 0;
 }
 
 .settings-header {
-  flex-shrink: 0;
   padding-bottom: 1rem;
   h2 { margin: 0 0 4px; }
 }
@@ -50,7 +45,6 @@
 /* ── Barre d'onglets ──────────────────────────────────────── */
 
 .settings-tabs {
-  flex-shrink: 0;
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--pg-color-border);
@@ -92,13 +86,11 @@
 }
 
 .settings-tab-panel {
-  flex: 1;
-  min-height: 0; // indispensable pour que overflow-y fonctionne dans un flex item
-  overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
   gap: 1rem;
   padding-top: 1rem;
+  padding-bottom: 1.5rem;
   align-items: start;
 }
 

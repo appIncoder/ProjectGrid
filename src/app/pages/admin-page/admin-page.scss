@@ -289,6 +289,131 @@
   color: var(--pg-status-done-fg);
 }
 
+.admin-help {
+  margin: -0.4rem 0 0.9rem;
+  font-size: 12.5px;
+}
+
+.admin-inline {
+  display: flex;
+  gap: 0.5rem;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--pg-color-border);
+    border-radius: var(--pg-radius);
+    color: var(--pg-color-text);
+    background: #fff;
+    font-size: 13px;
+  }
+}
+
+.admin-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  color: var(--pg-color-text);
+}
+
+.admin-search {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--pg-color-border);
+    border-radius: var(--pg-radius);
+    color: var(--pg-color-text);
+    background: #fff;
+    font-size: 13px;
+  }
+
+  span {
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+}
+
+.admin-user-list {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.admin-user-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 8px 10px;
+  border: 1px solid var(--pg-color-border);
+  border-radius: var(--pg-radius);
+}
+
+.admin-user-item__identity {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.admin-license-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pg-status-done-fg);
+  background: var(--pg-status-done-bg);
+
+  &--revoked {
+    color: var(--pg-status-alert-fg);
+    background: var(--pg-status-alert-bg);
+  }
+
+  &--pending {
+    color: var(--pg-status-review-fg);
+    background: var(--pg-status-review-bg);
+  }
+}
+
+.admin-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  margin-left: 0.4rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--pg-status-review-fg);
+  background: var(--pg-status-review-bg);
+  vertical-align: middle;
+}
+
+.admin-feedback {
+  margin: 0;
+}
+
 @media (max-width: 1024px) {
   .admin-page__crud {
     grid-template-columns: 1fr;

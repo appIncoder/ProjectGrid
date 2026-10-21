@@ -7,9 +7,14 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
+import { isLicenseActive, toUserLicenseStatus, type UserLicenseStatus } from '../models';
 import type { AuthBackend, AuthUser, LoginOptions } from './auth-backend';
 import { FirebaseSdkService } from './firebase-sdk.service';
+
+export const LICENSE_REVOKED_ERROR_CODE = 'license/revoked';
+export const LICENSE_PENDING_ERROR_CODE = 'license/pending';
+export const LICENSE_REJECTED_ERROR_CODE = 'license/rejected';
 
 @Injectable({ providedIn: 'root' })
 export class FirebaseAuthBackendService implements AuthBackend {
@@ -49,7 +54,27 @@ export class FirebaseAuthBackendService implements AuthBackend {
       });
     }
 
-    return auth.currentUser ? this.toAuthUser(auth.currentUser) : null;
+    if (!auth.currentUser) return null;
+    if ((await this.readLicenseAccess(auth.currentUser.uid)) !== 'granted') {
+      await signOut(auth);
+      return null;
+    }
+    return this.toAuthUser(auth.currentUser);
+  }
+
+  /**
+   * Une licence révoquée, en attente de validation ou refusée empêche la connexion ;
+   * en cas d'erreur de lecture, l'accès est conservé.
+   */
+  private async readLicenseAccess(uid: string): Promise<'granted' | UserLicenseStatus> {
+    try {
+      const snapshot = await getDoc(doc(this.firebaseSdk.firestore(), 'users', uid));
+      if (!snapshot.exists()) return 'granted';
+      const license = snapshot.data()['license'];
+      return isLicenseActive(license) ? 'granted' : (toUserLicenseStatus(license) ?? 'revoked');
+    } catch {
+      return 'granted';
+    }
   }
 
   private async resolveLoginEmail(login: string): Promise<string> {
@@ -92,6 +117,14 @@ export class FirebaseAuthBackendService implements AuthBackend {
     );
     const email = await this.resolveLoginEmail(login);
     const credential = await signInWithEmailAndPassword(this.firebaseSdk.auth(), email, password);
+    const access = await this.readLicenseAccess(credential.user.uid);
+    if (access !== 'granted') {
+      await signOut(this.firebaseSdk.auth());
+      const code = access === 'pending'
+        ? LICENSE_PENDING_ERROR_CODE
+        : access === 'rejected' ? LICENSE_REJECTED_ERROR_CODE : LICENSE_REVOKED_ERROR_CODE;
+      throw Object.assign(new Error("Votre licence n'est pas active."), { code });
+    }
     return this.toAuthUser(credential.user);
   }
 

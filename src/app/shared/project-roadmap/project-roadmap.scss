@@ -1,11 +1,5 @@
 :host {
   display: block;
-  --roadmap-viewport-offset: 16.5rem;
-  --roadmap-bottom-gap: 0.5rem;
-  --roadmap-frame-height: min(
-    820px,
-    max(420px, calc(100dvh - var(--roadmap-viewport-offset) - var(--roadmap-bottom-gap)))
-  );
 }
 
 // ── Palette Executive Slate (tokens globaux, cf. src/styles.scss) ─────────────
@@ -296,15 +290,12 @@ $accent-technologie: var(--pg-status-review-fg);
 }
 
 // ── Scroll frame ──────────────────────────────────────────────────────────────
-// Le défilement vertical se fait désormais à l'intérieur de chaque panneau
-// (et non plus sur ce cadre) afin que la scrollbar horizontale du Gantt,
-// portée par .roadmap-right-pane, reste ancrée en bas du cadre visible —
-// toujours visible, sans avoir à scroller jusqu'en bas du contenu.
+// Le cadre prend toute la hauteur de son contenu (toutes les lignes visibles,
+// quitte à allonger la page) : seul le défilement horizontal reste porté par
+// les panneaux (.roadmap-left-pane / .roadmap-right-pane).
 .roadmap-scroll-frame {
   display: flex;
   gap: 0;
-  height: var(--roadmap-frame-height);
-  max-height: var(--roadmap-frame-height);
   overflow: hidden;
   border: 1px solid $ms-border;
   border-radius: var(--pg-radius);
@@ -315,21 +306,17 @@ $accent-technologie: var(--pg-status-review-fg);
 .roadmap-left-pane {
   position: relative;
   z-index: 1;
-  height: 100%;
   background: $ms-pane-bg;
   overflow-x: auto;
-  // Défilement vertical synchronisé programmatiquement sur .roadmap-right-pane
-  // (cf. onGanttPaneScroll) : pas de scrollbar propre, pour n'en garder qu'une seule.
   overflow-y: hidden;
 }
 
 .roadmap-right-pane {
   position: relative;
   z-index: 1;
-  height: 100%;
   background: $ms-pane-bg;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: hidden;
   border-left: 1px solid $ms-border-light;
 }
 

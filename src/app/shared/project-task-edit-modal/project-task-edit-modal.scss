@@ -242,6 +242,13 @@
   background: #fff;
 }
 
+.child-item-form {
+  border: 1px solid var(--activity-card-border);
+  border-radius: 5px;
+  padding: 0.55rem;
+  background: #f8f9fb;
+}
+
 .child-task-row {
   display: flex;
   align-items: center;

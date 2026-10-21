@@ -6,7 +6,7 @@
         <div class="scorecard-kpis">
           <span class="scorecard-kpi">Activités: {{ getTotalTaskCount() }}</span>
           <span class="scorecard-kpi">Types d'activité: {{ getActivityCount() }}</span>
-          <span class="scorecard-kpi">Phases: {{ getPhaseCount() }}</span>
+          <span class="scorecard-kpi">Phases : {{ getPhaseCount() }}</span>
         </div>
       </div>
       <div class="scorecard-toolbar-actions">
@@ -38,7 +38,7 @@
             <td class="text-start activity-cell">
               <div class="activity-name">{{ activity.label }}</div>
               <div class="activity-manager" *ngIf="getActivityManagerLabel(activity.id) as managerLabel">
-                <span class="activity-manager-label">Manager</span>
+                <span class="activity-manager-label">Responsable</span>
                 <strong>{{ managerLabel }}</strong>
               </div>
             </td>
@@ -136,6 +136,8 @@
     [editedDependencies]="editedDependencies"
     [linkableTasks]="getLinkableTasks()"
     [childItems]="getChildItems()"
+    [canAddChildItem]="canAddActivity"
+    (addChildItem)="addChildItem($event)"
     (addDependency)="addDependencyRow()"
     (removeDependency)="removeDependencyRow($event)"
     (cancel)="modal.dismiss()"

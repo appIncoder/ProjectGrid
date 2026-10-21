@@ -67,7 +67,7 @@
 
   <!-- ── Filtre de swimlanes ─────────────────────────────────────────────── -->
   <div class="swimlane-filter">
-    <span class="swimlane-filter-label">Swimlanes</span>
+    <span class="swimlane-filter-label">Couloirs</span>
 
     <span class="swimlane-filter-divider"></span>
 
@@ -215,8 +215,8 @@
                 class="kc-avatar"
                 [class.kc-avatar--rep]="cardRoles[c.id]?.rep"
                 [class.kc-avatar--empty]="!cardRoles[c.id]?.rep"
-                [title]="cardRoles[c.id]?.rep ? ('Reporter : ' + cardRoles[c.id]!.rep) : 'Reporter non défini'"
-                (click)="showAssignmentPopover($event, c, 'reporter', 'Reporter', getTaskFromCard(c)?.reporterId)">
+                [title]="cardRoles[c.id]?.rep ? ('Rapporteur : ' + cardRoles[c.id]!.rep) : 'Rapporteur non défini'"
+                (click)="showAssignmentPopover($event, c, 'reporter', 'Rapporteur', getTaskFromCard(c)?.reporterId)">
                 {{ cardRoles[c.id]?.rep ? initials(cardRoles[c.id]!.rep!) : '' }}
               </span>
               <span
@@ -304,6 +304,8 @@
     [editedDependencies]="editedDependencies"
     [linkableTasks]="getLinkableTasks()"
     [childItems]="getChildItems()"
+    [canAddChildItem]="canAddActivity"
+    (addChildItem)="addChildItem($event)"
     (addDependency)="addDependencyRow()"
     (removeDependency)="removeDependencyRow($event)"
     (cancel)="modal.dismiss()"

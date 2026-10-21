@@ -348,7 +348,7 @@ export class ProjectDataService {
 
   async deleteProject(projectId: string): Promise<void> {
     const id = String(projectId ?? '').trim();
-    if (!id) throw new Error('Missing project id');
+    if (!id) throw new Error('Identifiant de projet manquant.');
 
     await this.backend.deleteProject(id);
     this.removeCachedProject(id);
@@ -397,7 +397,7 @@ export class ProjectDataService {
 
   async saveProjectWorkflow(projectId: string, workflow: ProjectWorkflow): Promise<void> {
     const id = String(projectId ?? '').trim();
-    if (!id) throw new Error('Missing project id');
+    if (!id) throw new Error('Identifiant de projet manquant.');
     await this.backend.saveProjectWorkflow(id, workflow);
     const cached = this.projectsCache.get(id);
     if (cached) {

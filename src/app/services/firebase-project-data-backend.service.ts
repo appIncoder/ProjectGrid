@@ -16,7 +16,7 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 import type { ActivityDefinition, ActivityId, Item, ItemComment, PhaseId, ProjectDetail, ProjectMember, ProjectRole, ProjectSettings, ProjectWorkflow, UserRef } from '../models';
-import { DEFAULT_PROJECT_SETTINGS } from '../models';
+import { DEFAULT_PROJECT_SETTINGS, isLicenseActive } from '../models';
 import type { ProjectDataBackend } from './project-data-backend';
 import type {
   CreateProjectTypePayload,
@@ -73,7 +73,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   ) {}
 
   private unsupported(): never {
-    throw new Error('Firebase project data backend operation is not implemented.');
+    throw new Error('Cette opération n\'est pas prise en charge par le serveur Firebase.');
   }
 
   private firestore(): Firestore {
@@ -187,12 +187,12 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   private async getProjectOrThrow(projectId: string): Promise<ProjectDetail> {
     const id = this.asString(projectId);
     if (!id) {
-      throw new Error('Missing project id');
+      throw new Error('Identifiant de projet manquant.');
     }
 
     const snapshot = await getDoc(doc(this.firestore(), 'projects', id));
     if (!snapshot.exists()) {
-      throw new Error('Project not found');
+      throw new Error('Projet introuvable.');
     }
 
     return this.normalizeProjectDetail(snapshot.id, snapshot.data());
@@ -917,6 +917,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
           item.id,
         ) || item.id,
         email: this.asString(item.data['email']),
+        hasLicense: isLicenseActive(item.data['license']),
       }))
       .filter((item) => !!item.id);
   }
@@ -940,16 +941,16 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async createProjectType(payload: CreateProjectTypePayload): Promise<ProjectTypeDefaults> {
     await this.auth.whenReady();
     const name = this.asString(payload?.name);
-    if (!name) throw new Error('Missing project type name');
+    if (!name) throw new Error('Nom du type de projet manquant.');
 
     const requestedId = this.asString(payload?.id);
     const id = requestedId || this.slugifyProjectTypeId(name);
-    if (!id) throw new Error('Missing project type id');
+    if (!id) throw new Error('Identifiant du type de projet manquant.');
 
     const ref = doc(this.firestore(), 'projectTypes', id);
     const existing = await getDoc(ref);
     if (existing.exists()) {
-      throw new Error(`Project type ${id} already exists`);
+      throw new Error(`Le type de projet ${id} existe déjà.`);
     }
 
     const description = this.asString(payload?.description);
@@ -985,12 +986,12 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async updateProjectType(projectTypeId: string, payload: UpdateProjectTypePayload): Promise<ProjectTypeDefaults> {
     await this.auth.whenReady();
     const id = this.asString(projectTypeId);
-    if (!id) throw new Error('Missing project type id');
+    if (!id) throw new Error('Identifiant du type de projet manquant.');
 
     const ref = doc(this.firestore(), 'projectTypes', id);
     const snapshot = await getDoc(ref);
     if (!snapshot.exists()) {
-      throw new Error(`Project type ${id} not found`);
+      throw new Error(`Type de projet ${id} introuvable.`);
     }
 
     const current = this.asRecord(snapshot.data()) ?? {};
@@ -1025,7 +1026,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async deleteProjectType(projectTypeId: string): Promise<void> {
     await this.auth.whenReady();
     const id = this.asString(projectTypeId);
-    if (!id) throw new Error('Missing project type id');
+    if (!id) throw new Error('Identifiant du type de projet manquant.');
     await deleteDoc(doc(this.firestore(), 'projectTypes', id));
   }
 
@@ -1048,13 +1049,13 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const project = await this.getProjectOrThrow(projectId);
     const normalizedHealthShortName = this.asString(healthShortName);
     if (!normalizedHealthShortName) {
-      throw new Error('Missing healthShortName');
+      throw new Error('État de santé manquant.');
     }
 
     const defaultsByShortName = await this.getHealthDefaultsMap();
     const selectedDefault = defaultsByShortName.get(normalizedHealthShortName.toLowerCase());
     if (!selectedDefault) {
-      throw new Error(`Unknown health status: ${normalizedHealthShortName}`);
+      throw new Error(`État de santé inconnu : ${normalizedHealthShortName}`);
     }
 
     const now = this.nowIso();
@@ -1111,9 +1112,9 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const title = this.asString(payload?.title);
     const probability = this.asString(payload?.probability);
     const criticity = this.asString(payload?.criticity);
-    if (!title) throw new Error('Missing risk title');
-    if (!probability) throw new Error('Missing risk probability');
-    if (!criticity) throw new Error('Missing risk criticity');
+    if (!title) throw new Error('Titre du risque manquant.');
+    if (!probability) throw new Error('Probabilité du risque manquante.');
+    if (!criticity) throw new Error('Criticité du risque manquante.');
 
     const now = this.nowIso();
     const currentUser = this.auth.user;
@@ -1146,13 +1147,13 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const project = await this.getProjectOrThrow(projectId);
     const normalizedRiskId = this.asString(riskId);
     if (!normalizedRiskId) {
-      throw new Error('Missing risk id');
+      throw new Error('Identifiant du risque manquant.');
     }
 
     const currentRisks = this.normalizeProjectRisks(project.projectRisks, project.id);
     const currentIndex = currentRisks.findIndex((row) => this.asString(row.riskId) === normalizedRiskId);
     if (currentIndex < 0) {
-      throw new Error('Project risk not found');
+      throw new Error('Risque du projet introuvable.');
     }
 
     const current = currentRisks[currentIndex];
@@ -1160,9 +1161,9 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     const nextProbability = this.asString(payload?.probability, current.probability) || current.probability;
     const nextCriticity = this.asString(payload?.criticity, current.criticity) || current.criticity;
 
-    if (!nextLongName) throw new Error('Missing longName');
-    if (!nextProbability) throw new Error('Missing risk probability');
-    if (!nextCriticity) throw new Error('Missing risk criticity');
+    if (!nextLongName) throw new Error('Libellé du risque manquant.');
+    if (!nextProbability) throw new Error('Probabilité du risque manquante.');
+    if (!nextCriticity) throw new Error('Criticité du risque manquante.');
 
     const updated: ProjectRiskRef = {
       ...current,
@@ -1221,7 +1222,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     await this.auth.whenReady();
     const snapshot = await getDoc(doc(this.firestore(), 'projects', projectId));
     if (!snapshot.exists()) {
-      throw new Error(`Project ${projectId} not found in Firestore`);
+      throw new Error(`Projet ${projectId} introuvable dans Firestore.`);
     }
 
     return this.normalizeProjectDetail(snapshot.id, snapshot.data());
@@ -1235,10 +1236,10 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async saveProjectDisplayInteractions(projectId: string, settings: ProjectSettings): Promise<ProjectSettings> {
     await this.auth.whenReady();
     const id = this.asString(projectId);
-    if (!id) throw new Error('Missing projectId');
+    if (!id) throw new Error('Identifiant de projet manquant.');
 
     const snapshot = await getDoc(doc(this.firestore(), 'projects', id));
-    if (!snapshot.exists()) throw new Error(`Project ${id} not found`);
+    if (!snapshot.exists()) throw new Error(`Projet ${id} introuvable.`);
 
     const data = this.asRecord(snapshot.data()) ?? {};
     const payload = this.asRecord(data['payload']) ?? {};
@@ -1257,7 +1258,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
     await this.auth.whenReady();
     const projectId = this.asString(project?.id);
     if (!projectId) {
-      throw new Error('Missing project id');
+      throw new Error('Identifiant de projet manquant.');
     }
 
     const source = this.asRecord(project as unknown) ?? {};
@@ -1293,12 +1294,12 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
 
   async runProjectProcedure(projectId: string, procedure: 'save_project', payload: { project: ProjectDetail }): Promise<void> {
     if (procedure !== 'save_project') {
-      throw new Error(`Unknown procedure: ${procedure}`);
+      throw new Error(`Procédure inconnue : ${procedure}`);
     }
 
     const project = payload?.project;
     if (!project) {
-      throw new Error('Missing payload.project for save_project');
+      throw new Error('Données du projet manquantes pour l\'enregistrement.');
     }
 
     await this.saveProject({
@@ -1364,7 +1365,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async setProjectMembers(projectId: string, members: ProjectMember[]): Promise<void> {
     await this.auth.whenReady();
     const id = this.asString(projectId);
-    if (!id) throw new Error('Missing project id');
+    if (!id) throw new Error('Identifiant de projet manquant.');
 
     const memberRoles = this.normalizeMemberRoles(
       members.reduce<Record<string, ProjectRole[]>>((acc, m) => {
@@ -1404,7 +1405,7 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async saveProjectTypeWorkflow(projectTypeId: string, workflow: ProjectWorkflow): Promise<void> {
     await this.auth.whenReady();
     const id = this.asString(projectTypeId);
-    if (!id) throw new Error('Missing projectTypeId');
+    if (!id) throw new Error('Identifiant du type de projet manquant.');
 
     const sanitized = this.sanitizeForFirestore(workflow) as Record<string, unknown>;
     await setDoc(
@@ -1417,10 +1418,10 @@ export class FirebaseProjectDataBackendService implements ProjectDataBackend {
   async saveProjectWorkflow(projectId: string, workflow: ProjectWorkflow): Promise<void> {
     await this.auth.whenReady();
     const id = this.asString(projectId);
-    if (!id) throw new Error('Missing projectId');
+    if (!id) throw new Error('Identifiant de projet manquant.');
 
     const snapshot = await getDoc(doc(this.firestore(), 'projects', id));
-    if (!snapshot.exists()) throw new Error(`Project ${id} not found`);
+    if (!snapshot.exists()) throw new Error(`Projet ${id} introuvable.`);
 
     const data = this.asRecord(snapshot.data()) ?? {};
     const payload = this.asRecord(data['payload']) ?? {};

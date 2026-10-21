@@ -1,16 +1,9 @@
 :host {
   display: block;
-  --scorecard-row-height-max: 11rem;
   --scorecard-row-height-min: 5.5rem;
   --scorecard-head-height: 2.25rem;
   --scorecard-cell-pad-y: 0.3rem;
   --scorecard-cell-pad-x: 0.4rem;
-  --scorecard-bottom-gap: 0.45rem;
-  --scorecard-viewport-offset: 24.5rem;
-  --scorecard-grid-height: min(
-    560px,
-    max(300px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
-  );
   // Cartouches agrandies : la colonne de phase suit désormais la taille de la
   // cartouche (cf. .phase-header-col/.phase-cell ci-dessous) plutôt que
   // l'inverse — le tableau peut donc déborder à droite de la zone visible
@@ -73,17 +66,12 @@
 .scorecard-table-wrap {
   position: relative;
   margin-bottom: 0;
-  height: var(--scorecard-grid-height);
-  max-height: var(--scorecard-grid-height);
-  overflow: auto;
-}
-
-.scorecard-table-wrap {
-  --scorecard-dynamic-row-height: clamp(
-    var(--scorecard-row-height-min),
-    calc((var(--scorecard-grid-height) - var(--scorecard-head-height)) / var(--scorecard-activity-count, 1)),
-    var(--scorecard-row-height-max)
-  );
+  // Tableau affiché en entier verticalement (la page s'allonge si besoin) :
+  // seul le défilement horizontal reste interne.
+  overflow-x: auto;
+  overflow-y: hidden;
+  // Hauteur minimale de ligne ; une ligne s'agrandit pour afficher toutes ses cartouches.
+  --scorecard-dynamic-row-height: var(--scorecard-row-height-min);
 }
 
 .task-context-menu {
@@ -229,9 +217,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.16rem;
-  height: calc(var(--scorecard-dynamic-row-height) - (var(--scorecard-cell-pad-y) * 2));
-  min-height: 0;
-  overflow-y: auto;
+  min-height: calc(var(--scorecard-dynamic-row-height) - (var(--scorecard-cell-pad-y) * 2));
 }
 
 // Cartouches calquées sur .kanban-card / .kc-* (project-board.scss) : fond
@@ -353,15 +339,8 @@
 
 @media (max-width: 991.98px) {
   :host {
-    --scorecard-row-height-max: 8rem;
-    --scorecard-row-height-min: 3.9rem;
+      --scorecard-row-height-min: 3.9rem;
     --scorecard-head-height: 2.1rem;
-    --scorecard-bottom-gap: 0.4rem;
-    --scorecard-viewport-offset: 25.5rem;
-    --scorecard-grid-height: min(
-      520px,
-      max(260px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
-    );
   }
 
   .activity-header-col {
@@ -373,14 +352,7 @@
 
 @media (max-width: 767.98px) {
   :host {
-    --scorecard-row-height-max: 7rem;
-    --scorecard-row-height-min: 3.5rem;
+      --scorecard-row-height-min: 3.5rem;
     --scorecard-head-height: 2rem;
-    --scorecard-bottom-gap: 0.35rem;
-    --scorecard-viewport-offset: 27.5rem;
-    --scorecard-grid-height: min(
-      470px,
-      max(220px, calc(100dvh - var(--scorecard-viewport-offset) - var(--scorecard-bottom-gap)))
-    );
   }
 }

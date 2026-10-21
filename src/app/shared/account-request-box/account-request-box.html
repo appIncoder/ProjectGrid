@@ -1,0 +1,51 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Demander un compte</h5>
+
+    @if (submittedEmail()) {
+      <div class="alert alert-success py-2 mb-3" role="status">
+        Votre demande pour {{ submittedEmail() }} a bien été envoyée. Vous pourrez vous connecter dès que l'administrateur l'aura validée.
+      </div>
+      <button type="button" class="btn btn-primary w-100" (click)="backToLogin.emit()">Retour à la connexion</button>
+    } @else {
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" autocomplete="off">
+        <div class="request-grid">
+          <div class="mb-3">
+            <label for="requestFirstName" class="form-label">Prénom</label>
+            <input id="requestFirstName" class="form-control" type="text" formControlName="firstName" autocomplete="given-name">
+          </div>
+          <div class="mb-3">
+            <label for="requestLastName" class="form-label">Nom</label>
+            <input id="requestLastName" class="form-control" type="text" formControlName="lastName" autocomplete="family-name">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="requestEmail" class="form-label">Adresse mail</label>
+          <input id="requestEmail" class="form-control" type="email" formControlName="email" autocomplete="email" autocapitalize="off" spellcheck="false">
+        </div>
+
+        <div class="mb-3">
+          <label for="requestPassword" class="form-label">Mot de passe</label>
+          <input id="requestPassword" class="form-control" type="password" formControlName="password" autocomplete="new-password" placeholder="6 caractères minimum">
+        </div>
+
+        <div class="mb-3">
+          <label for="requestPasswordConfirm" class="form-label">Confirmer le mot de passe</label>
+          <input id="requestPasswordConfirm" class="form-control" type="password" formControlName="passwordConfirm" autocomplete="new-password">
+        </div>
+
+        @if (errorMessage()) {
+          <div class="alert alert-danger py-2 mb-3" role="alert">{{ errorMessage() }}</div>
+        }
+
+        <button type="submit" class="btn btn-primary w-100 mb-2" [disabled]="loading()">
+          {{ loading() ? 'Envoi…' : 'Envoyer la demande' }}
+        </button>
+        <button type="button" class="btn btn-link w-100" [disabled]="loading()" (click)="backToLogin.emit()">
+          J'ai déjà un compte
+        </button>
+      </form>
+    }
+  </div>
+</div>

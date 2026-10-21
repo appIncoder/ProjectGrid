@@ -125,7 +125,7 @@ export class ProjectRessources {
   readonly availableHumanResources = computed<UserRef[]>(() => {
     const memberIds = new Set(this.members().map((member) => member.userId));
     return this.allUsers()
-      .filter((user) => !memberIds.has(user.id))
+      .filter((user) => user.hasLicense !== false && !memberIds.has(user.id))
       .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
   });
 

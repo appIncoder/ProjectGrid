@@ -10,11 +10,12 @@ import {
   SimpleChanges,
   TemplateRef,
   ViewChild,
+  inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
-import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
+import { ProjectTaskEditModal, type ChildItemDraft } from '../project-task-edit-modal/project-task-edit-modal';
 import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 import { AppButton } from '../design-system/button/button';
 
@@ -44,6 +45,7 @@ import {
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
+import { FinalStatusGuardService } from '../../services/final-status-guard.service';
 import { AuthService } from '../../services/auth.service';
 
 // Task schedule/constraints types imported from models/gantt.model.ts
@@ -450,12 +452,12 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
 
   // ===== Options UI
   itemStatusOptions: { value: ActivityStatus; label: string }[] = [
-    { value: 'todo',          label: 'To Do' },
-    { value: 'inprogress',    label: 'In Progress' },
-    { value: 'onhold',        label: 'On Hold' },
-    { value: 'done',          label: 'Done' },
-    { value: 'notdone',       label: 'Not Done' },
-    { value: 'notapplicable', label: 'N/A' },
+    { value: 'todo',          label: 'À faire' },
+    { value: 'inprogress',    label: 'En cours' },
+    { value: 'onhold',        label: 'En attente' },
+    { value: 'done',          label: 'Terminé' },
+    { value: 'notdone',       label: 'Non fait' },
+    { value: 'notapplicable', label: 'Non applicable' },
   ];
 
   itemCategoryOptions: { value: TaskCategory; label: string }[] = [
@@ -466,9 +468,9 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
   ];
 
   dependencyTypeOptions: { value: DependencyType; label: string }[] = [
-    { value: 'F2S', label: 'Finish to Start (F2S)' },
-    { value: 'F2F', label: 'Finish to Finish (F2F)' },
-    { value: 'S2S', label: 'Start to Start (S2S)' },
+    { value: 'F2S', label: 'Fin → Début (FD)' },
+    { value: 'F2F', label: 'Fin → Fin (FF)' },
+    { value: 'S2S', label: 'Début → Début (DD)' },
   ];
 
   private editingActivityId: ActivityId | null = null;
@@ -513,6 +515,8 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     private modalService: NgbModal,
     private authService: AuthService,
   ) {}
+
+  private readonly finalStatusGuard = inject(FinalStatusGuardService);
 
   get canEditRoadmap(): boolean {
     if (!this.project) return false;
@@ -652,7 +656,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       case '3m': return '3 mois';
       case '6m': return '6 mois';
       case '12m': return '1 an';
-      case 'custom': return 'Custom';
+      case 'custom': return 'Personnalisée';
       default: return '6 mois';
     }
   }
@@ -1360,9 +1364,9 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     const fromLabel = this.ganttTasksView.find(t => t.id === link.fromId)?.label ?? link.fromId;
     const toLabel = this.ganttTasksView.find(t => t.id === link.toId)?.label ?? link.toId;
     const typeLabel =
-      link.type === 'F2S' ? 'Finish → Start (F2S)' :
-      link.type === 'F2F' ? 'Finish → Finish (F2F)' :
-      'Start → Start (S2S)';
+      link.type === 'F2S' ? 'Fin → Début (FD)' :
+      link.type === 'F2F' ? 'Fin → Fin (FF)' :
+      'Début → Début (DD)';
 
     const text = `${typeLabel} : ${fromLabel} → ${toLabel}`;
 
@@ -1827,7 +1831,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       return;
     }
     if (!this.canEditRoadmap) {
-      this.milestoneEditError = "Vous n'avez pas le droit de modifier la roadmap.";
+      this.milestoneEditError = "Vous n'avez pas le droit de modifier la feuille de route.";
       return;
     }
 
@@ -1862,7 +1866,7 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
       return;
     }
     if (!this.canEditRoadmap) {
-      this.milestoneEditError = "Vous n'avez pas le droit de modifier la roadmap.";
+      this.milestoneEditError = "Vous n'avez pas le droit de modifier la feuille de route.";
       return;
     }
 
@@ -2172,18 +2176,18 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     const status = (base as any)?.status as ActivityStatus | undefined;
     switch (status) {
       case 'done':
-        return 'Done';
+        return 'Terminé';
       case 'inprogress':
-        return 'In progress';
+        return 'En cours';
       case 'onhold':
-        return 'On hold';
+        return 'En attente';
       case 'notdone':
-        return 'Not done';
+        return 'Non fait';
       case 'notapplicable':
-        return 'N/A';
+        return 'Non applicable';
       case 'todo':
       default:
-        return 'Todo';
+        return 'À faire';
     }
   }
 
@@ -2959,6 +2963,27 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     return all.filter(t => t.id !== curId);
   }
 
+  get canAddChildItem(): boolean {
+    return this.authService.canAddProjectActivity(this.project);
+  }
+
+  addChildItem(draft: ChildItemDraft): void {
+    if (!this.project || !this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return;
+    if (!this.canAddChildItem) {
+      this.editError = "Vous n'avez pas le droit d'ajouter un item.";
+      return;
+    }
+    const created = this.projectService.createChildItem({
+      projectId: this.project.id,
+      activityId: this.editingActivityId,
+      phase: this.editingPhase,
+      parentId: this.taskBeingEdited.id,
+      label: draft.label,
+      itemType: draft.itemType,
+    });
+    if (!created) this.editError = "Impossible de créer l'item.";
+  }
+
   getChildItems(): Task[] {
     if (!this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return [];
     const matrix = (this.project as any)?.projectTasksMatrix;
@@ -2979,13 +3004,13 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     this.showMoreInfos = !this.showMoreInfos;
   }
 
-  saveTaskEdit(modal: any): void {
+  async saveTaskEdit(modal: any): Promise<void> {
     if (!this.project) {
       modal.dismiss();
       return;
     }
     if (!this.canEditRoadmap) {
-      this.editError = "Vous n'avez pas le droit de modifier la roadmap.";
+      this.editError = "Vous n'avez pas le droit de modifier la feuille de route.";
       return;
     }
 
@@ -3088,6 +3113,17 @@ export class ProjectRoadmap implements OnInit, OnChanges, AfterViewInit, DoCheck
     } else {
       if (!this.taskBeingEdited || !this.editingActivityId || !this.editingPhase) {
         modal.dismiss();
+        return;
+      }
+
+      const statusChanged = this.editedItemStatus !== this.taskBeingEdited.status;
+      if (statusChanged && !(await this.finalStatusGuard.confirmStatusChange({
+        project: this.project,
+        activityId: this.editingActivityId,
+        phase: this.editingPhase,
+        activity: this.taskBeingEdited,
+        nextStatus: this.editedItemStatus,
+      }))) {
         return;
       }
 

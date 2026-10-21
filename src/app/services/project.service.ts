@@ -8,7 +8,9 @@ import type {
   Item,
   ItemCategory,
   ActivityStatus,
+  ItemType,
 } from '../models';
+import { isFinalActivityStatus } from '../models';
 
 // Backward-compat aliases
 type Task = Item;
@@ -56,6 +58,15 @@ export interface CreateItemPayload {
   reporterId?: string;
   accountantId?: string;
   responsibleId?: string;
+}
+
+export interface CreateChildItemPayload {
+  projectId: string;
+  activityId: ActivityId;
+  phase: PhaseId;
+  parentId: string;
+  label: string;
+  itemType: ItemType;
 }
 
 /** @deprecated Use CreateItemPayload instead */
@@ -302,6 +313,71 @@ export class ProjectService {
   /** @deprecated Use createItem instead */
   createTask(payload: CreateItemPayload): Item | null {
     return this.createItem(payload);
+  }
+
+  /**
+   * Crée un item fils sous une activité (même stockage que les écrans de gestion détaillée :
+   * projectTasksMatrix[activityId][phase][parentId]).
+   */
+  createChildItem(payload: CreateChildItemPayload): Item | null {
+    const project = this.getProject(payload.projectId);
+    if (!project) return null;
+
+    const p: any = project;
+    if (!p.projectTasksMatrix || typeof p.projectTasksMatrix !== 'object') p.projectTasksMatrix = {};
+    const byActivity = (p.projectTasksMatrix[payload.activityId] ??= {});
+    const byPhase = (byActivity[payload.phase] ??= {});
+
+    if (!Array.isArray(byPhase[payload.parentId])) {
+      // Comme les écrans détaillés : sans items fils, l'activité mère sert de premier item.
+      const parent = project.taskMatrix?.[payload.activityId]?.[payload.phase]?.find((t) => t.id === payload.parentId);
+      byPhase[payload.parentId] = parent ? [{ ...parent, parentActivityId: payload.parentId, comments: [] }] : [];
+    }
+
+    const base = payload.label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24) || 'task';
+    const item: Item = {
+      id: `${payload.activityId}-${payload.phase}-${payload.parentId}-${base}-${Date.now().toString(36)}`,
+      label: payload.label,
+      status: 'todo',
+      itemType: payload.itemType,
+      parentActivityId: payload.parentId,
+      comments: [],
+    };
+    this.stampItem(item);
+
+    byPhase[payload.parentId].push(item);
+    this.markProjectMutated(payload.projectId, 'item_updated');
+    return item;
+  }
+
+  /** Items fils d'une activité (projectTasksMatrix[activityId][phase][parentId]). */
+  getChildItems(projectId: string, activityId: ActivityId, phase: PhaseId, parentId: string): Item[] {
+    const project: any = this.getProject(projectId);
+    const list = project?.projectTasksMatrix?.[activityId]?.[phase]?.[parentId];
+    return Array.isArray(list) ? (list as Item[]) : [];
+  }
+
+  /** Passe au statut final donné tous les items fils qui ne sont pas encore dans un statut final. */
+  cascadeStatusToChildItems(
+    projectId: string,
+    activityId: ActivityId,
+    phase: PhaseId,
+    parentId: string,
+    status: ActivityStatus,
+  ): number {
+    let count = 0;
+    for (const child of this.getChildItems(projectId, activityId, phase, parentId)) {
+      if (isFinalActivityStatus(child.status)) continue;
+      child.status = status;
+      this.stampItem(child);
+      count++;
+    }
+    if (count) this.markProjectMutated(projectId, 'item_updated');
+    return count;
   }
 
   updateItem(payload: UpdateItemPayload): void {

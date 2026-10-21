@@ -1,3 +1,6 @@
+@if (requestMode()) {
+  <app-account-request-box (backToLogin)="requestMode.set(false)" />
+} @else {
 <div class="card shadow-sm">
   <div class="card-body">
     <h5 class="card-title mb-3">Connexion</h5>
@@ -59,6 +62,10 @@
       <button type="submit" class="btn btn-primary w-100" [disabled]="loading">
         {{ loading ? 'Connexion...' : 'Se connecter' }}
       </button>
+      <button type="button" class="btn btn-link w-100 mt-2" [disabled]="loading" (click)="requestMode.set(true)">
+        Pas encore de compte ? Demander un accès
+      </button>
     </form>
   </div>
 </div>
+}

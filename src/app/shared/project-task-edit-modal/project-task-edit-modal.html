@@ -58,7 +58,7 @@
     </div>
   </div>
 
-  <button type="button" class="btn-close ms-2" aria-label="Close" (click)="cancel.emit()"></button>
+  <button type="button" class="btn-close ms-2" aria-label="Fermer" (click)="cancel.emit()"></button>
 </div>
 
 <div class="modal-body">
@@ -144,7 +144,45 @@
 
   @if (!isCreateMode) {
     <section class="visual-panel child-tasks-panel mb-3">
-      <div class="visual-label">Items fils</div>
+      <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+        <div class="visual-label mb-0">Items fils</div>
+        @if (canAddChildItem && !childFormOpen) {
+          <button type="button" class="btn btn-sm btn-add" (click)="openChildForm()">
+            + Ajouter
+          </button>
+        }
+      </div>
+      @if (childFormOpen) {
+        <div class="child-item-form mb-2">
+          @if (childFormError) {
+            <div class="text-danger small mb-1">{{ childFormError }}</div>
+          }
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+              <label class="form-label form-label-sm mb-1" for="newChildLabel">Nom de l'item</label>
+              <input
+                id="newChildLabel"
+                class="form-control form-control-sm"
+                [(ngModel)]="newChildLabel"
+                (keydown.enter)="submitChildForm()"
+                (keydown.escape)="closeChildForm(); $event.stopPropagation()"
+              />
+            </div>
+            <div class="col-12 col-md-3">
+              <label class="form-label form-label-sm mb-1" for="newChildItemType">Type d'item</label>
+              <select id="newChildItemType" class="form-select form-select-sm" [(ngModel)]="newChildItemType">
+                @for (opt of itemTypeOptions; track opt.value) {
+                  <option [ngValue]="opt.value">{{ opt.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-12 col-md-3 d-flex gap-1">
+              <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" (click)="closeChildForm()">Annuler</button>
+              <button type="button" class="btn btn-sm btn-add flex-fill" (click)="submitChildForm()">Créer</button>
+            </div>
+          </div>
+        </div>
+      }
       @if (childItems.length === 0) {
         <div class="empty-state small">Aucun item fils.</div>
       }

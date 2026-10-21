@@ -1,0 +1,46 @@
+@if (request(); as req) {
+  <div class="fsc-backdrop" (click)="cancel()" aria-hidden="true"></div>
+
+  <div class="fsc-dialog" role="alertdialog" aria-modal="true" aria-labelledby="fscTitle" aria-describedby="fscMessage">
+    <div class="fsc-panel">
+      <div class="fsc-header">
+        <h3 id="fscTitle">Des items ne sont pas clôturés</h3>
+        <button type="button" class="btn-close" aria-label="Fermer" (click)="cancel()"></button>
+      </div>
+
+      <div class="fsc-body">
+        <p id="fscMessage" class="fsc-message">
+          Vous passez l'activité <strong>« {{ req.activityLabel }} »</strong> au statut
+          <span class="fsc-status fsc-status--{{ statusTone(req.nextStatus) }}">{{ req.nextStatusLabel }}</span>,
+          mais {{ itemCountLabel() }} associé{{ req.openItems.length > 1 ? 's ne sont' : ' n\'est' }} pas dans un statut final.
+        </p>
+
+        <div class="fsc-summary">
+          @for (s of req.summary; track s.status) {
+            <span class="fsc-status fsc-status--{{ statusTone(s.status) }}">{{ s.count }} {{ s.label }}</span>
+          }
+        </div>
+
+        <ul class="fsc-list">
+          @for (item of req.openItems; track item.id) {
+            <li class="fsc-item">
+              <span class="fsc-item__dot fsc-item__dot--{{ statusTone(item.status) }}" aria-hidden="true"></span>
+              <span class="fsc-item__label" [attr.title]="item.label">{{ item.label }}</span>
+              @if (item.typeLabel) {
+                <span class="fsc-item__type">{{ item.typeLabel }}</span>
+              }
+              <span class="fsc-status fsc-status--{{ statusTone(item.status) }}">{{ item.statusLabel }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+
+      <div class="fsc-footer">
+        <button type="button" class="fsc-btn" (click)="cancel()">Annuler</button>
+        <button type="button" class="fsc-btn fsc-btn--primary" (click)="cascade()">
+          Passer {{ req.openItems.length > 1 ? 'les ' + req.openItems.length + ' items' : 'l\'item' }} à « {{ req.nextStatusLabel }} »
+        </button>
+      </div>
+    </div>
+  </div>
+}

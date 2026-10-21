@@ -1,8 +1,8 @@
-import { Component, ElementRef, HostListener, Input, OnChanges, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, inject, HostListener, Input, OnChanges, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
-import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
+import { ProjectTaskEditModal, type ChildItemDraft } from '../project-task-edit-modal/project-task-edit-modal';
 import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 import { AppButton } from '../design-system/button/button';
 
@@ -22,6 +22,7 @@ import {
 } from '../../models';
 
 import { ProjectService } from '../../services/project.service';
+import { FinalStatusGuardService } from '../../services/final-status-guard.service';
 import { AuthService } from '../../services/auth.service';
 
 // Dependency types are imported from models/gantt.model
@@ -63,12 +64,12 @@ export class ProjectScorecard implements OnChanges {
   } | null = null;
 
   itemStatusOptions: { value: ActivityStatus; label: string }[] = [
-    { value: 'todo',          label: 'To Do' },
-    { value: 'inprogress',    label: 'In Progress' },
-    { value: 'onhold',        label: 'On Hold' },
-    { value: 'done',          label: 'Done' },
-    { value: 'notdone',       label: 'Not Done' },
-    { value: 'notapplicable', label: 'N/A' },
+    { value: 'todo',          label: 'À faire' },
+    { value: 'inprogress',    label: 'En cours' },
+    { value: 'onhold',        label: 'En attente' },
+    { value: 'done',          label: 'Terminé' },
+    { value: 'notdone',       label: 'Non fait' },
+    { value: 'notapplicable', label: 'Non applicable' },
   ];
 
   itemCategoryOptions: { value: TaskCategory; label: string }[] = [
@@ -107,9 +108,9 @@ export class ProjectScorecard implements OnChanges {
 
   // ✅ Options de type
   dependencyTypeOptions: { value: DependencyType; label: string }[] = [
-    { value: 'F2S', label: 'Finish to Start (F2S)' },
-    { value: 'F2F', label: 'Finish to Finish (F2F)' },
-    { value: 'S2S', label: 'Start to Start (S2S)' },
+    { value: 'F2S', label: 'Fin → Début (FD)' },
+    { value: 'F2F', label: 'Fin → Fin (FF)' },
+    { value: 'S2S', label: 'Début → Début (DD)' },
   ];
 
   editError: string | null = null;
@@ -127,6 +128,8 @@ export class ProjectScorecard implements OnChanges {
     private projectService: ProjectService,
     private authService: AuthService
   ) {}
+
+  private readonly finalStatusGuard = inject(FinalStatusGuardService);
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['project'] && this.project) {
@@ -209,18 +212,18 @@ export class ProjectScorecard implements OnChanges {
   getTaskStatusText(status: ActivityStatus): string {
     switch (status) {
       case 'done':
-        return 'Done';
+        return 'Terminé';
       case 'inprogress':
-        return 'In progress';
+        return 'En cours';
       case 'onhold':
-        return 'On hold';
+        return 'En attente';
       case 'notdone':
-        return 'Not done';
+        return 'Non fait';
       case 'notapplicable':
-        return 'N/A';
+        return 'Non applicable';
       case 'todo':
       default:
-        return 'Todo';
+        return 'À faire';
     }
   }
 
@@ -304,12 +307,22 @@ export class ProjectScorecard implements OnChanges {
     };
   }
 
-  applyQuickStatus(status: ActivityStatus): void {
+  async applyQuickStatus(status: ActivityStatus): Promise<void> {
     if (!this.project || !this.contextMenu) return;
     const ctx = this.contextMenu;
     const task = this.findTask(ctx.activityId, ctx.phase, ctx.taskId);
     if (!this.canManageActivity(ctx.activityId) && !this.canMoveAssignedTask(task)) {
       this.closeContextMenu();
+      return;
+    }
+    this.closeContextMenu();
+    if (task && !(await this.finalStatusGuard.confirmStatusChange({
+      project: this.project,
+      activityId: ctx.activityId,
+      phase: ctx.phase,
+      activity: task,
+      nextStatus: status,
+    }))) {
       return;
     }
     this.projectService.updateTask({
@@ -488,6 +501,23 @@ export class ProjectScorecard implements OnChanges {
     return all.filter(t => t.id !== curId);
   }
 
+  addChildItem(draft: ChildItemDraft): void {
+    if (!this.project || !this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return;
+    if (!this.canAddActivity) {
+      this.editError = "Vous n'avez pas le droit d'ajouter un item.";
+      return;
+    }
+    const created = this.projectService.createChildItem({
+      projectId: this.project.id,
+      activityId: this.editingActivityId,
+      phase: this.editingPhase,
+      parentId: this.taskBeingEdited.id,
+      label: draft.label,
+      itemType: draft.itemType,
+    });
+    if (!created) this.editError = "Impossible de créer l'item.";
+  }
+
   getChildItems(): Task[] {
     if (!this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return [];
     const matrix = (this.project as any)?.projectTasksMatrix;
@@ -585,7 +615,7 @@ export class ProjectScorecard implements OnChanges {
     }
   }
 
-  saveTaskEdit(modal: any): void {
+  async saveTaskEdit(modal: any): Promise<void> {
     if (!this.project) {
       modal.dismiss();
       return;
@@ -711,6 +741,15 @@ export class ProjectScorecard implements OnChanges {
       }
       if (locationChanged && !this.canMoveTask(this.editingActivityId, targetActivityId, this.taskBeingEdited)) {
         this.editError = "Vous n'avez pas le droit de déplacer cette activité vers ce type d'activité.";
+        return;
+      }
+      if (statusChanged && !(await this.finalStatusGuard.confirmStatusChange({
+        project: this.project,
+        activityId: this.editingActivityId,
+        phase: this.editingPhase,
+        activity: this.taskBeingEdited,
+        nextStatus: this.editedItemStatus,
+      }))) {
         return;
       }
 

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, OnDestroy, Output, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, ElementRef, EventEmitter, HostListener, Input, OnChanges, OnDestroy, Output, SimpleChanges, TemplateRef, ViewChild } from '@angular/core';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { NgbModal, NgbModalModule } from '@ng-bootstrap/ng-bootstrap';
 
@@ -17,11 +17,13 @@ import type {
   TaskCategory,
   UserRef,
 } from '../../models';
+import { localizeStatusLabel } from '../../models';
 import { AuthService } from '../../services/auth.service';
 import { ProjectDataService } from '../../services/project-data.service';
 import { ProjectService } from '../../services/project.service';
+import { FinalStatusGuardService } from '../../services/final-status-guard.service';
 import { TaskAssignmentPopover } from '../task-assignment-popover/task-assignment-popover';
-import { ProjectTaskEditModal } from '../project-task-edit-modal/project-task-edit-modal';
+import { ProjectTaskEditModal, type ChildItemDraft } from '../project-task-edit-modal/project-task-edit-modal';
 import { TaskHoverTooltip } from '../task-hover-tooltip/task-hover-tooltip';
 import { AppButton } from '../design-system/button/button';
 
@@ -82,12 +84,12 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   } | null = null;
 
   itemStatusOptions: { value: ActivityStatus; label: string }[] = [
-    { value: 'todo',          label: 'To Do' },
-    { value: 'inprogress',    label: 'In Progress' },
-    { value: 'onhold',        label: 'On Hold' },
-    { value: 'done',          label: 'Done' },
-    { value: 'notdone',       label: 'Not Done' },
-    { value: 'notapplicable', label: 'N/A' },
+    { value: 'todo',          label: 'À faire' },
+    { value: 'inprogress',    label: 'En cours' },
+    { value: 'onhold',        label: 'En attente' },
+    { value: 'done',          label: 'Terminé' },
+    { value: 'notdone',       label: 'Non fait' },
+    { value: 'notapplicable', label: 'Non applicable' },
   ];
 
   itemCategoryOptions: { value: TaskCategory; label: string }[] = [
@@ -98,9 +100,9 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   ];
 
   dependencyTypeOptions: { value: DependencyType; label: string }[] = [
-    { value: 'F2S', label: 'Finish to Start (F2S)' },
-    { value: 'F2F', label: 'Finish to Finish (F2F)' },
-    { value: 'S2S', label: 'Start to Start (S2S)' },
+    { value: 'F2S', label: 'Fin → Début (FD)' },
+    { value: 'F2F', label: 'Fin → Fin (FF)' },
+    { value: 'S2S', label: 'Début → Début (DD)' },
   ];
 
   private editingActivityId: ActivityId | null = null;
@@ -256,6 +258,8 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     private cdr: ChangeDetectorRef,
   ) {}
 
+  private readonly finalStatusGuard = inject(FinalStatusGuardService);
+
   ngOnDestroy(): void {
     this.clearWorkflowSaveTimer();
     this.releaseFullscreenViewport();
@@ -375,18 +379,18 @@ export class ProjectBoard implements OnChanges, OnDestroy {
   private resolveWorkflowStatuses(): Array<{ id: KanbanStatus; label: string }> {
     const workflow = (this.project?.workflow as ProjectWorkflow | undefined) ?? null;
     const statuses = workflow?.statuses?.length ? workflow.statuses : [
-      { id: 'todo', label: 'To Do', sequence: 1 },
-      { id: 'inprogress', label: 'In Progress', sequence: 2 },
-      { id: 'onhold', label: 'On Hold', sequence: 3 },
-      { id: 'done', label: 'Done', sequence: 4 },
-      { id: 'notdone', label: 'Not Done', sequence: 5 },
-      { id: 'notapplicable', label: 'N/A', sequence: 6 },
+      { id: 'todo', label: 'À faire', sequence: 1 },
+      { id: 'inprogress', label: 'En cours', sequence: 2 },
+      { id: 'onhold', label: 'En attente', sequence: 3 },
+      { id: 'done', label: 'Terminé', sequence: 4 },
+      { id: 'notdone', label: 'Non fait', sequence: 5 },
+      { id: 'notapplicable', label: 'Non applicable', sequence: 6 },
     ];
 
     const ordered = statuses
       .slice()
       .sort((a, b) => a.sequence - b.sequence)
-      .map((status) => ({ id: status.id, label: status.label }));
+      .map((status) => ({ id: status.id, label: localizeStatusLabel(status.label) }));
     this.syncItemStatusOptions(ordered);
     return ordered;
   }
@@ -496,7 +500,7 @@ export class ProjectBoard implements OnChanges, OnDestroy {
           cards.push({
             id: `${laneKey}:${phaseKey}:${t.id}`,
             title: t.label,
-            description: `Phase: ${phaseKey}`,
+            description: `Phase : ${phaseKey}`,
             assignees: [],
             status: this.mapLegacyStatusToKanban(t.status),
             laneId: laneKey, // si tes lanes = keys, sinon adapte
@@ -723,7 +727,7 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     this.hideAssignmentPopover();
   }
 
-  onDrop(laneId: string, status: KanbanStatus, ev: CdkDragDrop<KanbanCard[]>): void {
+  async onDrop(laneId: string, status: KanbanStatus, ev: CdkDragDrop<KanbanCard[]>): Promise<void> {
     this.hideTaskHoverCard();
     const target = this.laneBuckets[laneId][status];
     const fromLaneId = this.extractLaneIdFromDropId(ev.previousContainer.id);
@@ -734,6 +738,7 @@ export class ProjectBoard implements OnChanges, OnDestroy {
       moveItemInArray(target, ev.previousIndex, ev.currentIndex);
     } else {
       const fromStatus = this.extractStatusFromDropId(ev.previousContainer.id);
+      if (movedCard && fromStatus !== status && !(await this.confirmFinalStatus(movedCard, status))) return;
       const source = this.laneBuckets[fromLaneId]?.[fromStatus] ?? [];
 
       transferArrayItem(source, target, ev.previousIndex, ev.currentIndex);
@@ -748,6 +753,21 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     }
 
     this.emitAllCards();
+    this.cdr.markForCheck();
+  }
+
+  /** Passage en statut final : vérifie les items fils encore ouverts (popup Annuler / cascader). */
+  private confirmFinalStatus(card: KanbanCard, status: KanbanStatus): Promise<boolean> {
+    const parsed = this.parseFallbackCardId(card.id);
+    const task = this.getTaskFromCard(card);
+    if (!this.project || !parsed || !task) return Promise.resolve(true);
+    return this.finalStatusGuard.confirmStatusChange({
+      project: this.project,
+      activityId: parsed.activityId,
+      phase: parsed.phase,
+      activity: task,
+      nextStatus: this.mapKanbanToTaskStatus(status),
+    });
   }
 
   canMoveKanbanCard(card: KanbanCard): boolean {
@@ -817,7 +837,7 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     this.modalService.open(content, { size: 'lg', centered: true });
   }
 
-  saveTaskEdit(modal: any): void {
+  async saveTaskEdit(modal: any): Promise<void> {
     if (!this.project) {
       modal.dismiss();
       return;
@@ -933,6 +953,15 @@ export class ProjectBoard implements OnChanges, OnDestroy {
       }
       if (locationChanged && !this.canMoveCardBetweenLanes(this.editingActivityId, targetActivityId, null, this.taskBeingEdited)) {
         this.editError = "Vous n'avez pas le droit de déplacer cette activité vers ce type d'activité.";
+        return;
+      }
+      if (statusChanged && !(await this.finalStatusGuard.confirmStatusChange({
+        project: this.project,
+        activityId: this.editingActivityId,
+        phase: this.editingPhase,
+        activity: this.taskBeingEdited,
+        nextStatus: this.editedItemStatus,
+      }))) {
         return;
       }
 
@@ -1083,6 +1112,23 @@ export class ProjectBoard implements OnChanges, OnDestroy {
     const all = this.getAllTasksFlat();
     const curId = this.taskBeingEdited?.id;
     return all.filter((t) => t.id !== curId);
+  }
+
+  addChildItem(draft: ChildItemDraft): void {
+    if (!this.project || !this.taskBeingEdited?.id || !this.editingActivityId || !this.editingPhase) return;
+    if (!this.canAddActivity) {
+      this.editError = "Vous n'avez pas le droit d'ajouter un item.";
+      return;
+    }
+    const created = this.projectService.createChildItem({
+      projectId: this.project.id,
+      activityId: this.editingActivityId,
+      phase: this.editingPhase,
+      parentId: this.taskBeingEdited.id,
+      label: draft.label,
+      itemType: draft.itemType,
+    });
+    if (!created) this.editError = "Impossible de créer l'item.";
   }
 
   getChildItems(): Task[] {

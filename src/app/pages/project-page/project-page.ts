@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import type { ActivityId, Item, PhaseId, ProjectDetail, ProjectPhaseActivityReport, ProjectTab, UserRef } from '../../models';
+import { localizeStoredLabel } from '../../models';
 import { ProjectDataService, type ProjectHealthDefaultRef } from '../../services/project-data.service';
 import { ProjectService } from '../../services/project.service';
 
@@ -68,6 +69,8 @@ interface PhaseActivityReport {
   encapsulation: ViewEncapsulation.None,
 })
 export class ProjectPage implements OnInit, OnDestroy {
+  readonly localizeStoredLabel = localizeStoredLabel;
+
   project: ProjectDetail | null = null;
   users: UserRef[] = [];
   healthDefaults: ProjectHealthDefaultRef[] = [];
@@ -665,17 +668,17 @@ export class ProjectPage implements OnInit, OnDestroy {
   private getStatusLabel(status: unknown): string {
     switch (String(status ?? '').toLowerCase()) {
       case 'todo':
-        return 'To Do';
+        return 'À faire';
       case 'inprogress':
-        return 'In Progress';
+        return 'En cours';
       case 'onhold':
-        return 'On Hold';
+        return 'En attente';
       case 'done':
         return 'Terminé';
       case 'notdone':
         return 'Non fait';
       case 'notapplicable':
-        return 'N/A';
+        return 'Non applicable';
       default:
         return String(status ?? 'n/a') || 'n/a';
     }

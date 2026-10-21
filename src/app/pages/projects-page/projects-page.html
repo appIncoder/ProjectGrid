@@ -108,7 +108,7 @@
             class="project-card__health"
             [class.project-card__health--warning]="project.health === 'warning'"
             [class.project-card__health--critical]="project.health === 'critical'">
-            <span class="project-card__health-dot"></span>{{ project.healthName || getHealthLabel(project.health) }}
+            <span class="project-card__health-dot"></span>{{ project.healthName ? localizeStoredLabel(project.healthName) : getHealthLabel(project.health) }}
           </span>
         </div>
 

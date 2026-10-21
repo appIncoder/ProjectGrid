@@ -4,10 +4,11 @@ import { NgFor, NgIf } from '@angular/common';
 import { NgbTooltipModule } from '@ng-bootstrap/ng-bootstrap';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
-import type { ProjectRole } from './models';
+import { PROJECT_ROLE_LABELS, type ProjectRole } from './models';
 import { AuthService } from './services/auth.service';
 import { ProjectService } from './services/project.service';
 import { ThemeService } from './services/theme.service';
+import { FinalStatusCascadeDialog } from './shared/final-status-cascade-dialog/final-status-cascade-dialog';
 
 /** Clé de persistance du choix utilisateur (réduit / étendu) pour la sidebar. */
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'pg.sidebar.collapsed';
@@ -15,22 +16,14 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = 'pg.sidebar.collapsed';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgFor, NgbTooltipModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgIf, NgFor, NgbTooltipModule, FinalStatusCascadeDialog],
   templateUrl: './app.html',
   styleUrls: ['./app.scss']
 })
 export class App implements OnInit, OnDestroy {
   title = 'ProjectManagementApp';
-  readonly accessCheckRoleOptions: Array<{ value: ProjectRole; label: string }> = [
-    { value: 'projectManager', label: 'Project Manager' },
-    { value: 'businessManager', label: 'Business Manager' },
-    { value: 'changeManager', label: 'Change Manager' },
-    { value: 'technologyManager', label: 'Technology Manager' },
-    { value: 'projectMember', label: 'Project Member' },
-    { value: 'businessMember', label: 'Business Member' },
-    { value: 'changeMember', label: 'Change Member' },
-    { value: 'technologyMember', label: 'Technology Member' },
-  ];
+  readonly accessCheckRoleOptions: Array<{ value: ProjectRole; label: string }> =
+    (Object.keys(PROJECT_ROLE_LABELS) as ProjectRole[]).map((value) => ({ value, label: PROJECT_ROLE_LABELS[value] }));
 
   /** Écran de l'espace projet : suggère un repli automatique de la sidebar tant que l'utilisateur n'a rien choisi. */
   readonly isProjectWorkspaceRoute = signal(false);

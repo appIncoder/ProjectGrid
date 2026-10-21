@@ -21,6 +21,7 @@ import type {
   RiskLevel,
   Task,
 } from '../../models';
+import { localizeStoredLabel } from '../../models';
 
 type ProgressCell = {
   phaseId: PhaseId;
@@ -85,6 +86,8 @@ type DashboardPrefs = {
   styleUrls: ['./private-page.scss'],
 })
 export class PrivatePage implements OnInit, OnDestroy {
+  readonly localizeStoredLabel = localizeStoredLabel;
+
   private readonly defaultPhaseLongNames: Record<string, string> = {
     Phase1: 'Phase 1',
     Phase2: 'Phase 2',

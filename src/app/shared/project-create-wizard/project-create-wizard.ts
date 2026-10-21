@@ -27,9 +27,9 @@ interface WizardRiskRow {
 }
 
 const MANAGER_ROLE_OPTIONS: Array<{ value: ManagerRole; label: string }> = [
-  { value: 'businessManager', label: 'Manager du volet Métier' },
-  { value: 'changeManager', label: 'Manager du volet Changement' },
-  { value: 'technologyManager', label: 'Manager du volet Technologie' },
+  { value: 'businessManager', label: 'Responsable du volet Métier' },
+  { value: 'changeManager', label: 'Responsable du volet Changement' },
+  { value: 'technologyManager', label: 'Responsable du volet Technologie' },
 ];
 
 const RISK_PROBABILITY_LEVELS = ['Très faible', 'Faible', 'Moyenne', 'Élevée', 'Très élevée'];
@@ -115,7 +115,7 @@ export class ProjectCreateWizard implements OnChanges {
   get availableUsersForManager(): UserRef[] {
     const creatorId = String(this.authService.user?.id ?? '').trim();
     const usedIds = new Set(this.managers.map((m) => m.userId));
-    return this.allUsers.filter((u) => u.id !== creatorId && !usedIds.has(u.id));
+    return this.allUsers.filter((u) => u.hasLicense !== false && u.id !== creatorId && !usedIds.has(u.id));
   }
 
   get availableManagerRoleOptions(): Array<{ value: ManagerRole; label: string }> {

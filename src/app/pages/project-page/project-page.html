@@ -47,7 +47,7 @@
                   [disabled]="isUpdatingHealth || isSaving"
                 >
                   <option *ngFor="let h of healthDefaults" [ngValue]="h.shortName">
-                    {{ h.shortName }} - {{ h.longName }}
+                    {{ localizeStoredLabel(h.shortName) }} - {{ localizeStoredLabel(h.longName) }}
                   </option>
                 </select>
               </span>
@@ -61,7 +61,7 @@
         <ul class="nav nav-tabs project-tabs">
           <li class="nav-item">
             <button class="nav-link" [class.active]="activeTab === 'scorecard'" type="button" (click)="setTab('scorecard')">
-              Scorecard
+              Tableau de bord
             </button>
           </li>
           <li class="nav-item">
@@ -76,12 +76,12 @@
           </li>
           <li class="nav-item">
             <button class="nav-link" [class.active]="activeTab === 'roadmap'" type="button" (click)="setTab('roadmap')">
-              Roadmap
+              Feuille de route
             </button>
           </li>
           <li class="nav-item">
             <button class="nav-link" [class.active]="activeTab === 'board'" type="button" (click)="setTab('board')">
-              Board
+              Tableau Kanban
             </button>
           </li>
           <li class="nav-item">

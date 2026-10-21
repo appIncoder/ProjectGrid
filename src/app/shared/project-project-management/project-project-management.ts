@@ -4,7 +4,7 @@ import { Component, HostListener, Input, NgZone, OnChanges, OnDestroy } from '@a
 
 import { ProjectDataService } from '../../services/project-data.service';
 import { AuthService } from '../../services/auth.service';
-import { ITEM_TYPE_OPTIONS, type ActivityStatus, type ItemType, type PhaseId, type ProjectDetail, type ProjectWorkflow, type Task, type TaskComment, type UserRef } from '../../models';
+import { ITEM_TYPE_OPTIONS, localizeStatusLabel, type ActivityStatus, type ItemType, type PhaseId, type ProjectDetail, type ProjectWorkflow, type Task, type TaskComment, type UserRef } from '../../models';
 import { ProjectKanbanTaskModal } from '../project-kanban-task-modal/project-kanban-task-modal';
 import { ProjectAddTaskButton } from '../project-add-task-button/project-add-task-button';
 import { TaskAssignmentPopover } from '../task-assignment-popover/task-assignment-popover';
@@ -32,12 +32,12 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
   constructor(private projectData: ProjectDataService, private zone: NgZone, private authService: AuthService) {}
 
   private readonly defaultStatusColumns: Array<{ id: ActivityStatus; label: string }> = [
-    { id: 'todo',          label: 'To Do' },
-    { id: 'inprogress',    label: 'In Progress' },
-    { id: 'onhold',        label: 'On Hold' },
-    { id: 'done',          label: 'Done' },
-    { id: 'notdone',       label: 'Not Done' },
-    { id: 'notapplicable', label: 'N/A' },
+    { id: 'todo',          label: 'À faire' },
+    { id: 'inprogress',    label: 'En cours' },
+    { id: 'onhold',        label: 'En attente' },
+    { id: 'done',          label: 'Terminé' },
+    { id: 'notdone',       label: 'Non fait' },
+    { id: 'notapplicable', label: 'Non applicable' },
   ];
 
   get statusColumns(): Array<{ id: ActivityStatus; label: string }> {
@@ -45,7 +45,7 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
     if (wf?.statuses?.length) {
       return [...wf.statuses]
         .sort((a, b) => a.sequence - b.sequence)
-        .map((s) => ({ id: s.id, label: s.label }));
+        .map((s) => ({ id: s.id, label: localizeStatusLabel(s.label) }));
     }
     return this.defaultStatusColumns;
   }
@@ -557,14 +557,14 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
 
   getItemTypeLabel(task: Task): string {
     const type = (task.itemType ?? 'story') as ItemType;
-    return this.itemTypeOptions.find((o) => o.value === type)?.label ?? 'Story';
+    return this.itemTypeOptions.find((o) => o.value === type)?.label ?? 'Récit';
   }
 
   getItemTypeAbbrev(task: Task): string {
     const type = (task.itemType ?? 'story') as ItemType;
     if (type === 'epic') return 'É';
     if (type === 'subtask') return 'T';
-    return 'S';
+    return 'R';
   }
 
   getEditedTaskComments(): TaskComment[] {
@@ -623,7 +623,7 @@ export class ProjectProjectManagement implements OnChanges, OnDestroy {
       const taskId = String(this.editedTask?.id ?? '').trim();
       const previousParentId = this.findParentActivityIdForTask(phase, taskId);
       if (!previousParentId) {
-        throw new Error('Impossible de retrouver la tache a modifier.');
+        throw new Error('Impossible de retrouver la tâche à modifier.');
       }
       const ref = this.findTaskRef(phase, previousParentId, taskId);
       if (!ref) return;

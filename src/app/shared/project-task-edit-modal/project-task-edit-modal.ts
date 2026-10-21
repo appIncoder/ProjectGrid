@@ -2,15 +2,22 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { ITEM_TYPE_OPTIONS } from '../../models';
 import type {
   ActivityStatus,
   DependencyType,
   EditableDependencyRow,
   Item,
   ItemCategory,
+  ItemType,
   PhaseId,
   UserRef,
 } from '../../models';
+
+export interface ChildItemDraft {
+  label: string;
+  itemType: ItemType;
+}
 
 @Component({
   selector: 'app-project-task-edit-modal',
@@ -64,6 +71,15 @@ export class ProjectTaskEditModal {
   @Input() editedDependencies: EditableDependencyRow[] = [];
   @Input() linkableTasks: Item[] = [];
   @Input() childItems: Item[] = [];
+  @Input() canAddChildItem = false;
+
+  @Output() addChildItem = new EventEmitter<ChildItemDraft>();
+
+  readonly itemTypeOptions = ITEM_TYPE_OPTIONS;
+  childFormOpen = false;
+  newChildLabel = '';
+  newChildItemType: ItemType = 'story';
+  childFormError: string | null = null;
 
   @Output() addDependency = new EventEmitter<void>();
   @Output() removeDependency = new EventEmitter<number>();
@@ -80,6 +96,28 @@ export class ProjectTaskEditModal {
       return "Champs obligatoires : nom, phase, type d'activité, début, fin.";
     }
     return this.editedItemLabel || 'Activité sans titre';
+  }
+
+  openChildForm(): void {
+    this.childFormOpen = true;
+    this.newChildLabel = '';
+    this.newChildItemType = 'story';
+    this.childFormError = null;
+  }
+
+  closeChildForm(): void {
+    this.childFormOpen = false;
+    this.childFormError = null;
+  }
+
+  submitChildForm(): void {
+    const label = this.newChildLabel.trim();
+    if (!label) {
+      this.childFormError = "Le nom de l'item est obligatoire.";
+      return;
+    }
+    this.addChildItem.emit({ label, itemType: this.newChildItemType });
+    this.closeChildForm();
   }
 
   openAssignPopover(field: 'reporter' | 'accountant' | 'responsible'): void {
@@ -174,20 +212,20 @@ export class ProjectTaskEditModal {
 
   getStatusLabel(status: ActivityStatus): string {
     const labels: Record<ActivityStatus, string> = {
-      todo:          'To Do',
-      inprogress:    'In Progress',
-      onhold:        'On Hold',
-      done:          'Done',
-      notdone:       'Not Done',
-      notapplicable: 'N/A',
+      todo:          'À faire',
+      inprogress:    'En cours',
+      onhold:        'En attente',
+      done:          'Terminé',
+      notdone:       'Non fait',
+      notapplicable: 'Non applicable',
     };
     return labels[status] ?? status;
   }
 
   getDependencyTypeShort(type: DependencyType | undefined): string {
     if (type === 'F2F') return 'FF';
-    if (type === 'S2S') return 'SS';
-    return 'FS';
+    if (type === 'S2S') return 'DD';
+    return 'FD';
   }
 
   getItemLabel(itemId: string): string {

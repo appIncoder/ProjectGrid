@@ -40,8 +40,8 @@ export class AccountPage implements OnInit {
 
   readonly profileTypes: Array<{ value: ProfileType; label: string }> = [
     { value: 'standard', label: 'Standard' },
-    { value: 'manager', label: 'Manager' },
-    { value: 'admin', label: 'Admin' },
+    { value: 'manager', label: 'Gestionnaire' },
+    { value: 'admin', label: 'Administrateur' },
     { value: 'guest', label: 'Invité' },
   ];
 
@@ -161,7 +161,7 @@ export class AccountPage implements OnInit {
       .map(([name]) => {
         switch (name) {
           case 'username':
-            return 'Username';
+            return "Nom d'utilisateur";
           case 'firstName':
             return 'Prénom';
           case 'lastName':
@@ -238,12 +238,12 @@ export class AccountPage implements OnInit {
 
   private async saveAccountToFirestore(account: AccountModel): Promise<void> {
     if (!this.firebaseSdk.isConfigured()) {
-      throw new Error('Firebase not configured');
+      throw new Error('Firebase n\'est pas configuré.');
     }
 
     const userId = this.getCurrentUserId();
     if (!userId) {
-      throw new Error('No authenticated user');
+      throw new Error('Aucun utilisateur authentifié.');
     }
 
     const userRef = doc(this.firebaseSdk.firestore(), 'users', userId);
@@ -284,7 +284,7 @@ export class AccountPage implements OnInit {
   private fileToDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onerror = () => reject(new Error('FileReader error'));
+      reader.onerror = () => reject(new Error('Erreur de lecture du fichier.'));
       reader.onload = () => resolve(String(reader.result));
       reader.readAsDataURL(file);
     });

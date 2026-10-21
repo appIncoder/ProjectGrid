@@ -85,26 +85,26 @@
         <a class="pg-sidebar-link" *ngIf="isSuperUser"
            routerLink="/admin"
            routerLinkActive="pg-sidebar-link--active"
-           ngbTooltip="Admin"
+           ngbTooltip="Administration"
            placement="right"
            container="body"
            [disableTooltip]="!sidebarCollapsed()">
           <svg class="pg-sidebar-link-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3 4 6v6c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V6z"/></svg>
-          <span class="pg-sidebar-link-label">Admin</span>
-          <span class="pg-sidebar-link-tag">super</span>
+          <span class="pg-sidebar-link-label">Administration</span>
+          <span class="pg-sidebar-link-tag">super-utilisateur</span>
         </a>
       </ng-container>
     </nav>
 
     <div class="pg-sidebar-bottom">
       <div *ngIf="auth.isRealSysAdmin && auth.isAuthenticated" class="access-check-control">
-        <label class="access-check-label" for="accessCheckRole">Check access as</label>
+        <label class="access-check-label" for="accessCheckRole">Vérifier l'accès en tant que</label>
         <select
           id="accessCheckRole"
           class="access-check-select"
           [value]="auth.accessCheckMode?.role ?? ''"
           (change)="onAccessCheckRoleChange($event)">
-          <option value="">Sysadmin réel</option>
+          <option value="">Administrateur système réel</option>
           <option *ngFor="let role of accessCheckRoleOptions" [value]="role.value">
             {{ role.label }}
           </option>
@@ -139,7 +139,7 @@
     <footer class="bg-light border-top py-2">
       <div class="container d-flex justify-content-between align-items-center small">
         <div>
-          Status :
+          Statut :
           <span *ngIf="auth.isAuthenticated" class="text-success">Connecté</span>
           <span *ngIf="!auth.isAuthenticated" class="text-danger">Non connecté</span>
           <span *ngIf="auth.isAccessCheckActive" class="access-check-status">
@@ -153,3 +153,6 @@
     </footer>
   </div>
 </div>
+
+<!-- Contrôle du passage d'une activité en statut final (items fils non clôturés) -->
+<app-final-status-cascade-dialog />

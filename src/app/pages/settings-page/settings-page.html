@@ -143,7 +143,7 @@
         (click)="activeTab = 'access'"
       >
         <span class="settings-tab-icon">👥</span>
-        Droits d'accès
+        Mon équipe
       </button>
       <button
         type="button"
@@ -152,7 +152,7 @@
         (click)="activeTab = 'roles'"
       >
         <span class="settings-tab-icon">▦</span>
-        Roles
+        Rôles
       </button>
     </nav>
 
@@ -166,12 +166,12 @@
         <section class="settings-section card">
           <div class="section-header">
             <h3>Affichage &amp; interactions</h3>
-            <span class="section-badge firestore">DB</span>
+            <span class="section-badge firestore">BD</span>
           </div>
 
           <form [formGroup]="form" class="settings-fields">
             <div class="field-row">
-              <label class="field-label" for="periodPreset">Période par défaut (Roadmap)</label>
+              <label class="field-label" for="periodPreset">Période par défaut (feuille de route)</label>
               <select id="periodPreset" class="field-control" formControlName="periodPreset">
                 @for (p of periodPresets; track p.value) {
                   <option [value]="p.value">{{ p.label }}</option>
@@ -198,7 +198,7 @@
             </div>
 
             <div class="field-row">
-              <label class="field-label">Hover hints</label>
+              <label class="field-label">Infobulles au survol</label>
               <label class="toggle">
                 <input type="checkbox" formControlName="hoverHintsEnabled" />
                 <span class="toggle-track"></span>
@@ -227,18 +227,18 @@
         <!-- Workflow des statuts -->
         <section class="settings-section card">
           <div class="section-header">
-            <h3>Workflow des statuts</h3>
+            <h3>Flux de travail des statuts</h3>
             <span class="section-badge firestore">Firestore</span>
           </div>
 
           <p class="section-hint">
             Personnalisez les libellés des statuts utilisés dans les tableaux de bord du projet.
-            L'owner du projet, ou le super user, peut ajouter des statuts et les réordonner dans le workflow.
+            Le propriétaire du projet, ou le super-utilisateur, peut ajouter des statuts et les réordonner dans le flux de travail.
           </p>
 
           @if (!canManageWorkflow) {
             <div class="alert-danger small mb-2">
-              Seuls l'owner du projet et le super user peuvent modifier ce workflow.
+              Seuls le propriétaire du projet et le super-utilisateur peuvent modifier ce flux de travail.
             </div>
           }
 
@@ -334,7 +334,7 @@
           </div>
 
           <p class="section-hint">
-            Les droits sont définis par les rôles. Tout accès non listé est <strong>readonly</strong> par défaut.
+            Les droits sont définis par les rôles. Tout accès non listé est <strong>en lecture seule</strong> par défaut.
           </p>
 
           @if (isMembersLoading) {
@@ -500,7 +500,7 @@
     }
 
     <!-- ══════════════════════════════════════════════════════════
-         Onglet 3 : Roles
+         Onglet 3 : Rôles
          ══════════════════════════════════════════════════════════ -->
     @if (activeTab === 'roles') {
       <div class="settings-tab-panel settings-tab-panel--wide" style="padding-left: 1rem; padding-right: 1rem">
@@ -513,13 +513,13 @@
 
           <p class="section-hint">
             Cette matrice documente les règles d’accès appliquées dans l’application.
-            Les icônes indiquent YES, NO ou ONLY WHEN ASSIGNED.
+            Les icônes indiquent OUI, NON ou UNIQUEMENT SI ASSIGNÉ.
           </p>
 
           <div class="access-legend">
-            <span class="access-token access-token--yes" aria-hidden="true">✓</span><span>YES</span>
-            <span class="access-token access-token--no" aria-hidden="true">✕</span><span>NO</span>
-            <span class="access-token access-token--assigned" aria-hidden="true">●</span><span>ONLY WHEN ASSIGNED</span>
+            <span class="access-token access-token--yes" aria-hidden="true">✓</span><span>OUI</span>
+            <span class="access-token access-token--no" aria-hidden="true">✕</span><span>NON</span>
+            <span class="access-token access-token--assigned" aria-hidden="true">●</span><span>UNIQUEMENT SI ASSIGNÉ</span>
           </div>
 
           <div class="access-matrix-wrap">

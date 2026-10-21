@@ -2,12 +2,12 @@
   <header class="admin-page__header">
     <div>
       <p class="admin-page__eyebrow">Administration</p>
-      <h2>Admin page</h2>
+      <h2>Page d'administration</h2>
       <p class="admin-page__intro">
-        Cette page est reservée au super user et centralise les informations d'administration de l'application.
+        Cette page est réservée au super-utilisateur et centralise les informations d'administration de l'application.
       </p>
     </div>
-    <span class="admin-page__badge">Super user only</span>
+    <span class="admin-page__badge">Réservé au super-utilisateur</span>
   </header>
 
   <section class="admin-page__grid">
@@ -19,11 +19,11 @@
           <dd>{{ auth.user?.label || '—' }}</dd>
         </div>
         <div>
-          <dt>Email</dt>
+          <dt>Adresse mail</dt>
           <dd>{{ auth.user?.username || '—' }}</dd>
         </div>
         <div>
-          <dt>Compte super user attendu</dt>
+          <dt>Compte super-utilisateur attendu</dt>
           <dd>{{ superUserEmail }}</dd>
         </div>
       </dl>
@@ -37,22 +37,196 @@
           <dd>{{ projectService.currentProjectId || 'Aucun projet ouvert' }}</dd>
         </div>
         <div>
-          <dt>Backend canonique</dt>
+          <dt>Serveur de référence</dt>
           <dd>Firebase Firestore Cloud</dd>
         </div>
         <div>
-          <dt>Perimetre</dt>
+          <dt>Périmètre</dt>
           <dd>Administration de l'application</dd>
         </div>
       </dl>
     </article>
   </section>
 
+  <section class="admin-card admin-card--wide admin-requests">
+    <div class="admin-card__header">
+      <h3>
+        Demandes de compte à valider
+        @if (pendingUsers().length > 0) {
+          <span class="admin-count-badge">{{ pendingUsers().length }}</span>
+        }
+      </h3>
+      <button type="button" class="btn btn-ghost" (click)="loadUsers()" [disabled]="isLoadingUsers()">
+        Recharger
+      </button>
+    </div>
+
+    <p class="admin-muted admin-help">
+      Les visiteurs demandent un compte depuis l'écran de connexion (« Demander un accès »). Ils ne peuvent pas se connecter tant que leur demande n'est pas approuvée.
+    </p>
+
+    @if (isLoadingUsers()) {
+      <p class="admin-muted">Chargement des demandes…</p>
+    } @else if (pendingUsers().length === 0) {
+      <p class="admin-muted">Aucune demande en attente.</p>
+    } @else {
+      <ul class="admin-user-list">
+        @for (user of pendingUsers(); track user.id) {
+          <li class="admin-user-item">
+            <div class="admin-user-item__identity">
+              <span class="admin-type-item__title">{{ user.label }}</span>
+              <span class="admin-type-item__meta">
+                {{ user.email || user.id }}
+                @if (user.requestedAt) {
+                  · demandé le {{ user.requestedAt | date: 'dd/MM/yyyy HH:mm' }}
+                }
+              </span>
+            </div>
+            <div class="admin-actions">
+              <button type="button" class="btn btn-add" (click)="setLicense(user, 'active')" [disabled]="userBusyId() === user.id">Approuver</button>
+              <button type="button" class="btn btn-danger-ghost" (click)="setLicense(user, 'rejected')" [disabled]="userBusyId() === user.id">Refuser</button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="admin-page__crud">
+    <article class="admin-card">
+      <div class="admin-card__header">
+        <h3>Créer un utilisateur</h3>
+        <button type="button" class="btn btn-add" (click)="createUser()" [disabled]="userActionState() === 'saving'">
+          {{ userActionState() === 'saving' ? 'Création…' : 'Créer avec licence' }}
+        </button>
+      </div>
+
+      <p class="admin-muted admin-help">
+        L'utilisateur reçoit une licence active : il peut se connecter et les propriétaires de projet peuvent l'ajouter à leur équipe.
+      </p>
+
+      <div class="admin-form-grid">
+        <label class="admin-field">
+          <span>Prénom</span>
+          <input type="text" [(ngModel)]="userForm.firstName" autocomplete="off" />
+        </label>
+
+        <label class="admin-field">
+          <span>Nom</span>
+          <input type="text" [(ngModel)]="userForm.lastName" autocomplete="off" />
+        </label>
+
+        <label class="admin-field">
+          <span>Adresse mail</span>
+          <input type="email" [(ngModel)]="userForm.email" autocomplete="off" placeholder="prenom.nom@exemple.org" />
+        </label>
+
+        <label class="admin-field">
+          <span>Nom d'utilisateur (optionnel)</span>
+          <input type="text" [(ngModel)]="userForm.username" autocomplete="off" placeholder="ex : jdupont" />
+        </label>
+
+        <div class="admin-field admin-field--full">
+          <label for="newUserPassword"><span>Mot de passe initial</span></label>
+          <div class="admin-inline">
+            <input id="newUserPassword" type="text" [(ngModel)]="userForm.password" autocomplete="new-password" placeholder="6 caractères minimum" />
+            <button type="button" class="btn btn-ghost" (click)="generatePassword()">Générer</button>
+          </div>
+        </div>
+
+        <label class="admin-check admin-field--full">
+          <input type="checkbox" [(ngModel)]="userForm.sendPasswordResetEmail" />
+          Envoyer à l'utilisateur un e-mail pour définir son propre mot de passe
+        </label>
+      </div>
+    </article>
+
+    <article class="admin-card">
+      <div class="admin-card__header">
+        <h3>Utilisateurs et licences</h3>
+        <button type="button" class="btn btn-ghost" (click)="loadUsers()" [disabled]="isLoadingUsers()">
+          Recharger
+        </button>
+      </div>
+
+      @if (isLoadingUsers()) {
+        <p class="admin-muted">Chargement des utilisateurs…</p>
+      } @else if (usersError()) {
+        <p class="admin-error">{{ usersError() }}</p>
+      } @else if (users().length === 0) {
+        <p class="admin-muted">Aucun utilisateur.</p>
+      } @else {
+        <p class="admin-muted admin-help">{{ activeLicenseCount() }} licence(s) active(s) sur {{ users().length }} utilisateur(s).</p>
+        <div class="admin-search">
+          <input
+            type="search"
+            [(ngModel)]="userSearch"
+            placeholder="Rechercher par nom, adresse mail ou nom d'utilisateur…"
+            aria-label="Rechercher un utilisateur"
+            autocomplete="off"
+            list="adminUserSuggestions"
+          />
+          <datalist id="adminUserSuggestions">
+            @for (user of filteredUsers().slice(0, 10); track user.id) {
+              <option [value]="user.label">{{ user.email }}</option>
+            }
+          </datalist>
+          @if (userSearch()) {
+            <span class="admin-muted">{{ filteredUsers().length }} résultat(s)</span>
+          }
+        </div>
+        @if (filteredUsers().length === 0) {
+          <p class="admin-muted">Aucun utilisateur ne correspond à « {{ userSearch() }} ».</p>
+        }
+        <ul class="admin-user-list">
+          @for (user of filteredUsers(); track user.id) {
+            <li class="admin-user-item">
+              <div class="admin-user-item__identity">
+                <span class="admin-type-item__title">{{ user.label }}</span>
+                <span class="admin-type-item__meta">{{ user.email || user.id }}</span>
+              </div>
+              <span
+                class="admin-license-badge"
+                [class.admin-license-badge--revoked]="user.licenseStatus === 'revoked' || user.licenseStatus === 'rejected'"
+                [class.admin-license-badge--pending]="user.licenseStatus === 'pending'"
+                [attr.title]="user.licenseStatus === 'legacy' ? 'Compte antérieur à la gestion des licences, considéré comme actif' : null">
+                {{ licenseLabel(user) }}
+              </span>
+              @if (!isCurrentUser(user)) {
+                @switch (user.licenseStatus) {
+                  @case ('pending') {
+                    <div class="admin-actions">
+                      <button type="button" class="btn btn-ghost" (click)="setLicense(user, 'active')" [disabled]="userBusyId() === user.id">Approuver</button>
+                      <button type="button" class="btn btn-danger-ghost" (click)="setLicense(user, 'rejected')" [disabled]="userBusyId() === user.id">Refuser</button>
+                    </div>
+                  }
+                  @case ('rejected') {
+                    <button type="button" class="btn btn-ghost" (click)="setLicense(user, 'active')" [disabled]="userBusyId() === user.id">Approuver</button>
+                  }
+                  @case ('revoked') {
+                    <button type="button" class="btn btn-ghost" (click)="setLicense(user, 'active')" [disabled]="userBusyId() === user.id">Réactiver</button>
+                  }
+                  @default {
+                    <button type="button" class="btn btn-danger-ghost" (click)="setLicense(user, 'revoked')" [disabled]="userBusyId() === user.id">Révoquer</button>
+                  }
+                }
+              }
+            </li>
+          }
+        </ul>
+      }
+    </article>
+  </section>
+
+  @if (userActionMessage()) {
+    <p [class]="userActionState() === 'error' ? 'admin-error admin-feedback' : 'admin-success admin-feedback'" role="status">{{ userActionMessage() }}</p>
+  }
+
   <section class="admin-page__crud">
     <article class="admin-card">
       <div class="admin-card__header">
         <h3>Créer un projectType</h3>
-        <button type="button" class="btn btn-add" (click)="createProjectType()" [disabled]="projectTypeActionState === 'saving'">
+        <button type="button" class="btn btn-add" (click)="createProjectType()" [disabled]="projectTypeActionState() === 'saving'">
           Ajouter
         </button>
       </div>
@@ -77,30 +251,30 @@
 
     <article class="admin-card">
       <div class="admin-card__header">
-        <h3>ProjectTypes</h3>
-        <button type="button" class="btn btn-ghost" (click)="loadProjectTypes(selectedProjectTypeId)" [disabled]="isLoadingProjectTypes || projectTypeActionState === 'saving'">
+        <h3>Types de projet</h3>
+        <button type="button" class="btn btn-ghost" (click)="loadProjectTypes(selectedProjectTypeId())" [disabled]="isLoadingProjectTypes() || projectTypeActionState() === 'saving'">
           Recharger
         </button>
       </div>
 
-      @if (isLoadingProjectTypes) {
-        <p class="admin-muted">Chargement des projectTypes…</p>
-      } @else if (projectTypesError) {
-        <p class="admin-error">{{ projectTypesError }}</p>
-      } @else if (projectTypes.length === 0) {
-        <p class="admin-muted">Aucun projectType trouvé.</p>
+      @if (isLoadingProjectTypes()) {
+        <p class="admin-muted">Chargement des types de projet…</p>
+      } @else if (projectTypesError()) {
+        <p class="admin-error">{{ projectTypesError() }}</p>
+      } @else if (projectTypes().length === 0) {
+        <p class="admin-muted">Aucun type de projet trouvé.</p>
       } @else {
         <div class="admin-type-list">
-          @for (type of projectTypes; track type.id) {
+          @for (type of projectTypes(); track type.id) {
             <button
               type="button"
               class="admin-type-item"
-              [class.is-selected]="type.id === selectedProjectTypeId"
+              [class.is-selected]="type.id === selectedProjectTypeId()"
               (click)="selectProjectType(type.id)">
               <span class="admin-type-item__title">{{ type.name }}</span>
               <span class="admin-type-item__meta">{{ type.id }}</span>
               <span class="admin-type-item__stats">
-                {{ type.phasesCount }} phases · {{ type.activitiesCount }} activités · {{ type.defaultsCount }} defaults
+                {{ type.phasesCount }} phases · {{ type.activitiesCount }} activités · {{ type.defaultsCount }} activités par défaut
               </span>
             </button>
           }
@@ -113,18 +287,16 @@
     <div class="admin-card__header">
       <h3>Modifier le projectType sélectionné</h3>
       <div class="admin-actions">
-        <button type="button" class="btn btn-primary" (click)="saveProjectType()" [disabled]="!selectedProjectType || projectTypeActionState === 'saving'">
-          {{ projectTypeActionState === 'saving' ? 'Enregistrement…' : 'Enregistrer' }}
+        <button type="button" class="btn btn-primary" (click)="saveProjectType()" [disabled]="!selectedProjectType() || projectTypeActionState() === 'saving'">
+          {{ projectTypeActionState() === 'saving' ? 'Enregistrement…' : 'Enregistrer' }}
         </button>
-        <button type="button" class="btn btn-danger-ghost" (click)="deleteProjectType()" [disabled]="!selectedProjectType || projectTypeActionState === 'saving'">
+        <button type="button" class="btn btn-danger-ghost" (click)="deleteProjectType()" [disabled]="!selectedProjectType() || projectTypeActionState() === 'saving'">
           Supprimer
         </button>
       </div>
     </div>
 
-    @if (!selectedProjectType) {
-      <p class="admin-muted">Sélectionne un projectType pour afficher et modifier ses informations.</p>
-    } @else {
+    @if (selectedProjectType(); as selected) {
       <div class="admin-form-grid">
         <label class="admin-field">
           <span>ID document</span>
@@ -143,16 +315,18 @@
       </div>
 
       <div class="admin-type-summary">
-        <div class="admin-summary-chip">{{ selectedProjectType.phases.length }} phases</div>
-        <div class="admin-summary-chip">{{ selectedProjectType.activities.length }} activités</div>
-        <div class="admin-summary-chip">{{ selectedProjectType.activitiesDefault.length }} defaults</div>
-        <div class="admin-summary-chip">{{ selectedProjectType.workflow?.statuses?.length ?? 0 }} statuts workflow</div>
+        <div class="admin-summary-chip">{{ selected.phases.length }} phases</div>
+        <div class="admin-summary-chip">{{ selected.activities.length }} activités</div>
+        <div class="admin-summary-chip">{{ selected.activitiesDefault.length }} activités par défaut</div>
+        <div class="admin-summary-chip">{{ selected.workflow?.statuses?.length ?? 0 }} statuts du flux de travail</div>
       </div>
+    } @else {
+      <p class="admin-muted">Sélectionne un type de projet pour afficher et modifier ses informations.</p>
     }
 
-    @if (projectTypeActionError) {
-      <p class="admin-error">{{ projectTypeActionError }}</p>
-    } @else if (projectTypeActionState === 'saved') {
+    @if (projectTypeActionError()) {
+      <p class="admin-error">{{ projectTypeActionError() }}</p>
+    } @else if (projectTypeActionState() === 'saved') {
       <p class="admin-success">Opération réalisée avec succès.</p>
     }
   </section>

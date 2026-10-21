@@ -25,6 +25,72 @@ export type CoreActivityStatus =
 
 export type ActivityStatus = CoreActivityStatus | (string & {});
 
+export const ACTIVITY_STATUS_LABELS: Record<CoreActivityStatus, string> = {
+  todo:          'À faire',
+  inprogress:    'En cours',
+  onhold:        'En attente',
+  done:          'Terminé',
+  notdone:       'Non fait',
+  notapplicable: 'Non applicable',
+};
+
+/** Statuts finaux : une activité dans l'un de ces statuts est considérée comme clôturée. */
+export const FINAL_ACTIVITY_STATUSES: readonly CoreActivityStatus[] = ['done', 'notdone', 'notapplicable'];
+
+export function isFinalActivityStatus(status: ActivityStatus | null | undefined): boolean {
+  return FINAL_ACTIVITY_STATUSES.includes(status as CoreActivityStatus);
+}
+
+export const ACTIVITY_STATUS_OPTIONS: { value: ActivityStatus; label: string }[] =
+  (Object.keys(ACTIVITY_STATUS_LABELS) as CoreActivityStatus[]).map((value) => ({
+    value,
+    label: ACTIVITY_STATUS_LABELS[value],
+  }));
+
+/** Anciens libellés anglais par défaut (encore présents dans certains workflows stockés). */
+const LEGACY_STATUS_LABELS: Record<string, string> = {
+  'to do': ACTIVITY_STATUS_LABELS.todo,
+  'todo': ACTIVITY_STATUS_LABELS.todo,
+  'in progress': ACTIVITY_STATUS_LABELS.inprogress,
+  'on hold': ACTIVITY_STATUS_LABELS.onhold,
+  'done': ACTIVITY_STATUS_LABELS.done,
+  'not done': ACTIVITY_STATUS_LABELS.notdone,
+  'n/a': ACTIVITY_STATUS_LABELS.notapplicable,
+};
+
+/** Traduit un libellé de statut par défaut resté en anglais ; les libellés personnalisés sont conservés. */
+export function localizeStatusLabel(label: string): string {
+  return LEGACY_STATUS_LABELS[String(label ?? '').trim().toLowerCase()] ?? label;
+}
+
+/** Libellés anglais stockés en base (santé du projet, statuts de risque) → français. */
+const STORED_LABEL_TRANSLATIONS: Record<string, string> = {
+  'good': 'Bon',
+  'average': 'Moyen',
+  'bad': 'Mauvais',
+  'blocked': 'Bloqué',
+  'no known issues': 'Aucun problème connu',
+  'non blocking issues to manage': 'Problèmes non bloquants à gérer',
+  'severe issues requiring action': 'Problèmes sérieux nécessitant une action',
+  'blocking issues requiring immediate action': 'Problèmes bloquants nécessitant une action immédiate',
+  'open': 'Ouvert',
+  'in progress': 'En cours',
+  'on hold': 'En attente',
+  'resolved': 'Résolu',
+  'closed': 'Fermé',
+};
+
+/** Traduit pour l'affichage un libellé anglais connu provenant de la base ; les autres sont conservés. */
+export function localizeStoredLabel(label: string | null | undefined): string {
+  const raw = String(label ?? '');
+  return STORED_LABEL_TRANSLATIONS[raw.trim().toLowerCase()] ?? raw;
+}
+
+/** Libellé français d'un statut d'activité (statuts personnalisés : identifiant brut). */
+export function getActivityStatusLabel(status: ActivityStatus): string {
+  return ACTIVITY_STATUS_LABELS[status as CoreActivityStatus] ?? status;
+}
+
 
 
 
@@ -62,7 +128,7 @@ export type ItemType = 'epic' | 'story' | 'subtask';
 
 export const ITEM_TYPE_OPTIONS: { value: ItemType; label: string }[] = [
   { value: 'epic', label: 'Épopée' },
-  { value: 'story', label: 'Story' },
+  { value: 'story', label: 'Récit' },
   { value: 'subtask', label: 'Sous-tâche' },
 ];
 
@@ -287,6 +353,30 @@ export interface UserRef {
   id: string;
   label: string;
   email?: string;
+  /** Licence active : l'utilisateur peut se connecter et être ajouté à une équipe projet. */
+  hasLicense?: boolean;
+}
+
+/**
+ * Statut de licence stocké dans users/{uid}.license.status.
+ * Les comptes antérieurs à la gestion des licences n'ont pas ce champ : ils sont considérés comme actifs.
+ */
+export type UserLicenseStatus = 'active' | 'revoked' | 'pending' | 'rejected';
+
+/**
+ * 'pending' : demande de compte faite depuis l'écran de connexion, en attente de validation par le super-utilisateur.
+ * 'rejected' : demande refusée. Seuls 'active' et l'absence de statut (comptes historiques) autorisent l'accès.
+ */
+export function isLicenseActive(license: unknown): boolean {
+  const status = (license as { status?: unknown } | null | undefined)?.status;
+  return status === undefined || status === null || status === 'active';
+}
+
+export function toUserLicenseStatus(license: unknown): UserLicenseStatus | null {
+  const status = (license as { status?: unknown } | null | undefined)?.status;
+  return status === 'active' || status === 'revoked' || status === 'pending' || status === 'rejected'
+    ? status
+    : null;
 }
 
 // ── Rôles projet ────────────────────────────────────────────────────────────
@@ -299,6 +389,17 @@ export type ProjectRole =
   | 'businessMember'      // CRUD sur les items métier assignés
   | 'changeMember'        // CRUD sur les items changement assignés
   | 'technologyMember';   // CRUD sur les items technologie assignés
+
+export const PROJECT_ROLE_LABELS: Record<ProjectRole, string> = {
+  projectManager:    'Chef de projet',
+  businessManager:   'Responsable métier',
+  changeManager:     'Responsable du changement',
+  technologyManager: 'Responsable technologique',
+  projectMember:     'Membre projet',
+  businessMember:    'Membre métier',
+  changeMember:      'Membre changement',
+  technologyMember:  'Membre technologie',
+};
 
 export type DayOffType = 'holiday' | 'sick' | 'off';
 

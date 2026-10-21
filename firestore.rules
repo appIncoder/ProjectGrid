@@ -53,10 +53,23 @@ service cloud.firestore {
       );
     }
 
+    // Demande de compte (écran de connexion ou création par le sysadmin) :
+    // le nouvel utilisateur écrit son profil avec une licence 'pending' uniquement.
+    function isPendingAccountRequest(data) {
+      return data.license is map &&
+        data.license.keys().hasOnly(['status', 'requestedAt']) &&
+        data.license.status == 'pending' &&
+        (!('globalRoles' in data) || data.globalRoles.size() == 0);
+    }
+
     match /users/{userId} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.auth.uid == userId;
-      allow update: if signedIn() && (isSysAdmin() || request.auth.uid == userId);
+      allow create: if isSysAdmin() ||
+        (signedIn() && request.auth.uid == userId && isPendingAccountRequest(request.resource.data));
+      allow update: if isSysAdmin() || (
+        signedIn() && request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['license', 'globalRoles'])
+      );
       allow delete: if isSysAdmin();
     }
 

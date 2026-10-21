@@ -38,10 +38,10 @@
       </div>
 
       <label class="row" [class.invalid]="isControlInvalid('username')">
-        <span class="label">Username</span>
+        <span class="label">Nom d'utilisateur</span>
         <input class="control" type="text" formControlName="username" placeholder="ex: jdupont" [class.invalid]="isControlInvalid('username')" />
       </label>
-      <div class="error" *ngIf="isControlInvalid('username')">Username requis (min 3 caractères).</div>
+      <div class="error" *ngIf="isControlInvalid('username')">Nom d'utilisateur requis (3 caractères minimum).</div>
 
       <label class="row" [class.invalid]="isControlInvalid('firstName')">
         <span class="label">Prénom</span>
@@ -60,7 +60,7 @@
         <input class="control" type="email" formControlName="email" placeholder="ex: nom@domaine.com" [class.invalid]="isControlInvalid('email')" />
       </label>
       <div class="error" *ngIf="form.get('email')?.touched && form.get('email')?.invalid">
-        Email invalide.
+        Adresse mail invalide.
       </div>
 
       <label class="row">

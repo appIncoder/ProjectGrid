@@ -6,8 +6,8 @@ import { Subscription } from 'rxjs';
 
 import type { PeriodPreset } from '../../models/params.model';
 import type { DependencyType, ViewMode } from '../../models/gantt.model';
-import type { ActivityStatus, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow } from '../../models';
-import { DEFAULT_PROJECT_SETTINGS, type ProjectSettings } from '../../models';
+import type { ActivityStatus, ProjectDetail, ProjectMember, ProjectRole, ProjectWorkflow, UserRef } from '../../models';
+import { DEFAULT_PROJECT_SETTINGS, PROJECT_ROLE_LABELS, localizeStatusLabel, type ProjectSettings } from '../../models';
 import { AuthService } from '../../services/auth.service';
 import { ProjectDataService } from '../../services/project-data.service';
 import { DEFAULT_WORKFLOW } from '../../services/project-type-fallbacks';
@@ -15,14 +15,14 @@ import { ProjectService } from '../../services/project.service';
 import { THEME_ACCENT_OPTIONS, THEME_MODE_OPTIONS, THEME_SKIN_OPTIONS, ThemeService } from '../../services/theme.service';
 
 export const PROJECT_ROLE_OPTIONS: Array<{ value: ProjectRole; label: string; description: string }> = [
-  { value: 'projectManager',    label: 'Project Manager',    description: 'Accès admin complet au projet' },
-  { value: 'businessManager',   label: 'Business Manager',   description: 'CRUD sur les activités "Gestion du métier"' },
-  { value: 'changeManager',     label: 'Change Manager',     description: 'CRUD sur les activités "Gestion du changement"' },
-  { value: 'technologyManager', label: 'Technology Manager', description: 'CRUD sur les activités "Gestion de la technologie"' },
-  { value: 'projectMember',     label: 'Project Member',     description: 'CRUD sur les activités/tâches qui lui sont assignées' },
-  { value: 'businessMember',    label: 'Business Member',    description: 'CRUD sur les tâches métier assignées' },
-  { value: 'changeMember',      label: 'Change Member',      description: 'CRUD sur les tâches changement assignées' },
-  { value: 'technologyMember',  label: 'Technology Member',  description: 'CRUD sur les tâches technologie assignées' },
+  { value: 'projectManager',    label: PROJECT_ROLE_LABELS.projectManager,    description: 'Accès administrateur complet au projet' },
+  { value: 'businessManager',   label: PROJECT_ROLE_LABELS.businessManager,   description: 'Gestion complète des activités "Gestion du métier"' },
+  { value: 'changeManager',     label: PROJECT_ROLE_LABELS.changeManager,     description: 'Gestion complète des activités "Gestion du changement"' },
+  { value: 'technologyManager', label: PROJECT_ROLE_LABELS.technologyManager, description: 'Gestion complète des activités "Gestion de la technologie"' },
+  { value: 'projectMember',     label: PROJECT_ROLE_LABELS.projectMember,     description: 'Gestion complète des activités/tâches qui lui sont assignées' },
+  { value: 'businessMember',    label: PROJECT_ROLE_LABELS.businessMember,    description: 'Gestion complète des tâches métier assignées' },
+  { value: 'changeMember',      label: PROJECT_ROLE_LABELS.changeMember,      description: 'Gestion complète des tâches changement assignées' },
+  { value: 'technologyMember',  label: PROJECT_ROLE_LABELS.technologyMember,  description: 'Gestion complète des tâches technologie assignées' },
 ];
 
 const UNIQUE_MANAGER_ROLES = new Set<ProjectRole>([
@@ -79,7 +79,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     { value: 'custom', label: 'Personnalisée' },
   ];
   readonly viewModes: Array<{ value: ViewMode; label: string }> = [
-    { value: 'split',       label: 'Split' },
+    { value: 'split',       label: 'Partagé' },
     { value: 'focusLeft',   label: 'Agrandir table' },
     { value: 'focusRight',  label: 'Agrandir Gantt' },
   ];
@@ -99,22 +99,22 @@ export class SettingsPage implements OnInit, OnDestroy {
   // ── Membres & rôles (Firestore) ──────────────────────────────────────────
   readonly roleOptions = PROJECT_ROLE_OPTIONS;
   readonly accessRoleColumns: Array<{ value: AccessRoleColumn; label: string }> = [
-    { value: 'sysadmin', label: 'Sysadmin' },
-    { value: 'owner', label: 'Owner' },
-    { value: 'projectManager', label: 'Project Manager' },
-    { value: 'businessManager', label: 'Business Manager' },
-    { value: 'changeManager', label: 'Change Manager' },
-    { value: 'technologyManager', label: 'Technology Manager' },
-    { value: 'projectMember', label: 'Project Member' },
-    { value: 'businessMember', label: 'Business Member' },
-    { value: 'changeMember', label: 'Change Member' },
-    { value: 'technologyMember', label: 'Technology Member' },
+    { value: 'sysadmin', label: 'Administrateur système' },
+    { value: 'owner', label: 'Propriétaire' },
+    { value: 'projectManager', label: PROJECT_ROLE_LABELS.projectManager },
+    { value: 'businessManager', label: PROJECT_ROLE_LABELS.businessManager },
+    { value: 'changeManager', label: PROJECT_ROLE_LABELS.changeManager },
+    { value: 'technologyManager', label: PROJECT_ROLE_LABELS.technologyManager },
+    { value: 'projectMember', label: PROJECT_ROLE_LABELS.projectMember },
+    { value: 'businessMember', label: PROJECT_ROLE_LABELS.businessMember },
+    { value: 'changeMember', label: PROJECT_ROLE_LABELS.changeMember },
+    { value: 'technologyMember', label: PROJECT_ROLE_LABELS.technologyMember },
   ];
   readonly accessRuleRows: AccessRuleRow[] = [
     {
       section: 'Activités',
       label: 'Créer une activité',
-      note: 'Création via scorecard, board, roadmap et boards détaillés.',
+      note: 'Création via le tableau de bord, le tableau Kanban, la feuille de route et les tableaux détaillés.',
       values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
     },
     {
@@ -158,14 +158,14 @@ export class SettingsPage implements OnInit, OnDestroy {
       values: this.rule('yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes', 'yes'),
     },
     {
-      section: 'Roadmap',
-      label: 'Modifier la roadmap',
+      section: 'Feuille de route',
+      label: 'Modifier la feuille de route',
       note: 'Jalons, dépendances, recalcul, édition complète.',
       values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
     },
     {
-      section: 'Roadmap',
-      label: 'Déplacer une barre roadmap',
+      section: 'Feuille de route',
+      label: 'Déplacer une barre de la feuille de route',
       note: 'Les members peuvent replanifier uniquement leurs éléments assignés.',
       values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'assigned', 'assigned', 'assigned', 'assigned'),
     },
@@ -206,13 +206,13 @@ export class SettingsPage implements OnInit, OnDestroy {
     },
     {
       section: 'Administration',
-      label: 'Modifier le workflow',
+      label: 'Modifier le flux de travail',
       values: this.rule('yes', 'yes', 'yes', 'no', 'no', 'no', 'no', 'no', 'no', 'no'),
     },
   ];
 
   members: ProjectMember[] = [];
-  allUsers: Array<{ id: string; label: string }> = [];
+  allUsers: UserRef[] = [];
   isMembersLoading = false;
   membersError: string | null = null;
   membersSaveState: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
@@ -269,9 +269,9 @@ export class SettingsPage implements OnInit, OnDestroy {
   }
 
   getAccessValueLabel(value: AccessRuleValue): string {
-    if (value === 'yes') return 'YES';
-    if (value === 'assigned') return 'ONLY WHEN ASSIGNED';
-    return 'NO';
+    if (value === 'yes') return 'OUI';
+    if (value === 'assigned') return 'UNIQUEMENT SI ASSIGNÉ';
+    return 'NON';
   }
 
   ngOnInit(): void {
@@ -429,9 +429,10 @@ export class SettingsPage implements OnInit, OnDestroy {
     }
   }
 
-  get availableUsersForAdd(): Array<{ id: string; label: string }> {
+  /** Seuls les utilisateurs disposant d'une licence active peuvent rejoindre l'équipe. */
+  get availableUsersForAdd(): UserRef[] {
     return this.allUsers
-      .slice()
+      .filter((u) => u.hasLicense !== false)
       .sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
   }
 
@@ -600,7 +601,7 @@ export class SettingsPage implements OnInit, OnDestroy {
     this.workflowStatuses = statuses
       .slice()
       .sort((a, b) => a.sequence - b.sequence)
-      .map((s) => ({ id: s.id, label: s.label, sequence: s.sequence }));
+      .map((s) => ({ id: s.id, label: localizeStatusLabel(s.label), sequence: s.sequence }));
   }
 
   get canManageWorkflow(): boolean {
@@ -650,7 +651,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   async saveWorkflow(): Promise<void> {
     if (!this.project?.id) return;
     if (!this.canManageWorkflow) {
-      this.workflowError = "Seuls l'owner du projet et le super user peuvent modifier le workflow.";
+      this.workflowError = "Seuls le propriétaire du projet et le super-utilisateur peuvent modifier le flux de travail.";
       this.workflowSaveState = 'error';
       return;
     }
@@ -692,7 +693,7 @@ export class SettingsPage implements OnInit, OnDestroy {
   resetWorkflowToDefault(): void {
     this.workflowStatuses = DEFAULT_WORKFLOW.statuses
       .slice()
-      .map((s) => ({ id: s.id, label: s.label, sequence: s.sequence }));
+      .map((s) => ({ id: s.id, label: localizeStatusLabel(s.label), sequence: s.sequence }));
     this.newWorkflowStatusLabel = '';
     this.workflowError = null;
   }

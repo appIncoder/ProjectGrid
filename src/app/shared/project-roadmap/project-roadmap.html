@@ -12,7 +12,7 @@
     <div class="card-body roadmap-card-body">
   <div class="roadmap-toolbar">
     <div class="roadmap-toolbar-info">
-      <span class="roadmap-title">Roadmap – Diagramme de Gantt</span>
+      <span class="roadmap-title">Feuille de route – Diagramme de Gantt</span>
     </div>
 
     <div class="roadmap-toolbar-actions">
@@ -562,6 +562,8 @@
     [editedDependencies]="editedDependencies"
     [linkableTasks]="getLinkableTasks()"
     [childItems]="getChildItems()"
+    [canAddChildItem]="canAddChildItem"
+    (addChildItem)="addChildItem($event)"
     (addDependency)="addDependencyRow()"
     (removeDependency)="removeDependencyRow($event)"
     (cancel)="modal.dismiss()"
@@ -573,7 +575,7 @@
 <ng-template #milestoneEditModal let-modal>
   <div class="modal-header py-2">
     <h5 class="modal-title fs-6 mb-0">{{ milestoneModalTitle }}</h5>
-    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+    <button type="button" class="btn-close" aria-label="Fermer" (click)="modal.dismiss()"></button>
   </div>
 
   <div class="modal-body">
@@ -586,7 +588,7 @@
       class="form-control form-control-sm mb-3"
       [(ngModel)]="editedMilestoneLabel"
       maxlength="40"
-      placeholder="ex: Go live"
+      placeholder="ex : Mise en production"
     />
 
     <label class="form-label form-label-sm">Date</label>

@@ -26,7 +26,7 @@ export class FirebaseSdkService {
 
   app(): FirebaseApp {
     if (!this.isConfigured()) {
-      throw new Error('Firebase is not configured. Fill src/app/environments/environment.ts with the Firebase web config.');
+      throw new Error('Firebase n\'est pas configuré. Renseignez la configuration web Firebase dans src/app/environments/environment.ts.');
     }
 
     if (this.appInstance) return this.appInstance;
